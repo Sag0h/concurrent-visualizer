@@ -33,8 +33,8 @@ el paradigma que se esté estudiando.
 -   [x] Inicializar Git.
 -   [x] Crear primer commit.
 -   [x] Levantar la aplicación localmente.
--   [ ] Renombrar rama `master` a `main`.
--   [ ] Configurar `main` como rama predeterminada para futuros
+-   [x] Renombrar rama `master` a `main`.
+-   [x] Configurar `main` como rama predeterminada para futuros
     repositorios.
 -   [ ] Limpiar contenido demo de Vite.
 -   [ ] Definir estructura inicial de `src/`.
