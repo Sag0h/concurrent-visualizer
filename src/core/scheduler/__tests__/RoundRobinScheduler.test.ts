@@ -11,6 +11,7 @@ function createProcess(
     state,
     programCounter: 0,
     instructions: [],
+    localMemory: {},
   }
 }
 
@@ -59,5 +60,22 @@ describe('RoundRobinScheduler', () => {
     const scheduler = new RoundRobinScheduler()
 
     expect(scheduler.selectNext([])).toBeUndefined()
+  })
+
+  it('restarts from the beginning after reset', () => {
+    const processes = [
+      createProcess('P1'),
+      createProcess('P2'),
+      createProcess('P3'),
+    ]
+
+    const scheduler = new RoundRobinScheduler()
+
+    expect(scheduler.selectNext(processes)?.id).toBe('P1')
+    expect(scheduler.selectNext(processes)?.id).toBe('P2')
+
+    scheduler.reset()
+
+    expect(scheduler.selectNext(processes)?.id).toBe('P1')
   })
 })

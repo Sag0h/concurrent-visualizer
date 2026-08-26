@@ -11,6 +11,7 @@ function createProcess(
     state,
     programCounter: 0,
     instructions: [],
+    localMemory: {},
   }
 }
 
@@ -84,5 +85,29 @@ describe('RandomScheduler', () => {
     )
 
     expect(firstSequence).not.toEqual(secondSequence)
+  })
+
+  it('repeats the same sequence after reset', () => {
+    const processes = [
+      createProcess('P1'),
+      createProcess('P2'),
+      createProcess('P3'),
+    ]
+
+    const scheduler = new RandomScheduler(42)
+
+    const firstSequence = Array.from(
+      { length: 20 },
+      () => scheduler.selectNext(processes)?.id,
+    )
+
+    scheduler.reset()
+
+    const secondSequence = Array.from(
+      { length: 20 },
+      () => scheduler.selectNext(processes)?.id,
+    )
+
+    expect(secondSequence).toEqual(firstSequence)
   })
 })
