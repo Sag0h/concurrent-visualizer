@@ -74,22 +74,6 @@ El material histórico incluye temas como:
 Debe verificarse la semántica concreta contra material actual antes de
 implementar primitivas avanzadas.
 
-### Pendiente inmediato
-
-1.  Renombrar rama `master` a `main`.
-2.  Configurar `main` como rama predeterminada de Git.
-3.  Copiar esta documentación al repositorio.
-4.  Limpiar el contenido demo de Vite.
-5.  Crear estructura inicial de `src/`.
-6.  Commit de estructura/documentación.
-7.  Comenzar M1 definiendo `ProcessId` y los estados de proceso.
-
-### Comandos previstos
-
-``` bash
-git branch -m main
-git config --global init.defaultBranch main
-```
 
 ### Nota para retomar
 
@@ -102,3 +86,26 @@ Antes de continuar después de una pausa:
     vigente.
 5.  Ejecutar los tests existentes.
 6.  Continuar únicamente desde el próximo ticket pendiente.
+
+### M1 — Program y ExecutionState
+
+- Se creó `Program` como contenedor de procesos.
+- Se creó `ExecutionState` como estado global de la simulación.
+- Se agregó `createExecutionState()` para inicializar simulaciones con `stepCount = 0`.
+
+### M2 — Random Scheduler
+
+- Se implementó `RandomScheduler`.
+- Solo selecciona procesos en estado `READY`.
+- Se agregó `SeededRandom` para evitar depender de `Math.random()`.
+- Una misma seed genera la misma secuencia de scheduling.
+- Se agregaron tests de reproducibilidad y selección válida.
+- Se agregó `ExecutionEvent`.
+- `ExecutionState` mantiene el historial de instrucciones ejecutadas.
+- Cada evento registra número de step, proceso e instrucción.
+- El historial queda disponible para futuras visualizaciones, debugging y reproducción de ejecuciones.
+- `SimulationEngine` guarda un estado inicial clonable.
+- Se agregó `reset()`.
+- Se agregó un límite máximo configurable de steps.
+- Se agregó `hasReachedStepLimit()`.
+- El límite evita ejecuciones infinitas sin control.

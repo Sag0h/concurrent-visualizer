@@ -36,10 +36,10 @@ el paradigma que se esté estudiando.
 -   [x] Renombrar rama `master` a `main`.
 -   [x] Configurar `main` como rama predeterminada para futuros
     repositorios.
--   [ ] Limpiar contenido demo de Vite.
--   [ ] Definir estructura inicial de `src/`.
--   [ ] Agregar documentación base al repositorio.
--   [ ] Crear commit de estructura inicial.
+-   [x] Limpiar contenido demo de Vite.
+-   [x] Definir estructura inicial de `src/`.
+-   [x] Agregar documentación base al repositorio.
+-   [x] Crear commit de estructura inicial.
 
 **Resultado:** proyecto limpio, documentado y listo para desarrollar el
 motor.
@@ -51,18 +51,18 @@ motor.
 Inicialmente los programas se definirán mediante objetos TypeScript.
 Todavía no habrá parser.
 
--   [ ] Definir `ProcessId`.
--   [ ] Definir estados `READY`, `RUNNING`, `BLOCKED`, `FINISHED`.
--   [ ] Crear modelo `Process`.
--   [ ] Crear modelo `Instruction`.
--   [ ] Crear modelo `Program`.
--   [ ] Crear `ExecutionState`.
--   [ ] Crear `SimulationEngine`.
--   [ ] Implementar `step()`.
--   [ ] Mantener program counter por proceso.
--   [ ] Detectar proceso terminado.
--   [ ] Detectar programa terminado.
--   [ ] Agregar tests básicos del motor.
+-   [x] Definir `ProcessId`.
+-   [x] Definir estados `READY`, `RUNNING`, `BLOCKED`, `FINISHED`.
+-   [x] Crear modelo `Process`.
+-   [x] Crear modelo `Instruction`.
+-   [x] Crear modelo `Program`.
+-   [x] Crear `ExecutionState`.
+-   [x] Crear `SimulationEngine`.
+-   [x] Implementar `step()`.
+-   [x] Mantener program counter por proceso.
+-   [x] Detectar proceso terminado.
+-   [x] Detectar programa terminado.
+-   [x] Agregar tests básicos del motor.
 
 **Objetivo mínimo:** ejecutar instrucciones pertenecientes a varios
 procesos paso a paso.
@@ -71,16 +71,16 @@ procesos paso a paso.
 
 ## M2 --- Scheduler e interleavings
 
--   [ ] Crear interfaz `Scheduler`.
--   [ ] Scheduler determinista.
--   [ ] Scheduler round-robin.
--   [ ] Scheduler aleatorio.
--   [ ] Seleccionar procesos en estado `READY`.
--   [ ] Permitir cambios de proceso entre steps.
--   [ ] Registrar historial de ejecución.
--   [ ] Permitir seed para ejecuciones aleatorias reproducibles.
--   [ ] Resetear simulación.
--   [ ] Configurar límite máximo de steps.
+-   [x] Crear interfaz `Scheduler`.
+-   [x] Scheduler determinista.
+-   [x] Scheduler round-robin.
+-   [x] Scheduler aleatorio.
+-   [x] Seleccionar procesos en estado `READY`.
+-   [x] Permitir cambios de proceso entre steps.
+-   [x] Registrar historial de ejecución.
+-   [x] Permitir seed para ejecuciones aleatorias reproducibles.
+-   [x] Resetear simulación.
+-   [x] Configurar límite máximo de steps.
 
 ------------------------------------------------------------------------
 
