@@ -1,75 +1,117 @@
-# React + TypeScript + Vite
+# Concurrent Visualizer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Simulador educativo de programación concurrente orientado a visualizar
+la ejecución de procesos, mecanismos de sincronización, interleavings y
+errores clásicos de concurrencia.
 
-Currently, two official plugins are available:
+El proyecto nace como herramienta de estudio para Programación
+Concurrente de la Facultad de Informática de la UNLP, pero se diseña
+como un motor general de pseudocódigo concurrente.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Estado
 
-## React Compiler
+Proyecto en etapa inicial de diseño y construcción del motor.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Objetivo
 
-## Expanding the ESLint configuration
+La experiencia final buscada es:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+``` text
+Pseudocódigo
+    ↓
+Parser
+    ↓
+AST
+    ↓
+Simulation Engine
+    ↓
+Estado de ejecución
+    ├── Visualización
+    └── Análisis
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+El usuario debería poder escribir un programa concurrente, ejecutarlo
+paso a paso, observar procesos y recursos, cambiar el scheduling y
+explorar ejecuciones problemáticas.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Funcionalidades objetivo
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+-   Procesos concurrentes.
+-   Estados `READY`, `RUNNING`, `BLOCKED`, `FINISHED`.
+-   Scheduling e interleavings.
+-   Variables locales y memoria compartida.
+-   Estructuras de control convencionales.
+-   Funciones.
+-   Atomicidad.
+-   `await`.
+-   Semáforos.
+-   Monitores.
+-   Pasaje de mensajes.
+-   Ejecución paso a paso.
+-   Timeline e historial.
+-   Detección de deadlocks y otros errores.
+-   Exploración de ejecuciones y reproducción de contraejemplos.
 
+## Principios
+
+### Un motor real, no animaciones prefabricadas
+
+Los problemas clásicos deben expresarse como programas y ejecutarse
+mediante el mismo motor.
+
+### Motor independiente de la UI
+
+La lógica de simulación vive fuera de React.
+
+### Aprender construyendo
+
+Las funcionalidades se incorporarán siguiendo los conceptos estudiados
+en la materia.
+
+### Fidelidad académica
+
+Las primitivas concurrentes deben respetar prioritariamente la
+terminología y semántica utilizada por la cátedra.
+
+## Stack
+
+-   React
+-   TypeScript
+-   Vite
+-   ESLint
+
+Previstos cuando sean necesarios:
+
+-   Tailwind CSS
+-   React Flow
+
+## Desarrollo
+
+``` bash
+npm install
+npm run dev
 ```
+
+## Documentación
+
+-   `BACKLOG.md`: roadmap, milestones y tickets.
+-   `docs/ARCHITECTURE.md`: arquitectura vigente.
+-   `docs/DECISIONS.md`: decisiones importantes y sus motivos.
+-   `docs/PROGRESS.md`: diario breve para retomar el desarrollo.
+
+## Regla de trabajo
+
+Un ticket no se considera terminado únicamente porque "parece
+funcionar".
+
+Debe:
+
+1.  estar implementado;
+2.  estar verificado/testeado según corresponda;
+3.  mantener los tests existentes funcionando;
+4.  reflejarse en el backlog y progreso;
+5.  actualizar arquitectura/decisiones cuando corresponda.
+
+## Roadmap
+
+Consultar [`BACKLOG.md`](BACKLOG.md) para el roadmap completo.
