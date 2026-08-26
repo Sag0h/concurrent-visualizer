@@ -31,6 +31,7 @@ export class SimulationEngine {
 
   reset(): void {
     this.state = structuredClone(this.initialState)
+    this.scheduler.reset()
   }
 
   hasReachedStepLimit(): boolean {

@@ -24,4 +24,8 @@ export class RandomScheduler implements Scheduler {
 
     return readyProcesses[index]
   }
+
+  reset(): void {
+    this.random.reset()
+  }
 }

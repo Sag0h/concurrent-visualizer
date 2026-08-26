@@ -7,4 +7,7 @@ export class FirstReadyScheduler implements Scheduler {
       (process) => process.state === 'READY',
     )
   }
+  reset(): void {
+    
+  }
 }

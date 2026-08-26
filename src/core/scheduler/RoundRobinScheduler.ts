@@ -23,4 +23,7 @@ export class RoundRobinScheduler implements Scheduler {
 
     return undefined
   }
+  reset(): void {
+    this.lastSelectedIndex = -1
+  }
 }
