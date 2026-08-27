@@ -4,7 +4,7 @@ import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
-import type { IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
+import type { CallInstruction, IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 import type { PendingInstruction } from '../process/PendingInstruction'
@@ -14,6 +14,8 @@ import type {
   FunctionCallExpression,
 } from '../expressions/Expression'
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
+import type { FunctionDefinition } from '../language/FunctionDefinition'
+import type { PendingEvaluation } from '../process/PendingEvaluation'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -354,91 +356,62 @@ step(): boolean {
         break
 
       case 'CALL': {
-        const functionDefinition =
-          this.state.program.functions?.[
-            instruction.functionName
-          ]
-
-        if (!functionDefinition) {
-          throw new Error(
-            `Function "${instruction.functionName}" is not defined`,
-          )
-        }
-
-        if (
-          instruction.arguments.length
-          !==
-          functionDefinition.parameters.length
-        ) {
-          throw new Error(
-            `Function "${instruction.functionName}" expected `
-            + `${functionDefinition.parameters.length} arguments `
-            + `but received ${instruction.arguments.length}`,
-          )
-        }
-
-        const callerMemory =
-          this.getActiveLocalMemory(process)
-
-        const argumentValues =
-          instruction.arguments.map(
+        const functionArgumentIndex =
+          instruction.arguments.findIndex(
             (argument) =>
-              evaluateExpression(
-                argument,
-                {
-                  localMemory: callerMemory,
-                  sharedMemory:
-                    this.state.program.sharedMemory,
-                },
-              ),
+              this.containsFunctionCall(argument),
           )
 
-        const functionMemory: Record<
-          string,
-          RuntimeValue
-        > = {}
+        if (functionArgumentIndex !== -1) {
+         this.suspendExpression(
+            process,
+            instruction.arguments[
+              functionArgumentIndex
+            ],
+            {
+              type: 'CALL_ARGUMENTS',
+              instruction,
+              argumentIndex:
+                functionArgumentIndex,
+            },
+          )
 
-        functionDefinition.parameters.forEach(
-          (parameter, index) => {
-            functionMemory[parameter] =
-              structuredClone(
-                argumentValues[index],
-              )
-          },
-        )
-
-        process.callStack.push({
-          functionName:
-            functionDefinition.name,
-          localMemory: functionMemory,
-        })
-
-        if (
-          functionDefinition.body.length === 0
-        ) {
-          process.callStack.pop()
-
-          this.advanceProcess(process)
           break
         }
 
-        process.executionStack.push({
-          instructions:
-            functionDefinition.body,
-          programCounter: 0,
-          completionMode:
-            'FUNCTION_RETURN',
-        })
+        this.executeCallInstruction(
+          process,
+          instruction,
+        )
 
         break
       }
+      case 'RETURN': {
+        if (
+          instruction.value
+          && this.containsFunctionCall(
+            instruction.value,
+          )
+        ) {
+          this.suspendExpression(
+            process,
+            instruction.value,
+            {
+              type: 'RETURN',
+              instruction,
+            },
+          )
 
-      case 'RETURN':
+          break
+        }
+
         this.executeReturn(
           process,
           instruction.value,
         )
+
         break
+      }
     }
 
     this.state.history.push({
@@ -607,40 +580,38 @@ step(): boolean {
       )
     }
 
+    if (
+      this.containsFunctionCall(
+        loop.condition,
+      )
+    ) {
+      this.suspendExpression(
+        process,
+        loop.condition,
+        {
+          type: 'FOR_CONDITION',
+          frame,
+        },
+      )
+
+      return
+    }
+
     const condition = evaluateExpression(
       loop.condition,
       {
-        localMemory: this.getActiveLocalMemory(process),
+        localMemory:
+          this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
       },
     )
 
-    if (typeof condition !== 'boolean') {
-      throw new Error(
-        'FOR condition must evaluate to boolean',
-      )
-    }
-
-    if (!condition) {
-      this.advanceProcess(process)
-      return
-    }
-
-    if (loop.body.length === 0) {
-      this.startForIncrement(
-        process,
-        frame,
-      )
-      return
-    }
-
-    process.executionStack.push({
-      instructions: loop.body,
-      programCounter: 0,
-      completionMode: 'FOR_INCREMENT',
-      forLoop: loop,
-    })
+    this.applyForCondition(
+      process,
+      frame,
+      condition,
+    )
   }
 
   private startForIncrement(
@@ -854,11 +825,7 @@ step(): boolean {
     process.lastReturnValue =
       frame.returnValue
 
-    if (
-      process.expressionRuntimeStatus
-      === 'WAITING_FOR_FUNCTION'
-      && process.pendingInstruction
-    ) {
+    if (frame.resumesExpression) {
       this.completePendingExpression(
         process,
         frame.returnValue,
@@ -974,8 +941,17 @@ step(): boolean {
   private startNextPendingFunction(
     process: Process,
   ): void {
+    const evaluation =
+      this.getCurrentPendingEvaluation(process)
+
+    if (!evaluation) {
+      throw new Error(
+        'Missing pending evaluation',
+      )
+    }
+
     const pending =
-      process.pendingExpression
+      evaluation.pendingExpression
 
     if (!pending) {
       throw new Error(
@@ -994,7 +970,7 @@ step(): boolean {
       )
     }
 
-    process.pendingExpression = {
+    evaluation.pendingExpression = {
       expression: pending.expression,
       activeCall: functionCall,
     }
@@ -1065,6 +1041,7 @@ step(): boolean {
       functionName:
         functionDefinition.name,
       localMemory: functionMemory,
+      resumesExpression: true,
     })
 
     if (
@@ -1094,8 +1071,17 @@ step(): boolean {
       )
     }
 
+    const evaluation =
+      this.getCurrentPendingEvaluation(process)
+
+    if (!evaluation) {
+      throw new Error(
+        'Missing pending evaluation',
+      )
+    }
+
     const pendingExpression =
-      process.pendingExpression
+      evaluation.pendingExpression
 
     if (!pendingExpression) {
       throw new Error(
@@ -1119,7 +1105,7 @@ step(): boolean {
         value,
       )
 
-    process.pendingExpression = {
+    evaluation.pendingExpression = {
       expression: newExpression,
     }
 
@@ -1157,18 +1143,22 @@ step(): boolean {
     process: Process,
     value: RuntimeValue,
   ): void {
-    const pending =
-      process.pendingInstruction
+    const evaluation =
+      process.pendingEvaluations.pop()
 
-    if (!pending) {
+    if (!evaluation) {
       throw new Error(
-        'Missing pending instruction',
+        'Missing pending evaluation',
       )
     }
 
-    process.pendingExpression = undefined
-    process.pendingInstruction = undefined
-    process.expressionRuntimeStatus = 'DONE'
+    const pending =
+      evaluation.pendingInstruction
+
+    process.expressionRuntimeStatus =
+      process.pendingEvaluations.length > 0
+        ? 'WAITING_FOR_FUNCTION'
+        : 'IDLE'
 
     switch (pending.type) {
       case 'DECLARE':
@@ -1183,7 +1173,7 @@ step(): boolean {
         }
 
         this.advanceProcess(process)
-        break
+        return
 
       case 'ASSIGN':
         this.applyAssignment(
@@ -1193,7 +1183,7 @@ step(): boolean {
         )
 
         this.advanceProcess(process)
-        break
+        return
 
       case 'IF':
         this.applyIfCondition(
@@ -1201,7 +1191,7 @@ step(): boolean {
           pending.instruction,
           value,
         )
-        break
+        return
 
       case 'WHILE':
         this.applyWhileCondition(
@@ -1209,24 +1199,46 @@ step(): boolean {
           pending.instruction,
           value,
         )
-        break
+        return
 
       case 'REPEAT_UNTIL':
         this.applyRepeatUntilCondition(
           process,
           value,
         )
-        break
+        return
 
       case 'REPEAT_UNTIL_FRAME':
         this.applyRepeatUntilFrameCondition(
           process,
           value,
         )
-        break
-    }
+        return
 
-    process.expressionRuntimeStatus = 'IDLE'
+      case 'FOR_CONDITION':
+        this.applyForCondition(
+          process,
+          pending.frame,
+          value,
+        )
+        return
+
+      case 'RETURN':
+        this.executeReturnValue(
+          process,
+          value,
+        )
+        return
+
+      case 'CALL_ARGUMENTS':
+        this.completePendingCallArguments(
+          process,
+          pending.instruction,
+          pending.argumentIndex,
+          value,
+        )
+        return
+    }
   }
 
   private findNextFunctionCall(
@@ -1369,12 +1381,12 @@ step(): boolean {
     expression: Expression,
     pendingInstruction: PendingInstruction,
   ): void {
-    process.pendingExpression = {
-      expression,
-    }
-
-    process.pendingInstruction =
-      pendingInstruction
+    process.pendingEvaluations.push({
+      pendingExpression: {
+        expression,
+      },
+      pendingInstruction,
+    })
 
     process.expressionRuntimeStatus =
       'WAITING_FOR_FUNCTION'
@@ -1536,5 +1548,224 @@ step(): boolean {
     if (condition) {
       this.advanceProcess(process)
     }
+  }
+
+  private executeReturnValue(
+    process: Process,
+    value: RuntimeValue,
+  ): void {
+    const callFrame =
+      process.callStack[
+        process.callStack.length - 1
+      ]
+
+    if (!callFrame) {
+      throw new Error(
+        'RETURN can only be used inside a function',
+      )
+    }
+
+    callFrame.returnValue = value
+
+    this.unwindCurrentFunction(process)
+  }
+
+  private executeCallInstruction(
+    process: Process,
+    instruction: CallInstruction,
+  ): void {
+    const functionDefinition =
+      this.state.program.functions?.[
+        instruction.functionName
+      ]
+
+    if (!functionDefinition) {
+      throw new Error(
+        `Function "${instruction.functionName}" is not defined`,
+      )
+    }
+
+    if (
+      instruction.arguments.length
+      !== functionDefinition.parameters.length
+    ) {
+      throw new Error(
+        `Function "${instruction.functionName}" expected `
+        + `${functionDefinition.parameters.length} arguments `
+        + `but received ${instruction.arguments.length}`,
+      )
+    }
+
+    const callerMemory =
+      this.getActiveLocalMemory(process)
+
+    const argumentValues =
+      instruction.arguments.map(
+        (argument) =>
+          evaluateExpression(
+            argument,
+            {
+              localMemory: callerMemory,
+              sharedMemory:
+                this.state.program.sharedMemory,
+            },
+          ),
+      )
+
+    this.startFunctionWithValues(
+      process,
+      functionDefinition,
+      argumentValues,
+    )
+  }
+
+  private startFunctionWithValues(
+    process: Process,
+    functionDefinition: FunctionDefinition,
+    argumentValues: RuntimeValue[],
+  ): void {
+    const functionMemory: Record<
+      string,
+      RuntimeValue
+    > = {}
+
+    functionDefinition.parameters.forEach(
+      (parameter, index) => {
+        functionMemory[parameter] =
+          structuredClone(
+            argumentValues[index],
+          )
+      },
+    )
+
+    process.callStack.push({
+      functionName:
+        functionDefinition.name,
+        localMemory: functionMemory,
+        resumesExpression: false,
+    })
+
+    if (
+      functionDefinition.body.length === 0
+    ) {
+      process.callStack.pop()
+      this.advanceProcess(process)
+      return
+    }
+
+    process.executionStack.push({
+      instructions:
+        functionDefinition.body,
+      programCounter: 0,
+      completionMode:
+        'FUNCTION_RETURN',
+    })
+  }
+
+  private completePendingCallArguments(
+    process: Process,
+    instruction: CallInstruction,
+    argumentIndex: number,
+    value: RuntimeValue,
+  ): void {
+    const resolvedArgs =
+      instruction.arguments.map(
+        (argument, index) =>
+          index === argumentIndex
+            ? {
+                type: 'LITERAL' as const,
+                value,
+              }
+            : argument,
+      )
+
+    const nextFunctionArgumentIndex =
+      resolvedArgs.findIndex(
+        (argument) =>
+          this.containsFunctionCall(
+            argument,
+          ),
+      )
+
+    if (
+      nextFunctionArgumentIndex !== -1
+    ) {
+      this.suspendExpression(
+        process,
+        resolvedArgs[
+          nextFunctionArgumentIndex
+        ],
+        {
+          type: 'CALL_ARGUMENTS',
+          instruction: {
+            ...instruction,
+            arguments: resolvedArgs,
+          },
+          argumentIndex:
+            nextFunctionArgumentIndex,
+        },
+      )
+
+      return
+    }
+
+    const finalInstruction: CallInstruction = {
+      ...instruction,
+      arguments: resolvedArgs,
+    }
+
+    this.executeCallInstruction(
+      process,
+      finalInstruction,
+    )
+  }
+
+  private applyForCondition(
+    process: Process,
+    frame: ExecutionFrame,
+    condition: RuntimeValue,
+  ): void {
+    const loop = frame.forLoop
+
+    if (!loop) {
+      throw new Error(
+        'FOR frame is missing runtime information',
+      )
+    }
+
+    if (typeof condition !== 'boolean') {
+      throw new Error(
+        'FOR condition must evaluate to boolean',
+      )
+    }
+
+    if (!condition) {
+      this.advanceProcess(process)
+      return
+    }
+
+    if (loop.body.length === 0) {
+      this.startForIncrement(
+        process,
+        frame,
+      )
+
+      return
+    }
+
+    process.executionStack.push({
+      instructions: loop.body,
+      programCounter: 0,
+      completionMode: 'FOR_INCREMENT',
+      forLoop: loop,
+    })
+  }
+
+  private getCurrentPendingEvaluation(
+    process: Process,
+  ): PendingEvaluation | undefined {
+    return process.pendingEvaluations[
+      process.pendingEvaluations.length - 1
+    ]
   }
 }

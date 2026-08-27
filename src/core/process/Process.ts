@@ -6,11 +6,10 @@ import type { ExecutionFrame } from './ExecutionFrame'
 import type { FunctionCallFrame } from './FunctionCallFrame'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 
-import type { PendingInstruction } from './PendingInstruction'
+import type { PendingEvaluation } from './PendingEvaluation'
 
 import type {
   ExpressionRuntimeStatus,
-  PendingExpression,
 } from '../expressions/ExpressionRuntime'
 
 export interface Process {
@@ -22,7 +21,6 @@ export interface Process {
   executionStack: ExecutionFrame[]
   callStack: FunctionCallFrame[]
   lastReturnValue?: RuntimeValue
-  pendingExpression?: PendingExpression
+  pendingEvaluations: PendingEvaluation[]
   expressionRuntimeStatus: ExpressionRuntimeStatus
-  pendingInstruction?: PendingInstruction
 }

@@ -158,6 +158,7 @@ class Parser {
       executionStack: [],
       callStack: [],
       expressionRuntimeStatus: 'IDLE',
+      pendingEvaluations: [],
     }
   }
 

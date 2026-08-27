@@ -149,11 +149,11 @@ secuencial normal.
 -   [x] `foreach`.
 -   [x] `break`.
 -   [x] `continue`.
--   [ ] Funciones.
--   [ ] Parámetros.
--   [ ] Variables locales de función.
--   [ ] `return`.
--   [ ] Call stack.
+-   [x] Funciones.
+-   [x] Parámetros.
+-   [x] Variables locales de función.
+-   [x] `return`.
+-   [x] Call stack.
 -   [ ] Funciones vacías.
 -   [ ] `yield`.
 -   [ ] `sleep(ticks)`.

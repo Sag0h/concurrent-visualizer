@@ -3,6 +3,8 @@ import type {
   IfInstruction,
   WhileInstruction,
   RepeatUntilInstruction,
+  ReturnInstruction,
+  CallInstruction,
 } from '../instructions/Instruction'
 
 import type { ExecutionFrame } from './ExecutionFrame'
@@ -31,5 +33,18 @@ export type PendingInstruction =
     }
   | {
     readonly type: 'REPEAT_UNTIL_FRAME'
+    readonly frame: ExecutionFrame
+  }
+  | {
+    readonly type: 'RETURN'
+    readonly instruction: ReturnInstruction
+  }
+  | {
+      readonly type: 'CALL_ARGUMENTS'
+      readonly instruction: CallInstruction
+      readonly argumentIndex: number
+    }
+  | {
+    readonly type: 'FOR_CONDITION'
     readonly frame: ExecutionFrame
   }
