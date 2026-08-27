@@ -1,0 +1,588 @@
+import type { Expression } from '../expressions/Expression'
+import {
+  arrayAccess,
+  binary,
+  literal,
+  unary,
+  variable,
+} from '../expressions/expressionFactories'
+import type { Instruction } from '../instructions/Instruction'
+import {
+  arrayTarget,
+  assign,
+  declare,
+  variableTarget,
+} from '../instructions/instructionFactories'
+import type { RuntimeValue } from '../memory/RuntimeValue'
+import type { Process } from '../process/Process'
+import type { Program } from '../engine/Program'
+import type { Token, TokenType } from './Token'
+import { ParserError } from './ParserError'
+import { tokenize } from './tokenize'
+
+export function parseProgram(
+  source: string,
+): Program {
+  const parser = new Parser(tokenize(source))
+
+  return parser.parseProgram()
+}
+
+class Parser {
+  private current = 0
+
+  constructor(
+    private readonly tokens: Token[],
+  ) {}
+
+  parseProgram(): Program {
+    const processes: Process[] = []
+    const sharedMemory: Program['sharedMemory'] = {}
+
+    while (!this.isAtEnd()) {
+      if (this.match('SHARED')) {
+        this.parseSharedDeclaration(sharedMemory)
+        continue
+      }
+
+      if (this.match('PROCESS')) {
+        processes.push(this.parseProcess())
+        continue
+      }
+
+      throw this.error(
+        this.peek(),
+        'Expected "shared" or "process"',
+      )
+    }
+
+    return {
+      processes,
+      sharedMemory,
+    }
+  }
+
+  private parseSharedDeclaration(
+    sharedMemory: Program['sharedMemory'],
+  ): void {
+    this.parseType()
+
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected variable name',
+    )
+
+    this.consume(
+      'ASSIGN',
+      'Expected "=" after variable name',
+    )
+
+    const value = this.parseLiteralOrArrayValue()
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after shared declaration',
+    )
+
+    sharedMemory[name.lexeme] = value
+  }
+
+  private parseProcess(): Process {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected process name',
+    )
+
+    this.consume(
+      'LEFT_BRACE',
+      'Expected "{" after process name',
+    )
+
+    const instructions: Instruction[] = []
+
+    while (
+      !this.check('RIGHT_BRACE')
+      && !this.isAtEnd()
+    ) {
+      instructions.push(
+        this.parseProcessInstruction(),
+      )
+    }
+
+    this.consume(
+      'RIGHT_BRACE',
+      'Expected "}" after process body',
+    )
+
+    return {
+      id: name.lexeme,
+      state: 'READY',
+      programCounter: 0,
+      instructions,
+      localMemory: {},
+    }
+  }
+
+  private parseProcessInstruction(): Instruction {
+    if (this.isTypeToken(this.peek().type)) {
+      return this.parseLocalDeclaration()
+    }
+
+    if (this.check('IDENTIFIER')) {
+      return this.parseAssignment()
+    }
+
+    throw this.error(
+      this.peek(),
+      'Expected declaration or assignment',
+    )
+  }
+
+  private parseLocalDeclaration(): Instruction {
+    this.parseType()
+
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected variable name',
+    )
+
+    this.consume(
+      'ASSIGN',
+      'Expected "=" after variable name',
+    )
+
+    const initialValue = this.parseExpression()
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after variable declaration',
+    )
+
+    return declare(
+      'LOCAL',
+      name.lexeme,
+      initialValue,
+    )
+  }
+
+  private parseAssignment(): Instruction {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected assignment target',
+    )
+
+    if (this.match('LEFT_BRACKET')) {
+      const index = this.parseExpression()
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after array index',
+      )
+
+      this.consume(
+        'ASSIGN',
+        'Expected "=" after assignment target',
+      )
+
+      const expression = this.parseExpression()
+
+      this.consume(
+        'SEMICOLON',
+        'Expected ";" after assignment',
+      )
+
+      return assign(
+        arrayTarget(name.lexeme, index),
+        expression,
+      )
+    }
+
+    this.consume(
+      'ASSIGN',
+      'Expected "=" after assignment target',
+    )
+
+    const expression = this.parseExpression()
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after assignment',
+    )
+
+    return assign(
+      variableTarget(name.lexeme),
+      expression,
+    )
+  }
+
+  private parseExpression(): Expression {
+    return this.parseOr()
+  }
+
+  private parseOr(): Expression {
+    let expression = this.parseAnd()
+
+    while (this.match('OR')) {
+      expression = binary(
+        '||',
+        expression,
+        this.parseAnd(),
+      )
+    }
+
+    return expression
+  }
+
+  private parseAnd(): Expression {
+    let expression = this.parseEquality()
+
+    while (this.match('AND')) {
+      expression = binary(
+        '&&',
+        expression,
+        this.parseEquality(),
+      )
+    }
+
+    return expression
+  }
+
+  private parseEquality(): Expression {
+    let expression = this.parseComparison()
+
+    while (
+      this.match(
+        'EQUAL_EQUAL',
+        'NOT_EQUAL',
+      )
+    ) {
+      const operator =
+        this.previous().type === 'EQUAL_EQUAL'
+          ? '=='
+          : '!='
+
+      expression = binary(
+        operator,
+        expression,
+        this.parseComparison(),
+      )
+    }
+
+    return expression
+  }
+
+  private parseComparison(): Expression {
+    let expression = this.parseTerm()
+
+    while (
+      this.match(
+        'LESS',
+        'LESS_EQUAL',
+        'GREATER',
+        'GREATER_EQUAL',
+      )
+    ) {
+      const operatorToken = this.previous()
+
+      const operator = {
+        LESS: '<',
+        LESS_EQUAL: '<=',
+        GREATER: '>',
+        GREATER_EQUAL: '>=',
+      }[operatorToken.type]
+
+      if (!operator) {
+        throw this.error(
+          operatorToken,
+          'Invalid comparison operator',
+        )
+      }
+
+      expression = binary(
+        operator as '<' | '<=' | '>' | '>=',
+        expression,
+        this.parseTerm(),
+      )
+    }
+
+    return expression
+  }
+
+  private parseTerm(): Expression {
+    let expression = this.parseFactor()
+
+    while (
+      this.match(
+        'PLUS',
+        'MINUS',
+      )
+    ) {
+      const operator =
+        this.previous().type === 'PLUS'
+          ? '+'
+          : '-'
+
+      expression = binary(
+        operator,
+        expression,
+        this.parseFactor(),
+      )
+    }
+
+    return expression
+  }
+
+  private parseFactor(): Expression {
+    let expression = this.parseUnary()
+
+    while (
+      this.match(
+        'STAR',
+        'SLASH',
+      )
+    ) {
+      const operator =
+        this.previous().type === 'STAR'
+          ? '*'
+          : '/'
+
+      expression = binary(
+        operator,
+        expression,
+        this.parseUnary(),
+      )
+    }
+
+    return expression
+  }
+
+  private parseUnary(): Expression {
+    if (this.match('NOT')) {
+      return unary(
+        '!',
+        this.parseUnary(),
+      )
+    }
+
+    return this.parsePrimary()
+  }
+
+  private parsePrimary(): Expression {
+    if (this.match('NUMBER')) {
+      return literal(
+        Number(this.previous().lexeme),
+      )
+    }
+
+    if (this.match('STRING')) {
+      return literal(
+        this.previous().lexeme,
+      )
+    }
+
+    if (this.match('BOOLEAN')) {
+      return literal(
+        this.previous().lexeme === 'true',
+      )
+    }
+
+    if (this.match('IDENTIFIER')) {
+      const name = this.previous().lexeme
+
+      if (this.match('LEFT_BRACKET')) {
+        const index = this.parseExpression()
+
+        this.consume(
+          'RIGHT_BRACKET',
+          'Expected "]" after array index',
+        )
+
+        return arrayAccess(
+          variable(name),
+          index,
+        )
+      }
+
+      return variable(name)
+    }
+
+    if (this.match('LEFT_PAREN')) {
+      const expression = this.parseExpression()
+
+      this.consume(
+        'RIGHT_PAREN',
+        'Expected ")" after expression',
+      )
+
+      return expression
+    }
+
+    throw this.error(
+      this.peek(),
+      'Expected expression',
+    )
+  }
+
+  private parseLiteralOrArrayValue(): RuntimeValue {
+    if (this.match('NUMBER')) {
+      return Number(this.previous().lexeme)
+    }
+
+    if (this.match('STRING')) {
+      return this.previous().lexeme
+    }
+
+    if (this.match('BOOLEAN')) {
+      return this.previous().lexeme === 'true'
+    }
+
+    if (this.match('LEFT_BRACKET')) {
+      const values: Array<
+        number | boolean | string
+      > = []
+
+      if (!this.check('RIGHT_BRACKET')) {
+        do {
+          const token = this.peek()
+
+          if (this.match('NUMBER')) {
+            values.push(
+              Number(this.previous().lexeme),
+            )
+            continue
+          }
+
+          if (this.match('STRING')) {
+            values.push(
+              this.previous().lexeme,
+            )
+            continue
+          }
+
+          if (this.match('BOOLEAN')) {
+            values.push(
+              this.previous().lexeme === 'true',
+            )
+            continue
+          }
+
+          throw this.error(
+            token,
+            'Expected array literal value',
+          )
+        } while (this.match('COMMA'))
+      }
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after array literal',
+      )
+
+      return values
+    }
+
+    throw this.error(
+      this.peek(),
+      'Expected literal value',
+    )
+  }
+
+  private parseType(): void {
+    if (
+      !this.match(
+        'INT',
+        'BOOL',
+        'STRING_TYPE',
+      )
+    ) {
+      throw this.error(
+        this.peek(),
+        'Expected type',
+      )
+    }
+
+    if (this.match('LEFT_BRACKET')) {
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" in array type',
+      )
+    }
+  }
+
+  private isTypeToken(
+    type: TokenType,
+  ): boolean {
+    return (
+      type === 'INT'
+      || type === 'BOOL'
+      || type === 'STRING_TYPE'
+    )
+  }
+
+  private match(
+    ...types: TokenType[]
+  ): boolean {
+    for (const type of types) {
+      if (this.check(type)) {
+        this.advance()
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private consume(
+    type: TokenType,
+    message: string,
+  ): Token {
+    if (this.check(type)) {
+      return this.advance()
+    }
+
+    throw this.error(
+      this.peek(),
+      message,
+    )
+  }
+
+  private check(
+    type: TokenType,
+  ): boolean {
+    if (this.isAtEnd()) {
+      return type === 'EOF'
+    }
+
+    return this.peek().type === type
+  }
+
+  private advance(): Token {
+    if (!this.isAtEnd()) {
+      this.current++
+    }
+
+    return this.previous()
+  }
+
+  private isAtEnd(): boolean {
+    return this.peek().type === 'EOF'
+  }
+
+  private peek(): Token {
+    return this.tokens[this.current]
+  }
+
+  private previous(): Token {
+    return this.tokens[this.current - 1]
+  }
+
+  private error(
+    token: Token,
+    message: string,
+  ): ParserError {
+    return new ParserError(
+      message,
+      token,
+    )
+  }
+}

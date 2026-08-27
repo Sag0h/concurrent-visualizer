@@ -102,6 +102,39 @@ procesos paso a paso.
 
 ------------------------------------------------------------------------
 
+## M3.5 — Visualizer MVP ejecutable
+
+- [x] Definir y documentar sintaxis V0 del pseudocódigo.
+- [x] Crear tokenizer mínimo.
+- [ ] Crear parser mínimo.
+- [ ] Parsear variables compartidas.
+- [ ] Parsear procesos.
+- [ ] Parsear variables locales.
+- [ ] Parsear asignaciones.
+- [ ] Parsear expresiones.
+- [ ] Parsear arrays básicos.
+- [ ] Convertir código en `Program`.
+- [ ] Mostrar errores de sintaxis.
+- [ ] Crear editor de código.
+- [ ] Permitir agregar procesos desde la UI.
+- [ ] Ejecutar el código escrito por el usuario.
+- [ ] Selector de scheduler.
+- [ ] First Ready.
+- [ ] Round Robin.
+- [ ] Random.
+- [ ] Seed configurable para Random.
+- [ ] Botón `Step`.
+- [ ] Botón `Reset`.
+- [ ] Botón `Run`.
+- [ ] Mostrar `stepCount`.
+- [ ] Mostrar procesos.
+- [ ] Mostrar estado de cada proceso.
+- [ ] Mostrar `programCounter`.
+- [ ] Mostrar memoria local.
+- [ ] Mostrar memoria compartida.
+- [ ] Mostrar historial de ejecución.
+------------------------------------------------------------------------
+
 ## M4 --- Lenguaje secuencial
 
 Cada proceso concurrente debe poder comportarse como un programa
