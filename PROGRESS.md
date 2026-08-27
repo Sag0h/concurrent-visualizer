@@ -5,13 +5,13 @@
 
 ## Estado actual
 
-**Fase:** M3.5 — Visualizer MVP ejecutable.
+**Fase:** M4 — Control de ejecución, funciones y runtime de expresiones suspendibles.
 
-**Último milestone completado:** M3 — Memoria, variables, expresiones y arrays.
+**Último milestone completado:** M3.5 — Lenguaje y Visualizer MVP ejecutable.
 
-**Estado M3.5:** sintaxis V0 definida, tokenizer y parser mínimo implementados.
+**Estado M4:** loops y control de flujo implementados; funciones con parámetros, call stack por proceso y `return` implementadas; llamadas a funciones dentro de expresiones ya pueden suspender y reanudar `DECLARE`, `ASSIGN` y condiciones de control de flujo.
 
-**Próximo objetivo:** conectar el parser con React mediante un editor de código real, permitir seleccionar el scheduler y construir/ejecutar el programa escrito por el usuario.
+**Próximo objetivo:** terminar de integrar el runtime suspendible con todos los contextos de expresión restantes (`RETURN`, argumentos de llamadas y colecciones/índices cuando corresponda), consolidar tests y cerrar M4 antes de avanzar a primitivas de concurrencia.
 
 ------------------------------------------------------------------------
 
@@ -165,19 +165,26 @@ Antes de continuar después de una pausa:
 - Se agregaron tests del parser.
 - El lenguaje escrito por el usuario ya puede transformarse en las mismas estructuras internas utilizadas por `SimulationEngine`.
 
-#### Decisiones para funciones futuras
+#### Visualizer MVP
 
-- Las funciones y módulos todavía no están implementados.
-- Las definiciones de funciones serán globales e inmutables.
-- Cada proceso tendrá su propio contexto de ejecución de una función.
-- Se planea implementar un call stack por proceso.
-- Cada llamada tendrá su propio stack frame con parámetros, variables locales y dirección de retorno.
-- El código de una función no será duplicado por proceso.
-- Esta arquitectura permitirá posteriormente visualizar llamadas, retornos y stacks de procesos independientemente.
+- Se conectó el lenguaje con la interfaz React.
+- Se agregó editor de código para el programa completo y acción `Build`.
+- Los errores de tokenizer/parser se muestran con línea y columna.
+- Se puede seleccionar scheduler desde la interfaz.
+- El scheduler Random soporta seed reproducible y modo de seed aleatoria.
+- Se agregaron controles `Step`, `Run` y `Reset`.
+- Se visualizan procesos, memoria local, memoria compartida, historial y call stack.
+- Se pueden agregar procesos desde la interfaz sin introducir indentación incorrecta en el código fuente.
 
-#### Próximo paso
+#### Decisiones de arquitectura para funciones
 
-Conectar el lenguaje con la interfaz React: editor de código, `Build`, errores de tokenizer/parser, selector de scheduler, seed de Random, `Step`, `Run`, `Reset`, visualización de procesos/memoria e historial.
+- Las definiciones de funciones son globales y el código no se duplica por proceso.
+- Cada proceso mantiene su propio `callStack`.
+- Cada llamada crea un frame independiente con parámetros y variables locales.
+- Las llamadas anidadas generan frames independientes y pueden visualizarse en la UI.
+- Se agregó `return;` y `return expresión;`.
+- `return` realiza unwind de los bloques internos hasta la frontera de la función, por lo que funciona dentro de `if` y loops anidados.
+- Se agregó soporte para `-` unario para expresiones como `-5`, `-x` y `-(x + 1)`.
 
 ### M4 — Loops y control de ejecución
 
@@ -193,3 +200,164 @@ Conectar el lenguaje con la interfaz React: editor de código, `Build`, errores 
   - `foreach`: avanza al siguiente elemento.
 - El `executionStack` fue extendido para representar distintos modos de finalización de bloques.
 - Los loops pueden contener `if`, otros loops, `break` y `continue` anidados.
+
+## 2026-08-27 --- M4: funciones y expresiones suspendibles
+
+### Funciones y call stack
+
+- Se implementaron definiciones y llamadas de funciones con parámetros.
+- Cada proceso posee un `callStack` independiente.
+- Los frames de llamada mantienen la memoria local de cada invocación.
+- Una misma función puede ser llamada por distintos procesos sin compartir variables temporales.
+- Las llamadas anidadas crean frames independientes.
+- El call stack y las variables temporales de las funciones se exponen en `SimulationSnapshot` y se visualizan en la interfaz.
+- Se implementó `return;` y `return expresión;`.
+- Un `return` dentro de estructuras anidadas realiza unwind hasta el frame de retorno de la función.
+- El valor retornado se preserva al completar la llamada.
+- Las funciones usadas como expresión deben retornar un valor.
+
+### Problema arquitectónico: llamadas a funciones dentro de expresiones
+
+El evaluador original (`evaluateExpression`) era síncrono. Esto era correcto para `x + 1`, `a < b`, `!active` o `array[i]`, pero no para `int result = double(5)`, `if (isReady())` o `x = foo() + bar()`.
+
+Una función puede contener múltiples instrucciones y debe ejecutarse durante varios steps. Ejecutarla completamente dentro de `evaluateExpression()` la convertiría artificialmente en una operación atómica y eliminaría posibles interleavings con otros procesos.
+
+Por ese motivo se decidió no volver async el engine y no ejecutar funciones de forma atómica dentro del evaluador.
+
+### Runtime de expresiones suspendibles
+
+- Se agregó `FunctionCallExpression` al AST.
+- El parser reconoce llamadas a funciones como expresiones, incluyendo llamadas anidadas.
+- Cada proceso puede mantener una expresión y una instrucción pendientes.
+- Cuando una expresión necesita ejecutar una función, la instrucción actual se suspende, la función se ejecuta mediante el call stack normal y consume steps normales del simulador.
+- Al retornar, la llamada dentro del AST pendiente se reemplaza por un literal con el valor retornado.
+- Si quedan más llamadas, se ejecuta la siguiente; cuando ya no quedan, la expresión restante se evalúa normalmente y se completa la instrucción original.
+
+Ejemplo conceptual:
+
+```text
+double(double(5)) + 3
+        |
+        v
+double(10) + 3
+        |
+        v
+20 + 3
+        |
+        v
+23
+```
+
+Este diseño conserva el comportamiento paso a paso y evita introducir atomicidad falsa.
+
+### Orden de evaluación de llamadas
+
+Para `add(double(5), double(10))` se procesa conceptualmente:
+
+```text
+double(5)  -> 10
+double(10) -> 20
+add(10,20) -> 30
+```
+
+Cada llamada continúa siendo una ejecución normal y puede ser intercalada por el scheduler.
+
+### Contextos ya integrados con expresiones suspendibles
+
+Actualmente el mecanismo se integró en:
+
+- declaraciones (`DECLARE`);
+- asignaciones (`ASSIGN`);
+- condiciones de `if`;
+- condiciones de `while`;
+- condición `until` de `repeat / until`;
+- condición de `for`.
+
+### `foreach`: aclaración importante
+
+`foreach` itera sobre un array, pero `instruction.collection` sigue siendo una expresión general.
+
+`foreach (x in values)` no necesita suspensión si `values` ya es un array disponible. Sin embargo, si se permite `foreach (x in getValues())`, la colección también deberá pasar por el runtime suspendible.
+
+El cuerpo del `foreach` ya puede contener instrucciones con funciones suspendibles normalmente.
+
+### Contextos de expresión todavía a revisar
+
+Antes de cerrar la integración hay que revisar sistemáticamente todos los lugares donde el engine llama a `evaluateExpression()`:
+
+- `RETURN`: `return foo();` y `return foo() + 1;`.
+- Argumentos de llamadas usadas como instrucción: `foo(bar())`.
+- Colección de `foreach`: `foreach (x in getValues())`.
+- Índices de arrays: `array[getIndex()]`.
+- Targets de asignación a arrays: `array[getIndex()] = value`.
+- Cualquier nuevo contexto que evalúe una `Expression`.
+
+Regla arquitectónica:
+
+> No llamar directamente a `evaluateExpression()` sobre una expresión que pueda contener `FUNCTION_CALL` sin antes pasar por el mecanismo suspendible.
+
+### Robustez de Step y Run
+
+Durante la implementación se detectó que una excepción podía dejar un proceso en `RUNNING`. Luego `Run` podía entrar en un loop infinito: el scheduler solo seleccionaba `READY`, no había progreso, `isFinished()` seguía falso y el contador de steps no avanzaba.
+
+Se modificó `SimulationEngine.step()` para devolver:
+
+- `true`: hubo progreso real;
+- `false`: no se pudo ejecutar un step.
+
+Además:
+
+- si una instrucción falla, el proceso vuelve a `READY` antes de propagar el error;
+- el historial registra instrucciones completadas correctamente;
+- `Run` corta si `step()` devuelve `false`;
+- los errores de runtime se capturan y muestran en la UI.
+
+Esta decisión será importante cuando existan procesos `BLOCKED`, deadlocks y primitivas de sincronización.
+
+### Estado de M4
+
+M4 incluye actualmente:
+
+- `if / else`;
+- `while`;
+- `repeat / until`;
+- `for`;
+- `foreach`;
+- `break`;
+- `continue`;
+- funciones y parámetros;
+- variables locales por llamada;
+- call stack por proceso;
+- `return`;
+- llamadas a funciones dentro de expresiones con suspensión.
+
+La semántica de `continue` es:
+
+- `while`: vuelve a evaluar la condición;
+- `repeat / until`: evalúa `until`;
+- `for`: ejecuta el incremento antes de volver a evaluar;
+- `foreach`: avanza al siguiente elemento.
+
+### Casos probados manualmente
+
+El núcleo suspendible fue probado con:
+
+```text
+int result = double(5);
+int result = double(5) + 3;
+int result = double(double(5));
+int result = double(5) + double(10);
+add(double(5), double(10));
+```
+
+También se probaron funciones con `return`, incluyendo retornos desde estructuras de control anidadas.
+
+### Próximo objetivo recomendado
+
+1. Completar los contextos pendientes (`RETURN`, argumentos de `CALL`, colección de `foreach` e índices de arrays).
+2. Agregar tests automáticos específicos del runtime suspendible.
+3. Ejecutar `npm test`, `npm run lint` y `npm run build`.
+4. Cerrar M4 con un commit estable.
+5. Actualizar `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` y `docs/SYNTAX.md` si todavía describen la arquitectura previa.
+6. Recién después avanzar a primitivas específicamente concurrentes.
+

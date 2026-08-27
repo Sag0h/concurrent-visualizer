@@ -4,14 +4,16 @@ import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
-import type { Instruction } from '../instructions/Instruction'
+import type { IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import type { RuntimeValue } from '../memory/RuntimeValue'
+import type { PendingInstruction } from '../process/PendingInstruction'
 
 import type {
   Expression,
   FunctionCallExpression,
 } from '../expressions/Expression'
+import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -93,6 +95,23 @@ step(): boolean {
         return true
 
       case 'ASSIGN': {
+        if (
+          this.containsFunctionCall(
+            instruction.expression,
+          )
+        ) {
+          this.suspendExpression(
+            process,
+            instruction.expression,
+            {
+              type: 'ASSIGN',
+              target: instruction.target,
+            },
+          )
+
+          break
+        }
+
         const value = evaluateExpression(
           instruction.expression,
           {
@@ -103,70 +122,11 @@ step(): boolean {
           },
         )
 
-        if (
-          instruction.target.type === 'VARIABLE'
-        ) {
-          writeVariable(
-            instruction.target.name,
-            value,
-            this.getActiveLocalMemory(process),
-            this.state.program.sharedMemory,
-          )
-        } else {
-          const index = evaluateExpression(
-            instruction.target.index,
-            {
-              localMemory:
-                this.getActiveLocalMemory(process),
-              sharedMemory:
-                this.state.program.sharedMemory,
-            },
-          )
-
-          if (
-            typeof index !== 'number'
-            || !Number.isInteger(index)
-          ) {
-            throw new Error(
-              'Array index must be an integer',
-            )
-          }
-
-          const arrayName =
-            instruction.target.arrayName
-
-          const localMemory =
-            this.getActiveLocalMemory(process)
-
-          const array =
-            arrayName in localMemory
-              ? localMemory[arrayName]
-              : this.state.program
-                  .sharedMemory[arrayName]
-
-          if (!Array.isArray(array)) {
-            throw new Error(
-              `Variable "${arrayName}" is not an array`,
-            )
-          }
-
-          if (
-            index < 0
-            || index >= array.length
-          ) {
-            throw new Error(
-              `Array index ${index} is out of bounds`,
-            )
-          }
-
-          if (Array.isArray(value)) {
-            throw new Error(
-              'Nested arrays are not supported yet',
-            )
-          }
-
-          array[index] = value
-        }
+        this.applyAssignment(
+          process,
+          instruction.target,
+          value,
+        )
 
         this.advanceProcess(process)
         break
@@ -178,21 +138,14 @@ step(): boolean {
             instruction.initialValue,
           )
         ) {
-          process.pendingExpression = {
-            expression: instruction.initialValue,
-          }
-
-          process.pendingInstruction = {
-            type: 'DECLARE',
-            name: instruction.name,
-            scope: instruction.scope,
-          }
-
-          process.expressionRuntimeStatus =
-            'WAITING_FOR_FUNCTION'
-
-          this.startNextPendingFunction(
+          this.suspendExpression(
             process,
+            instruction.initialValue,
+            {
+              type: 'DECLARE',
+              name: instruction.name,
+              scope: instruction.scope,
+            },
           )
 
           break
@@ -221,7 +174,25 @@ step(): boolean {
         this.advanceProcess(process)
         break
       }
+
       case 'IF': {
+        if (
+          this.containsFunctionCall(
+            instruction.condition,
+          )
+        ) {
+          this.suspendExpression(
+            process,
+            instruction.condition,
+            {
+              type: 'IF',
+              instruction,
+            },
+          )
+
+          break
+        }
+
         const condition = evaluateExpression(
           instruction.condition,
           {
@@ -232,32 +203,33 @@ step(): boolean {
           },
         )
 
-        if (typeof condition !== 'boolean') {
-          throw new Error(
-            'IF condition must evaluate to boolean',
-          )
-        }
-
-        const selectedBranch =
-          condition
-            ? instruction.thenBranch
-            : instruction.elseBranch
-
-        process.executionStack.push({
-          instructions: selectedBranch,
-          programCounter: 0,
-          completionMode: 'ADVANCE_PARENT',
-        })
-
-        if (selectedBranch.length === 0) {
-          process.executionStack.pop()
-          this.advanceProcess(process)
-        }
+        this.applyIfCondition(
+          process,
+          instruction,
+          condition,
+        )
 
         break
       }
 
       case 'WHILE': {
+        if (
+          this.containsFunctionCall(
+            instruction.condition,
+          )
+        ) {
+          this.suspendExpression(
+            process,
+            instruction.condition,
+            {
+              type: 'WHILE',
+              instruction,
+            },
+          )
+
+          break
+        }
+
         const condition = evaluateExpression(
           instruction.condition,
           {
@@ -268,26 +240,11 @@ step(): boolean {
           },
         )
 
-        if (typeof condition !== 'boolean') {
-          throw new Error(
-            'WHILE condition must evaluate to boolean',
-          )
-        }
-
-        if (!condition) {
-          this.advanceProcess(process)
-          break
-        }
-
-        if (instruction.body.length === 0) {
-          break
-        }
-
-        process.executionStack.push({
-          instructions: instruction.body,
-          programCounter: 0,
-          completionMode: 'REPEAT_PARENT',
-        })
+        this.applyWhileCondition(
+          process,
+          instruction,
+          condition,
+        )
 
         break
       }
@@ -709,36 +666,48 @@ step(): boolean {
   }
 
   private completeRepeatUntil(
-    process: Process,
-    frame: ExecutionFrame,
-  ): void {
-    const condition = frame.repeatCondition
+  process: Process,
+  frame: ExecutionFrame,
+): void {
+  const condition =
+    frame.repeatCondition
 
-    if (!condition) {
-      throw new Error(
-        'Repeat frame is missing its condition',
-      )
-    }
+  if (!condition) {
+    throw new Error(
+      'Repeat frame is missing its condition',
+    )
+  }
 
-    const result = evaluateExpression(
+  if (
+    this.containsFunctionCall(condition)
+  ) {
+    this.suspendExpression(
+      process,
       condition,
       {
-        localMemory: this.getActiveLocalMemory(process),
-        sharedMemory:
-          this.state.program.sharedMemory,
+        type: 'REPEAT_UNTIL_FRAME',
+        frame,
       },
     )
 
-    if (typeof result !== 'boolean') {
-      throw new Error(
-        'REPEAT UNTIL condition must evaluate to boolean',
-      )
-    }
-
-    if (result) {
-      this.advanceProcess(process)
-    }
+    return
   }
+
+  const result = evaluateExpression(
+    condition,
+    {
+      localMemory:
+        this.getActiveLocalMemory(process),
+      sharedMemory:
+        this.state.program.sharedMemory,
+    },
+  )
+
+  this.applyRepeatUntilFrameCondition(
+    process,
+    result,
+  )
+}
 
   private advanceForeach(
     process: Process,
@@ -1197,6 +1166,10 @@ step(): boolean {
       )
     }
 
+    process.pendingExpression = undefined
+    process.pendingInstruction = undefined
+    process.expressionRuntimeStatus = 'DONE'
+
     switch (pending.type) {
       case 'DECLARE':
         if (pending.scope === 'LOCAL') {
@@ -1209,24 +1182,51 @@ step(): boolean {
           ] = value
         }
 
+        this.advanceProcess(process)
         break
 
       case 'ASSIGN':
-        throw new Error(
-          'Pending ASSIGN is not implemented yet',
+        this.applyAssignment(
+          process,
+          pending.target,
+          value,
         )
+
+        this.advanceProcess(process)
+        break
+
+      case 'IF':
+        this.applyIfCondition(
+          process,
+          pending.instruction,
+          value,
+        )
+        break
+
+      case 'WHILE':
+        this.applyWhileCondition(
+          process,
+          pending.instruction,
+          value,
+        )
+        break
+
+      case 'REPEAT_UNTIL':
+        this.applyRepeatUntilCondition(
+          process,
+          value,
+        )
+        break
+
+      case 'REPEAT_UNTIL_FRAME':
+        this.applyRepeatUntilFrameCondition(
+          process,
+          value,
+        )
+        break
     }
 
-    process.pendingExpression = undefined
-    process.pendingInstruction = undefined
-
-    process.expressionRuntimeStatus =
-      'DONE'
-
-    this.advanceProcess(process)
-
-    process.expressionRuntimeStatus =
-      'IDLE'
+    process.expressionRuntimeStatus = 'IDLE'
   }
 
   private findNextFunctionCall(
@@ -1361,6 +1361,180 @@ step(): boolean {
 
       default:
         return expression
+    }
+  }
+
+  private suspendExpression(
+    process: Process,
+    expression: Expression,
+    pendingInstruction: PendingInstruction,
+  ): void {
+    process.pendingExpression = {
+      expression,
+    }
+
+    process.pendingInstruction =
+      pendingInstruction
+
+    process.expressionRuntimeStatus =
+      'WAITING_FOR_FUNCTION'
+
+    this.startNextPendingFunction(process)
+  }
+
+  private applyAssignment(
+    process: Process,
+    target: AssignmentTarget,
+    value: RuntimeValue,
+  ): void {
+    if (target.type === 'VARIABLE') {
+      writeVariable(
+        target.name,
+        value,
+        this.getActiveLocalMemory(process),
+        this.state.program.sharedMemory,
+      )
+
+      return
+    }
+
+    const index = evaluateExpression(
+      target.index,
+      {
+        localMemory:
+          this.getActiveLocalMemory(process),
+        sharedMemory:
+          this.state.program.sharedMemory,
+      },
+    )
+
+    if (
+      typeof index !== 'number'
+      || !Number.isInteger(index)
+    ) {
+      throw new Error(
+        'Array index must be an integer',
+      )
+    }
+
+    const arrayName = target.arrayName
+
+    const localMemory =
+      this.getActiveLocalMemory(process)
+
+    const array =
+      arrayName in localMemory
+        ? localMemory[arrayName]
+        : this.state.program.sharedMemory[
+            arrayName
+          ]
+
+    if (!Array.isArray(array)) {
+      throw new Error(
+        `Variable "${arrayName}" is not an array`,
+      )
+    }
+
+    if (
+      index < 0
+      || index >= array.length
+    ) {
+      throw new Error(
+        `Array index ${index} is out of bounds`,
+      )
+    }
+
+    if (Array.isArray(value)) {
+      throw new Error(
+        'Nested arrays are not supported yet',
+      )
+    }
+
+    array[index] = value
+  }
+
+  private applyIfCondition(
+    process: Process,
+    instruction: IfInstruction,
+    condition: RuntimeValue,
+  ): void {
+    if (typeof condition !== 'boolean') {
+      throw new Error(
+        'IF condition must evaluate to boolean',
+      )
+    }
+
+    const selectedBranch =
+      condition
+        ? instruction.thenBranch
+        : instruction.elseBranch
+
+    if (selectedBranch.length === 0) {
+      this.advanceProcess(process)
+      return
+    }
+
+    process.executionStack.push({
+      instructions: selectedBranch,
+      programCounter: 0,
+      completionMode: 'ADVANCE_PARENT',
+    })
+  }
+
+  private applyWhileCondition(
+    process: Process,
+    instruction: WhileInstruction,
+    condition: RuntimeValue,
+  ): void {
+    if (typeof condition !== 'boolean') {
+      throw new Error(
+        'WHILE condition must evaluate to boolean',
+      )
+    }
+
+    if (!condition) {
+      this.advanceProcess(process)
+      return
+    }
+
+    if (instruction.body.length === 0) {
+      return
+    }
+
+    process.executionStack.push({
+      instructions: instruction.body,
+      programCounter: 0,
+      completionMode: 'REPEAT_PARENT',
+    })
+  }
+
+  private applyRepeatUntilCondition(
+    process: Process,
+    condition: RuntimeValue,
+  ): void {
+    if (typeof condition !== 'boolean') {
+      throw new Error(
+        'REPEAT UNTIL condition must evaluate to boolean',
+      )
+    }
+
+    if (condition) {
+      this.advanceProcess(process)
+    }
+  }
+
+  private applyRepeatUntilFrameCondition(
+    process: Process,
+    condition: RuntimeValue,
+  ): void {
+    if (typeof condition !== 'boolean') {
+      throw new Error(
+        'REPEAT UNTIL condition must evaluate to boolean',
+      )
+    }
+
+    if (condition) {
+      this.advanceProcess(process)
     }
   }
 }
