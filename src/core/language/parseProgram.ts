@@ -5,6 +5,7 @@ import {
   literal,
   unary,
   variable,
+  functionCall,
 } from '../expressions/expressionFactories'
 import type { Instruction } from '../instructions/Instruction'
 import {
@@ -156,6 +157,7 @@ class Parser {
       localMemory: {},
       executionStack: [],
       callStack: [],
+      expressionRuntimeStatus: 'IDLE',
     }
   }
 
@@ -494,8 +496,31 @@ class Parser {
     if (this.match('IDENTIFIER')) {
       const name = this.previous().lexeme
 
+      if (this.match('LEFT_PAREN')) {
+        const args: Expression[] = []
+
+        if (!this.check('RIGHT_PAREN')) {
+          do {
+            args.push(
+              this.parseExpression(),
+            )
+          } while (this.match('COMMA'))
+        }
+
+        this.consume(
+          'RIGHT_PAREN',
+          'Expected ")" after function arguments',
+        )
+
+        return functionCall(
+          name,
+          args,
+        )
+      }
+
       if (this.match('LEFT_BRACKET')) {
-        const index = this.parseExpression()
+        const index =
+          this.parseExpression()
 
         this.consume(
           'RIGHT_BRACKET',

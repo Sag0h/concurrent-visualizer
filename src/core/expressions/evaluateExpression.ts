@@ -18,9 +18,16 @@ export function evaluateExpression(
     
     case 'UNARY':
       return evaluateUnaryExpression(expression, context)
+
     case 'ARRAY_ACCESS':
       return evaluateArrayAccess(expression, context)  
-    }
+
+    case 'FUNCTION_CALL':
+      throw new Error(
+        'Function call expressions require suspended evaluation',
+      )
+    
+  }
 }
 
 function readVariable(

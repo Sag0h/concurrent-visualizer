@@ -40,6 +40,11 @@ export interface ArrayAccessExpression {
   readonly array: Expression
   readonly index: Expression
 }
+export interface FunctionCallExpression {
+  readonly type: 'FUNCTION_CALL'
+  readonly functionName: string
+  readonly arguments: Expression[]
+}
 
 export type Expression =
   | LiteralExpression
@@ -47,3 +52,4 @@ export type Expression =
   | BinaryExpression
   | UnaryExpression
   | ArrayAccessExpression
+  | FunctionCallExpression

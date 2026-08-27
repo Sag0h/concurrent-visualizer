@@ -120,11 +120,33 @@ function App() {
       return
     }
 
-    engine.step()
+    try {
+      const progressed = engine.step()
 
-    setSnapshot(
-      engine.getSnapshot(),
-    )
+      if (!progressed) {
+        setError(
+          'The simulation could not make progress.',
+        )
+      } else {
+        setError(null)
+      }
+
+      setSnapshot(
+        engine.getSnapshot(),
+      )
+    } catch (runtimeError) {
+      if (runtimeError instanceof Error) {
+        setError(runtimeError.message)
+      } else {
+        setError(
+          'Unknown runtime error',
+        )
+      }
+
+      setSnapshot(
+        engine.getSnapshot(),
+      )
+    }
   }
 
   function handleReset() {
@@ -173,16 +195,34 @@ function App() {
       return
     }
 
-    while (
-      !engine.isFinished()
-      && !engine.hasReachedStepLimit()
-    ) {
-      engine.step()
-    }
+    try {
+      while (
+        !engine.isFinished()
+        && !engine.hasReachedStepLimit()
+      ) {
+        const progressed = engine.step()
 
-    setSnapshot(
-      engine.getSnapshot(),
-    )
+        if (!progressed) {
+          break
+        }
+      }
+
+      setSnapshot(
+        engine.getSnapshot(),
+      )
+
+      setError(null)
+    } catch (runtimeError) {
+      if (runtimeError instanceof Error) {
+        setError(runtimeError.message)
+      } else {
+        setError('Unknown runtime error')
+      }
+
+      setSnapshot(
+        engine.getSnapshot(),
+      )
+    }
   }
 
   function generateRandomSeed(): number {

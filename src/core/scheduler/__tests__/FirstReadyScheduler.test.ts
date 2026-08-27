@@ -14,6 +14,7 @@ function createProcess(
     localMemory: {},
     executionStack: [],
     callStack: [],
+    expressionRuntimeStatus: 'IDLE',
   }
 }
 

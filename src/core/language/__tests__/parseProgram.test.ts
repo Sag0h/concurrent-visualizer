@@ -204,5 +204,74 @@ describe('parseProgram', () => {
       instruction.elseBranch,
     ).toHaveLength(1)
   })
-  
+
+  it('parses function calls as expressions', () => {
+    const program = parseProgram(`
+      function double(int value) {
+        return value * 2;
+      }
+
+      process P1 {
+        int result = double(5);
+      }
+    `)
+
+    const instruction =
+      program.processes[0].instructions[0]
+
+    expect(instruction.type).toBe('DECLARE')
+
+    if (instruction.type !== 'DECLARE') {
+      throw new Error(
+        'Expected DECLARE instruction',
+      )
+    }
+
+    expect(
+      instruction.initialValue,
+    ).toMatchObject({
+      type: 'FUNCTION_CALL',
+      functionName: 'double',
+      arguments: [
+        {
+          type: 'LITERAL',
+          value: 5,
+        },
+      ],
+    })
+  })
+
+  it('parses nested function call expressions', () => {
+    const program = parseProgram(`
+      function double(int value) {
+        return value * 2;
+      }
+
+      process P1 {
+        int result = double(double(5));
+      }
+    `)
+
+    const instruction =
+      program.processes[0].instructions[0]
+
+    if (instruction.type !== 'DECLARE') {
+      throw new Error(
+        'Expected DECLARE instruction',
+      )
+    }
+
+    expect(
+      instruction.initialValue,
+    ).toMatchObject({
+      type: 'FUNCTION_CALL',
+      functionName: 'double',
+      arguments: [
+        {
+          type: 'FUNCTION_CALL',
+          functionName: 'double',
+        },
+      ],
+    })
+  })
 })

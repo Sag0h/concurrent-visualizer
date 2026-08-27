@@ -5,7 +5,8 @@ import type {
   LiteralExpression,
   VariableExpression,
   UnaryExpression,
-  ArrayAccessExpression
+  ArrayAccessExpression,
+  FunctionCallExpression
 } from './Expression'
 
 export function literal(value: RuntimeValue): LiteralExpression {
@@ -56,3 +57,15 @@ export function arrayAccess(
     index,
   }
 }
+
+export function functionCall(
+  functionName: string,
+  args: Expression[],
+): FunctionCallExpression {
+  return {
+    type: 'FUNCTION_CALL',
+    functionName,
+    arguments: args,
+  }
+}
+

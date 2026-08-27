@@ -7,7 +7,11 @@ import type { Process } from '../process/Process'
 import type { Instruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import type { RuntimeValue } from '../memory/RuntimeValue'
-import type { Expression } from '../expressions/Expression'
+
+import type {
+  Expression,
+  FunctionCallExpression,
+} from '../expressions/Expression'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -45,33 +49,29 @@ export class SimulationEngine {
     return this.state.stepCount >= this.maxSteps
   }
 
-  step(): void {
-    if (this.state.stepCount >= this.maxSteps) {
-      return
-    }
+step(): boolean {
+  if (this.state.stepCount >= this.maxSteps) {
+    return false
+  }
 
-    const process = this.scheduler.selectNext(
-      this.state.program.processes,
-    )
+  const process = this.scheduler.selectNext(
+    this.state.program.processes,
+  )
 
-    if (!process) {
-      return
-    }
+  if (!process) {
+    return false
+  }
 
-    process.state = 'RUNNING'
+  process.state = 'RUNNING'
 
-    const instruction = this.getCurrentInstruction(process)
+  try {
+    const instruction =
+      this.getCurrentInstruction(process)
 
     if (!instruction) {
       process.state = 'FINISHED'
-      return
+      return true
     }
-
-    this.state.history.push({
-      step: this.state.stepCount+1,
-      processId: process.id,
-      instructionType: instruction.type,
-    })
 
     switch (instruction.type) {
       case 'NO_OP':
@@ -81,19 +81,31 @@ export class SimulationEngine {
       case 'FINISH':
         process.programCounter++
         process.state = 'FINISHED'
+
+        this.state.history.push({
+          step: this.state.stepCount + 1,
+          processId: process.id,
+          instructionType: instruction.type,
+        })
+
         this.state.stepCount++
-        return
+
+        return true
 
       case 'ASSIGN': {
         const value = evaluateExpression(
           instruction.expression,
           {
-            localMemory:this.getActiveLocalMemory(process),
-            sharedMemory: this.state.program.sharedMemory,
+            localMemory:
+              this.getActiveLocalMemory(process),
+            sharedMemory:
+              this.state.program.sharedMemory,
           },
         )
 
-        if (instruction.target.type === 'VARIABLE') {
+        if (
+          instruction.target.type === 'VARIABLE'
+        ) {
           writeVariable(
             instruction.target.name,
             value,
@@ -104,8 +116,10 @@ export class SimulationEngine {
           const index = evaluateExpression(
             instruction.target.index,
             {
-              localMemory: this.getActiveLocalMemory(process),
-              sharedMemory: this.state.program.sharedMemory,
+              localMemory:
+                this.getActiveLocalMemory(process),
+              sharedMemory:
+                this.state.program.sharedMemory,
             },
           )
 
@@ -113,10 +127,13 @@ export class SimulationEngine {
             typeof index !== 'number'
             || !Number.isInteger(index)
           ) {
-            throw new Error('Array index must be an integer')
+            throw new Error(
+              'Array index must be an integer',
+            )
           }
 
-          const arrayName = instruction.target.arrayName
+          const arrayName =
+            instruction.target.arrayName
 
           const localMemory =
             this.getActiveLocalMemory(process)
@@ -124,13 +141,19 @@ export class SimulationEngine {
           const array =
             arrayName in localMemory
               ? localMemory[arrayName]
-              : this.state.program.sharedMemory[arrayName]
+              : this.state.program
+                  .sharedMemory[arrayName]
 
           if (!Array.isArray(array)) {
-            throw new Error(`Variable "${arrayName}" is not an array`)
+            throw new Error(
+              `Variable "${arrayName}" is not an array`,
+            )
           }
 
-          if (index < 0 || index >= array.length) {
+          if (
+            index < 0
+            || index >= array.length
+          ) {
             throw new Error(
               `Array index ${index} is out of bounds`,
             )
@@ -148,12 +171,40 @@ export class SimulationEngine {
         this.advanceProcess(process)
         break
       }
+
       case 'DECLARE': {
+        if (
+          this.containsFunctionCall(
+            instruction.initialValue,
+          )
+        ) {
+          process.pendingExpression = {
+            expression: instruction.initialValue,
+          }
+
+          process.pendingInstruction = {
+            type: 'DECLARE',
+            name: instruction.name,
+            scope: instruction.scope,
+          }
+
+          process.expressionRuntimeStatus =
+            'WAITING_FOR_FUNCTION'
+
+          this.startNextPendingFunction(
+            process,
+          )
+
+          break
+        }
+
         const value = evaluateExpression(
           instruction.initialValue,
           {
-            localMemory: this.getActiveLocalMemory(process),
-            sharedMemory: this.state.program.sharedMemory,
+            localMemory:
+              this.getActiveLocalMemory(process),
+            sharedMemory:
+              this.state.program.sharedMemory,
           },
         )
 
@@ -162,18 +213,20 @@ export class SimulationEngine {
             instruction.name
           ] = value
         } else {
-          this.state.program.sharedMemory[instruction.name] = value
+          this.state.program.sharedMemory[
+            instruction.name
+          ] = value
         }
 
         this.advanceProcess(process)
         break
       }
-
       case 'IF': {
         const condition = evaluateExpression(
           instruction.condition,
           {
-            localMemory: this.getActiveLocalMemory(process),
+            localMemory:
+              this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
           },
@@ -203,11 +256,13 @@ export class SimulationEngine {
 
         break
       }
+
       case 'WHILE': {
         const condition = evaluateExpression(
           instruction.condition,
           {
-            localMemory: this.getActiveLocalMemory(process),
+            localMemory:
+              this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
           },
@@ -242,7 +297,8 @@ export class SimulationEngine {
           const condition = evaluateExpression(
             instruction.condition,
             {
-              localMemory: this.getActiveLocalMemory(process),
+              localMemory:
+                this.getActiveLocalMemory(process),
               sharedMemory:
                 this.state.program.sharedMemory,
             },
@@ -264,8 +320,10 @@ export class SimulationEngine {
         process.executionStack.push({
           instructions: instruction.body,
           programCounter: 0,
-          completionMode: 'CHECK_REPEAT_UNTIL',
-          repeatCondition: instruction.condition,
+          completionMode:
+            'CHECK_REPEAT_UNTIL',
+          repeatCondition:
+            instruction.condition,
         })
 
         break
@@ -275,7 +333,8 @@ export class SimulationEngine {
         const collection = evaluateExpression(
           instruction.collection,
           {
-            localMemory: this.getActiveLocalMemory(process),
+            localMemory:
+              this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
           },
@@ -321,7 +380,8 @@ export class SimulationEngine {
           forLoop: {
             condition: instruction.condition,
             body: instruction.body,
-            increment: instruction.increment,
+            increment:
+              instruction.increment,
           },
         })
 
@@ -335,7 +395,7 @@ export class SimulationEngine {
       case 'CONTINUE':
         this.continueLoop(process)
         break
-      
+
       case 'CALL': {
         const functionDefinition =
           this.state.program.functions?.[
@@ -350,7 +410,8 @@ export class SimulationEngine {
 
         if (
           instruction.arguments.length
-          !== functionDefinition.parameters.length
+          !==
+          functionDefinition.parameters.length
         ) {
           throw new Error(
             `Function "${instruction.functionName}" expected `
@@ -383,7 +444,9 @@ export class SimulationEngine {
         functionDefinition.parameters.forEach(
           (parameter, index) => {
             functionMemory[parameter] =
-              structuredClone(argumentValues[index])
+              structuredClone(
+                argumentValues[index],
+              )
           },
         )
 
@@ -397,6 +460,7 @@ export class SimulationEngine {
           functionDefinition.body.length === 0
         ) {
           process.callStack.pop()
+
           this.advanceProcess(process)
           break
         }
@@ -412,15 +476,19 @@ export class SimulationEngine {
         break
       }
 
-      case 'RETURN': {
+      case 'RETURN':
         this.executeReturn(
           process,
           instruction.value,
         )
-
         break
-      }
     }
+
+    this.state.history.push({
+      step: this.state.stepCount + 1,
+      processId: process.id,
+      instructionType: instruction.type,
+    })
 
     this.state.stepCount++
 
@@ -433,7 +501,13 @@ export class SimulationEngine {
     } else {
       process.state = 'READY'
     }
+
+    return true
+  } catch (error) {
+    process.state = 'READY'
+    throw error
   }
+}
 
   getSnapshot(): SimulationSnapshot {
     return {
@@ -811,6 +885,19 @@ export class SimulationEngine {
     process.lastReturnValue =
       frame.returnValue
 
+    if (
+      process.expressionRuntimeStatus
+      === 'WAITING_FOR_FUNCTION'
+      && process.pendingInstruction
+    ) {
+      this.completePendingExpression(
+        process,
+        frame.returnValue,
+      )
+
+      return
+    }
+
     this.advanceProcess(process)
   }
 
@@ -884,5 +971,396 @@ export class SimulationEngine {
     }
 
     this.completeFunctionCall(process)
+  }
+
+  private containsFunctionCall(
+    expression: Expression,
+  ): boolean {
+    switch (expression.type) {
+      case 'FUNCTION_CALL':
+        return true
+
+      case 'BINARY':
+        return (
+          this.containsFunctionCall(expression.left)
+          || this.containsFunctionCall(expression.right)
+        )
+
+      case 'UNARY':
+        return this.containsFunctionCall(
+          expression.operand,
+        )
+
+      case 'ARRAY_ACCESS':
+        return (
+          this.containsFunctionCall(expression.array)
+          || this.containsFunctionCall(expression.index)
+        )
+
+      default:
+        return false
+    }
+  }
+
+  private startNextPendingFunction(
+    process: Process,
+  ): void {
+    const pending =
+      process.pendingExpression
+
+    if (!pending) {
+      throw new Error(
+        'Missing pending expression',
+      )
+    }
+
+    const functionCall =
+      this.findNextFunctionCall(
+        pending.expression,
+      )
+
+    if (!functionCall) {
+      throw new Error(
+        'No function call found in pending expression',
+      )
+    }
+
+    process.pendingExpression = {
+      expression: pending.expression,
+      activeCall: functionCall,
+    }
+
+    this.startFunctionCallExpression(
+      process,
+      functionCall,
+    )
+  }
+
+  private startFunctionCallExpression(
+    process: Process,
+    expression: FunctionCallExpression,
+  ): void {
+    const functionDefinition =
+      this.state.program.functions?.[
+        expression.functionName
+      ]
+
+    if (!functionDefinition) {
+      throw new Error(
+        `Function "${expression.functionName}" is not defined`,
+      )
+    }
+
+    if (
+      expression.arguments.length
+      !== functionDefinition.parameters.length
+    ) {
+      throw new Error(
+        `Function "${expression.functionName}" expected `
+        + `${functionDefinition.parameters.length} arguments `
+        + `but received ${expression.arguments.length}`,
+      )
+    }
+
+    const localMemory =
+      this.getActiveLocalMemory(process)
+
+    const argumentValues =
+      expression.arguments.map(
+        (argument) =>
+          evaluateExpression(
+            argument,
+            {
+              localMemory,
+              sharedMemory:
+                this.state.program.sharedMemory,
+            },
+          ),
+      )
+
+    const functionMemory: Record<
+      string,
+      RuntimeValue
+    > = {}
+
+    functionDefinition.parameters.forEach(
+      (parameter, index) => {
+        functionMemory[parameter] =
+          structuredClone(
+            argumentValues[index],
+          )
+      },
+    )
+
+    process.callStack.push({
+      functionName:
+        functionDefinition.name,
+      localMemory: functionMemory,
+    })
+
+    if (
+      functionDefinition.body.length === 0
+    ) {
+      throw new Error(
+        `Function "${functionDefinition.name}" used as expression did not return a value`,
+      )
+    }
+
+    process.executionStack.push({
+      instructions:
+        functionDefinition.body,
+      programCounter: 0,
+      completionMode:
+        'FUNCTION_RETURN',
+    })
+  }
+
+  private completePendingExpression(
+    process: Process,
+    value: RuntimeValue | undefined,
+  ): void {
+    if (value === undefined) {
+      throw new Error(
+        'Function used as expression did not return a value',
+      )
+    }
+
+    const pendingExpression =
+      process.pendingExpression
+
+    if (!pendingExpression) {
+      throw new Error(
+        'Missing pending expression',
+      )
+    }
+
+    const activeCall =
+      pendingExpression.activeCall
+
+    if (!activeCall) {
+      throw new Error(
+        'Missing active function call',
+      )
+    }
+
+    const newExpression =
+      this.replaceFunctionCallWithValue(
+        pendingExpression.expression,
+        activeCall,
+        value,
+      )
+
+    process.pendingExpression = {
+      expression: newExpression,
+    }
+
+    if (
+      this.containsFunctionCall(
+        newExpression,
+      )
+    ) {
+      this.startNextPendingFunction(
+        process,
+      )
+
+      return
+    }
+
+    const finalValue =
+      evaluateExpression(
+        newExpression,
+        {
+          localMemory:
+            this.getActiveLocalMemory(process),
+
+          sharedMemory:
+            this.state.program.sharedMemory,
+        },
+      )
+
+    this.completePendingInstruction(
+      process,
+      finalValue,
+    )
+  }
+
+  private completePendingInstruction(
+    process: Process,
+    value: RuntimeValue,
+  ): void {
+    const pending =
+      process.pendingInstruction
+
+    if (!pending) {
+      throw new Error(
+        'Missing pending instruction',
+      )
+    }
+
+    switch (pending.type) {
+      case 'DECLARE':
+        if (pending.scope === 'LOCAL') {
+          this.getActiveLocalMemory(process)[
+            pending.name
+          ] = value
+        } else {
+          this.state.program.sharedMemory[
+            pending.name
+          ] = value
+        }
+
+        break
+
+      case 'ASSIGN':
+        throw new Error(
+          'Pending ASSIGN is not implemented yet',
+        )
+    }
+
+    process.pendingExpression = undefined
+    process.pendingInstruction = undefined
+
+    process.expressionRuntimeStatus =
+      'DONE'
+
+    this.advanceProcess(process)
+
+    process.expressionRuntimeStatus =
+      'IDLE'
+  }
+
+  private findNextFunctionCall(
+    expression: Expression,
+  ): FunctionCallExpression | undefined {
+    switch (expression.type) {
+      case 'FUNCTION_CALL': {
+        for (
+          const argument
+          of expression.arguments
+        ) {
+          const nestedCall =
+            this.findNextFunctionCall(
+              argument,
+            )
+
+          if (nestedCall) {
+            return nestedCall
+          }
+        }
+
+        return expression
+      }
+
+      case 'BINARY':
+        return (
+          this.findNextFunctionCall(
+            expression.left,
+          )
+          ?? this.findNextFunctionCall(
+            expression.right,
+          )
+        )
+
+      case 'UNARY':
+        return this.findNextFunctionCall(
+          expression.operand,
+        )
+
+      case 'ARRAY_ACCESS':
+        return (
+          this.findNextFunctionCall(
+            expression.array,
+          )
+          ?? this.findNextFunctionCall(
+            expression.index,
+          )
+        )
+
+      default:
+        return undefined
+    }
+  }
+
+  private replaceFunctionCallWithValue(
+    expression: Expression,
+    target: FunctionCallExpression,
+    value: RuntimeValue,
+  ): Expression {
+    if (expression === target) {
+      return {
+        type: 'LITERAL',
+        value,
+      }
+    }
+
+    switch (expression.type) {
+      case 'BINARY':
+        return {
+          ...expression,
+
+          left:
+            this.replaceFunctionCallWithValue(
+              expression.left,
+              target,
+              value,
+            ),
+
+          right:
+            this.replaceFunctionCallWithValue(
+              expression.right,
+              target,
+              value,
+            ),
+        }
+
+      case 'UNARY':
+        return {
+          ...expression,
+
+          operand:
+            this.replaceFunctionCallWithValue(
+              expression.operand,
+              target,
+              value,
+            ),
+        }
+
+      case 'ARRAY_ACCESS':
+        return {
+          ...expression,
+
+          array:
+            this.replaceFunctionCallWithValue(
+              expression.array,
+              target,
+              value,
+            ),
+
+          index:
+            this.replaceFunctionCallWithValue(
+              expression.index,
+              target,
+              value,
+            ),
+        }
+
+      case 'FUNCTION_CALL':
+        return {
+          ...expression,
+
+          arguments:
+            expression.arguments.map(
+              (argument) =>
+                this.replaceFunctionCallWithValue(
+                  argument,
+                  target,
+                  value,
+                ),
+            ),
+        }
+
+      default:
+        return expression
+    }
   }
 }
