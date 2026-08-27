@@ -40,6 +40,28 @@ export interface RepeatUntilInstruction {
   readonly condition: Expression
   readonly body: Instruction[]
 }
+export interface ForInstruction {
+  readonly type: 'FOR'
+  readonly initializer: Instruction
+  readonly condition: Expression
+  readonly increment: Instruction
+  readonly body: Instruction[]
+}
+
+export interface ForeachInstruction {
+  readonly type: 'FOREACH'
+  readonly itemName: string
+  readonly collection: Expression
+  readonly body: Instruction[]
+}
+
+export interface BreakInstruction {
+  readonly type: 'BREAK'
+}
+
+export interface ContinueInstruction {
+  readonly type: 'CONTINUE'
+}
 
 export type Instruction =
   | NoOpInstruction
@@ -49,3 +71,7 @@ export type Instruction =
   | IfInstruction
   | WhileInstruction
   | RepeatUntilInstruction
+  | ForInstruction
+  | ForeachInstruction
+  | BreakInstruction
+  | ContinueInstruction

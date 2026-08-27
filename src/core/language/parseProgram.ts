@@ -10,7 +10,11 @@ import type { Instruction } from '../instructions/Instruction'
 import {
   arrayTarget,
   assign,
+  breakInstruction,
+  continueInstruction,
   declare,
+  foreachInstruction,
+  forInstruction,
   ifInstruction,
   repeatUntilInstruction,
   variableTarget,
@@ -145,6 +149,30 @@ class Parser {
       return this.parseRepeatUntilInstruction()
     }
 
+    if (this.match('FOR')) {
+      return this.parseForInstruction()
+    }
+
+    if (this.match('FOREACH')) {
+      return this.parseForeachInstruction()
+    }
+
+    if (this.match('BREAK')) {
+      this.consume(
+        'SEMICOLON',
+        'Expected ";" after "break"',
+      )
+      return breakInstruction()
+    }
+
+    if (this.match('CONTINUE')) {
+      this.consume(
+        'SEMICOLON',
+        'Expected ";" after "continue"',
+      )
+      return continueInstruction()
+    }
+
     if (this.check('IDENTIFIER')) {
       return this.parseAssignment()
     }
@@ -183,53 +211,15 @@ class Parser {
   }
 
   private parseAssignment(): Instruction {
-    const name = this.consume(
-      'IDENTIFIER',
-      'Expected assignment target',
-    )
-
-    if (this.match('LEFT_BRACKET')) {
-      const index = this.parseExpression()
-
-      this.consume(
-        'RIGHT_BRACKET',
-        'Expected "]" after array index',
-      )
-
-      this.consume(
-        'ASSIGN',
-        'Expected "=" after assignment target',
-      )
-
-      const expression = this.parseExpression()
-
-      this.consume(
-        'SEMICOLON',
-        'Expected ";" after assignment',
-      )
-
-      return assign(
-        arrayTarget(name.lexeme, index),
-        expression,
-      )
-    }
-
-    this.consume(
-      'ASSIGN',
-      'Expected "=" after assignment target',
-    )
-
-    const expression = this.parseExpression()
+    const instruction =
+      this.parseAssignmentWithoutSemicolon()
 
     this.consume(
       'SEMICOLON',
       'Expected ";" after assignment',
     )
 
-    return assign(
-      variableTarget(name.lexeme),
-      expression,
-    )
+    return instruction
   }
 
   private parseExpression(): Expression {
@@ -761,4 +751,136 @@ class Parser {
     )
   }
 
+  private parseForInstruction(): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "for"',
+    )
+
+    this.parseType()
+
+    const variableName = this.consume(
+      'IDENTIFIER',
+      'Expected FOR variable name',
+    )
+
+    this.consume(
+      'ASSIGN',
+      'Expected "=" in FOR initializer',
+    )
+
+    const initialValue =
+      this.parseExpression()
+
+    const initializer = declare(
+      'LOCAL',
+      variableName.lexeme,
+      initialValue,
+    )
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after FOR initializer',
+    )
+
+    const condition =
+      this.parseExpression()
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after FOR condition',
+    )
+
+    const increment =
+      this.parseAssignmentWithoutSemicolon()
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after FOR clauses',
+    )
+
+    const body =
+      this.parseInstructionBlock()
+
+    return forInstruction(
+      initializer,
+      condition,
+      increment,
+      body,
+    )
+  }
+
+  private parseAssignmentWithoutSemicolon(): Instruction {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected assignment target',
+    )
+
+    if (this.match('LEFT_BRACKET')) {
+      const index =
+        this.parseExpression()
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after array index',
+      )
+
+      this.consume(
+        'ASSIGN',
+        'Expected "=" after assignment target',
+      )
+
+      return assign(
+        arrayTarget(
+          name.lexeme,
+          index,
+        ),
+        this.parseExpression(),
+      )
+    }
+
+    this.consume(
+      'ASSIGN',
+      'Expected "=" after assignment target',
+    )
+
+    return assign(
+      variableTarget(name.lexeme),
+      this.parseExpression(),
+    )
+  }
+
+  private parseForeachInstruction(): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "foreach"',
+    )
+
+    const item = this.consume(
+      'IDENTIFIER',
+      'Expected FOREACH item name',
+    )
+
+    this.consume(
+      'IN',
+      'Expected "in" after FOREACH item',
+    )
+
+    const collection =
+      this.parseExpression()
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after FOREACH collection',
+    )
+
+    const body =
+      this.parseInstructionBlock()
+
+    return foreachInstruction(
+      item.lexeme,
+      collection,
+      body,
+    )
+  }
 }

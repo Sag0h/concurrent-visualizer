@@ -140,15 +140,15 @@ procesos paso a paso.
 Cada proceso concurrente debe poder comportarse como un programa
 secuencial normal.
 
--   [ ] Bloques de instrucciones.
+-   [x] Bloques de instrucciones.
 -   [x] `if`.
 -   [x] `if / else`.
 -   [x] `while`.
 -   [x] `repeat / until`.
--   [ ] `for`.
--   [ ] `foreach`.
--   [ ] `break`.
--   [ ] `continue`.
+-   [x] `for`.
+-   [x] `foreach`.
+-   [x] `break`.
+-   [x] `continue`.
 -   [ ] Funciones.
 -   [ ] Parámetros.
 -   [ ] Variables locales de función.

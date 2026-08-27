@@ -14,6 +14,11 @@ const keywords: Record<string, TokenType> = {
   while: 'WHILE',
   repeat: 'REPEAT',
   until: 'UNTIL',
+  for: 'FOR',
+  foreach: 'FOREACH',
+  in: 'IN',
+  break: 'BREAK',
+  continue: 'CONTINUE',
 }
 
 export function tokenize(source: string): Token[] {

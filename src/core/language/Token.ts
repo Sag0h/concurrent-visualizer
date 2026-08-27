@@ -36,6 +36,11 @@ export type TokenType =
   | 'WHILE'
   | 'REPEAT'
   | 'UNTIL'
+  | 'FOR'
+  | 'FOREACH'
+  | 'IN'
+  | 'BREAK'
+  | 'CONTINUE'
 
 export interface Token {
   readonly type: TokenType

@@ -5,6 +5,7 @@ import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
 import type { Instruction } from '../instructions/Instruction'
+import type { ExecutionFrame } from '../process/ExecutionFrame'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -262,6 +263,72 @@ export class SimulationEngine {
 
         break
       }
+
+      case 'FOREACH': {
+        const collection = evaluateExpression(
+          instruction.collection,
+          {
+            localMemory: process.localMemory,
+            sharedMemory:
+              this.state.program.sharedMemory,
+          },
+        )
+
+        if (!Array.isArray(collection)) {
+          throw new Error(
+            'FOREACH collection must be an array',
+          )
+        }
+
+        if (collection.length === 0) {
+          this.advanceProcess(process)
+          break
+        }
+
+        process.localMemory[
+          instruction.itemName
+        ] = collection[0]
+
+        process.executionStack.push({
+          instructions: instruction.body,
+          programCounter: 0,
+          completionMode: 'FOREACH_NEXT',
+          foreachLoop: {
+            itemName: instruction.itemName,
+            values: [...collection],
+            body: instruction.body,
+            index: 0,
+          },
+        })
+
+        break
+      }
+
+      case 'FOR': {
+        process.executionStack.push({
+          instructions: [
+            instruction.initializer,
+          ],
+          programCounter: 0,
+          completionMode: 'FOR_CHECK',
+          forLoop: {
+            condition: instruction.condition,
+            body: instruction.body,
+            increment: instruction.increment,
+          },
+        })
+
+        break
+      }
+
+      case 'BREAK':
+        this.breakLoop(process)
+        break
+
+      case 'CONTINUE':
+        this.continueLoop(process)
+        break
+      
     }
 
     this.state.stepCount++
@@ -317,7 +384,7 @@ export class SimulationEngine {
     ]
   }
 
-private advanceProcess(
+  private advanceProcess(
     process: Process,
   ): void {
     const frame =
@@ -346,47 +413,280 @@ private advanceProcess(
       return
     }
 
-    if (
-      completedFrame.completionMode
-      === 'CHECK_REPEAT_UNTIL'
-    ) {
-      const condition =
-        completedFrame.repeatCondition
+    this.completeFrame(
+      process,
+      completedFrame,
+    )
+  }
 
-      if (!condition) {
-        throw new Error(
-          'Repeat frame is missing its condition',
-        )
-      }
-
-      const result = evaluateExpression(
-        condition,
-        {
-          localMemory: process.localMemory,
-          sharedMemory:
-            this.state.program.sharedMemory,
-        },
-      )
-
-      if (typeof result !== 'boolean') {
-        throw new Error(
-          'REPEAT UNTIL condition must evaluate to boolean',
-        )
-      }
-
-      if (result) {
+  private completeFrame(
+    process: Process,
+    frame: ExecutionFrame,
+  ): void {
+    switch (frame.completionMode) {
+      case 'ADVANCE_PARENT':
         this.advanceProcess(process)
-      }
+        return
 
+      case 'REPEAT_PARENT':
+        return
+
+      case 'CHECK_REPEAT_UNTIL':
+        this.completeRepeatUntil(
+          process,
+          frame,
+        )
+        return
+
+      case 'FOR_CHECK':
+        this.checkForCondition(
+          process,
+          frame,
+        )
+        return
+
+      case 'FOR_INCREMENT':
+        this.startForIncrement(
+          process,
+          frame,
+        )
+        return
+
+      case 'FOREACH_NEXT':
+        this.advanceForeach(
+          process,
+          frame,
+        )
+        return
+    }
+  }
+
+  private checkForCondition(
+    process: Process,
+    frame: ExecutionFrame,
+  ): void {
+    const loop = frame.forLoop
+
+    if (!loop) {
+      throw new Error(
+        'FOR frame is missing runtime information',
+      )
+    }
+
+    const condition = evaluateExpression(
+      loop.condition,
+      {
+        localMemory: process.localMemory,
+        sharedMemory:
+          this.state.program.sharedMemory,
+      },
+    )
+
+    if (typeof condition !== 'boolean') {
+      throw new Error(
+        'FOR condition must evaluate to boolean',
+      )
+    }
+
+    if (!condition) {
+      this.advanceProcess(process)
       return
     }
 
-    if (
-      completedFrame.completionMode
-      === 'ADVANCE_PARENT'
-    ) {
+    if (loop.body.length === 0) {
+      this.startForIncrement(
+        process,
+        frame,
+      )
+      return
+    }
+
+    process.executionStack.push({
+      instructions: loop.body,
+      programCounter: 0,
+      completionMode: 'FOR_INCREMENT',
+      forLoop: loop,
+    })
+  }
+
+  private startForIncrement(
+    process: Process,
+    frame: ExecutionFrame,
+  ): void {
+    const loop = frame.forLoop
+
+    if (!loop) {
+      throw new Error(
+        'FOR frame is missing runtime information',
+      )
+    }
+
+    process.executionStack.push({
+      instructions: [
+        loop.increment,
+      ],
+      programCounter: 0,
+      completionMode: 'FOR_CHECK',
+      forLoop: loop,
+    })
+  }
+
+  private completeRepeatUntil(
+    process: Process,
+    frame: ExecutionFrame,
+  ): void {
+    const condition = frame.repeatCondition
+
+    if (!condition) {
+      throw new Error(
+        'Repeat frame is missing its condition',
+      )
+    }
+
+    const result = evaluateExpression(
+      condition,
+      {
+        localMemory: process.localMemory,
+        sharedMemory:
+          this.state.program.sharedMemory,
+      },
+    )
+
+    if (typeof result !== 'boolean') {
+      throw new Error(
+        'REPEAT UNTIL condition must evaluate to boolean',
+      )
+    }
+
+    if (result) {
       this.advanceProcess(process)
     }
   }
 
+  private advanceForeach(
+    process: Process,
+    frame: ExecutionFrame,
+  ): void {
+    const loop = frame.foreachLoop
+
+    if (!loop) {
+      throw new Error(
+        'FOREACH frame is missing runtime information',
+      )
+    }
+
+    loop.index++
+
+    if (loop.index >= loop.values.length) {
+      this.advanceProcess(process)
+      return
+    }
+
+    process.localMemory[
+      loop.itemName
+    ] = loop.values[loop.index]
+
+    process.executionStack.push({
+      instructions: loop.body,
+      programCounter: 0,
+      completionMode: 'FOREACH_NEXT',
+      foreachLoop: loop,
+    })
+  }
+
+  private breakLoop(
+    process: Process,
+  ): void {
+    const loopIndex =
+      this.findNearestLoopFrameIndex(process)
+
+    if (loopIndex === -1) {
+      throw new Error(
+        'BREAK can only be used inside a loop',
+      )
+    }
+
+    process.executionStack.splice(
+      loopIndex,
+    )
+
+    this.advanceProcess(process)
+  }
+
+  private continueLoop(
+    process: Process,
+  ): void {
+    const loopIndex =
+      this.findNearestLoopFrameIndex(process)
+
+    if (loopIndex === -1) {
+      throw new Error(
+        'CONTINUE can only be used inside a loop',
+      )
+    }
+
+    const loopFrame =
+      process.executionStack[loopIndex]
+
+    process.executionStack.splice(
+      loopIndex,
+    )
+
+    switch (loopFrame.completionMode) {
+      case 'REPEAT_PARENT':
+        return
+
+      case 'CHECK_REPEAT_UNTIL':
+        this.completeRepeatUntil(
+          process,
+          loopFrame,
+        )
+        return
+
+      case 'FOR_INCREMENT':
+        this.startForIncrement(
+          process,
+          loopFrame,
+        )
+        return
+
+      case 'FOREACH_NEXT':
+        this.advanceForeach(
+          process,
+          loopFrame,
+        )
+        return
+
+      default:
+        throw new Error(
+          'Invalid loop frame for CONTINUE',
+        )
+    }
+  }
+
+  private findNearestLoopFrameIndex(
+    process: Process,
+  ): number {
+    for (
+      let index =
+        process.executionStack.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const mode =
+        process.executionStack[index]
+          .completionMode
+
+      if (
+        mode === 'REPEAT_PARENT'
+        || mode === 'CHECK_REPEAT_UNTIL'
+        || mode === 'FOR_INCREMENT'
+        || mode === 'FOREACH_NEXT'
+      ) {
+        return index
+      }
+    }
+
+    return -1
+  }
 }

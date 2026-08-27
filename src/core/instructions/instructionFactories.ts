@@ -6,6 +6,10 @@ import type {
   IfInstruction,
   WhileInstruction,
   RepeatUntilInstruction,
+  ForInstruction,
+  ForeachInstruction,
+  BreakInstruction,
+  ContinueInstruction,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -100,5 +104,45 @@ export function repeatUntilInstruction(
     type: 'REPEAT_UNTIL',
     body,
     condition,
+  }
+}
+
+export function forInstruction(
+  initializer: Instruction,
+  condition: Expression,
+  increment: Instruction,
+  body: Instruction[],
+): ForInstruction {
+  return {
+    type: 'FOR',
+    initializer,
+    condition,
+    increment,
+    body,
+  }
+}
+
+export function foreachInstruction(
+  itemName: string,
+  collection: Expression,
+  body: Instruction[],
+): ForeachInstruction {
+  return {
+    type: 'FOREACH',
+    itemName,
+    collection,
+    body,
+  }
+}
+
+export function breakInstruction(): BreakInstruction {
+  return {
+    type: 'BREAK',
+  }
+}
+
+export function continueInstruction(): ContinueInstruction {
+  return {
+    type: 'CONTINUE',
   }
 }
