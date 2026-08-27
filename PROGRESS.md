@@ -5,10 +5,13 @@
 
 ## Estado actual
 
-**Fase:** M0 --- Base del proyecto.
+**Fase:** M3.5 — Visualizer MVP ejecutable.
 
-**Próximo objetivo:** terminar la limpieza y estructura inicial antes de
-comenzar `Process`.
+**Último milestone completado:** M3 — Memoria, variables, expresiones y arrays.
+
+**Estado M3.5:** sintaxis V0 definida, tokenizer y parser mínimo implementados.
+
+**Próximo objetivo:** conectar el parser con React mediante un editor de código real, permitir seleccionar el scheduler y construir/ejecutar el programa escrito por el usuario.
 
 ------------------------------------------------------------------------
 
@@ -119,3 +122,59 @@ Antes de continuar después de una pausa:
 - Se agregó la instrucción `DECLARE`.
 - El engine puede declarar y modificar variables locales y compartidas.
 - Se agregaron tests de scopes, shadowing, declaraciones y asignaciones.
+- Se agregó soporte para `string` como `RuntimeValue`.
+- El operador `+` soporta suma numérica y concatenación entre strings.
+- Se agregó soporte para arrays básicos de `int`, `bool` y `string`.
+- Se implementó lectura de arrays mediante índices y expresiones.
+- Se implementó asignación a posiciones de arrays.
+- Los arrays anidados quedan explícitamente fuera del alcance actual.
+- Se agregó `AssignmentTarget` para diferenciar variables simples de accesos a arrays.
+- Se agregó `SimulationSnapshot`.
+- `SimulationEngine.getSnapshot()` expone el estado necesario para visualización.
+- Los snapshots clonan las memorias para impedir que la UI modifique accidentalmente el estado interno del engine.
+- M3 queda completado.
+### M3.5 — Lenguaje y Visualizer MVP
+
+#### Sintaxis V0
+
+- Se definió la primera versión de la sintaxis del lenguaje del simulador.
+- Se documentó en `docs/SYNTAX.md`.
+- La sintaxis V0 soporta variables compartidas con `shared`, procesos mediante `process`, variables locales, tipos `int`, `bool` y `string`, arrays básicos, asignaciones, expresiones aritméticas, comparaciones, expresiones booleanas y acceso/escritura en arrays.
+- El scheduler se mantiene fuera del código fuente y será seleccionado desde la interfaz.
+- Se decidió utilizar un único editor para el programa completo.
+- Los procesos finalizan automáticamente al consumir todas sus instrucciones.
+
+#### Tokenizer
+
+- Se creó el tokenizer inicial del lenguaje.
+- Reconoce keywords, identificadores, números, strings y booleanos.
+- Reconoce delimitadores, arrays y operadores.
+- Se soportan comentarios de una línea mediante `//`.
+- Cada token conserva línea y columna para permitir errores de sintaxis precisos.
+- Se agregó `TokenizerError`.
+- Se agregaron tests del tokenizer.
+
+#### Parser
+
+- Se implementó un parser descendente recursivo (`recursive descent parser`).
+- `parseProgram(source)` convierte código fuente directamente en un `Program` ejecutable por el motor.
+- Se implementó parsing de variables compartidas, procesos, declaraciones locales, asignaciones, lectura/escritura de arrays y expresiones.
+- El parser respeta precedencia de operadores: `||`, `&&`, igualdad, comparaciones, suma/resta, multiplicación/división, `!` y expresiones primarias.
+- Se soportan paréntesis para modificar la precedencia.
+- Se agregó `ParserError` con información de línea y columna.
+- Se agregaron tests del parser.
+- El lenguaje escrito por el usuario ya puede transformarse en las mismas estructuras internas utilizadas por `SimulationEngine`.
+
+#### Decisiones para funciones futuras
+
+- Las funciones y módulos todavía no están implementados.
+- Las definiciones de funciones serán globales e inmutables.
+- Cada proceso tendrá su propio contexto de ejecución de una función.
+- Se planea implementar un call stack por proceso.
+- Cada llamada tendrá su propio stack frame con parámetros, variables locales y dirección de retorno.
+- El código de una función no será duplicado por proceso.
+- Esta arquitectura permitirá posteriormente visualizar llamadas, retornos y stacks de procesos independientemente.
+
+#### Próximo paso
+
+Conectar el lenguaje con la interfaz React: editor de código, `Build`, errores de tokenizer/parser, selector de scheduler, seed de Random, `Step`, `Run`, `Reset`, visualización de procesos/memoria e historial.
