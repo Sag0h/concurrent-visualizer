@@ -22,6 +22,12 @@ export interface DeclareInstruction {
   readonly initialValue: Expression
 }
 
+export interface IfInstruction {
+  readonly type: 'IF'
+  readonly condition: Expression
+  readonly thenBranch: Instruction[]
+  readonly elseBranch: Instruction[]
+}
 
 
 export type Instruction =
@@ -29,3 +35,4 @@ export type Instruction =
   | FinishInstruction
   | AssignmentInstruction
   | DeclareInstruction
+  | IfInstruction

@@ -3,6 +3,8 @@ import type { Scheduler } from '../scheduler/Scheduler'
 import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
+import type { Process } from '../process/Process'
+import type { Instruction } from '../instructions/Instruction'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -55,7 +57,7 @@ export class SimulationEngine {
 
     process.state = 'RUNNING'
 
-    const instruction = process.instructions[process.programCounter]
+    const instruction = this.getCurrentInstruction(process)
 
     if (!instruction) {
       process.state = 'FINISHED'
@@ -70,7 +72,7 @@ export class SimulationEngine {
 
     switch (instruction.type) {
       case 'NO_OP':
-        process.programCounter++
+        this.advanceProcess(process)
         break
 
       case 'FINISH':
@@ -137,7 +139,7 @@ export class SimulationEngine {
           array[index] = value
         }
 
-        process.programCounter++
+        this.advanceProcess(process)
         break
       }
       case 'DECLARE': {
@@ -155,15 +157,52 @@ export class SimulationEngine {
           this.state.program.sharedMemory[instruction.name] = value
         }
 
-        process.programCounter++
+        this.advanceProcess(process)
         break
       }
 
+      case 'IF': {
+        const condition = evaluateExpression(
+          instruction.condition,
+          {
+            localMemory: process.localMemory,
+            sharedMemory:
+              this.state.program.sharedMemory,
+          },
+        )
+
+        if (typeof condition !== 'boolean') {
+          throw new Error(
+            'IF condition must evaluate to boolean',
+          )
+        }
+
+        const selectedBranch =
+          condition
+            ? instruction.thenBranch
+            : instruction.elseBranch
+
+        process.executionStack.push({
+          instructions: selectedBranch,
+          programCounter: 0,
+        })
+
+        if (selectedBranch.length === 0) {
+          process.executionStack.pop()
+          this.advanceProcess(process)
+        }
+
+        break
+      }
     }
 
     this.state.stepCount++
 
-    if (process.programCounter >= process.instructions.length) {
+    if (
+      process.executionStack.length === 0
+      && process.programCounter
+        >= process.instructions.length
+    ) {
       process.state = 'FINISHED'
     } else {
       process.state = 'READY'
@@ -188,6 +227,50 @@ export class SimulationEngine {
           ),
         }),
       ),
+    }
+  }
+
+  private getCurrentInstruction(
+    process: Process,
+  ): Instruction | undefined {
+    const frame =
+      process.executionStack[
+        process.executionStack.length - 1
+      ]
+
+    if (frame) {
+      return frame.instructions[
+        frame.programCounter
+      ]
+    }
+
+    return process.instructions[
+      process.programCounter
+    ]
+  }
+
+  private advanceProcess(
+    process: Process,
+  ): void {
+    const frame =
+      process.executionStack[
+        process.executionStack.length - 1
+      ]
+
+    if (!frame) {
+      process.programCounter++
+      return
+    }
+
+    frame.programCounter++
+
+    if (
+      frame.programCounter
+      >= frame.instructions.length
+    ) {
+      process.executionStack.pop()
+
+      this.advanceProcess(process)
     }
   }
 

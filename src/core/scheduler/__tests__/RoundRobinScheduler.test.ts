@@ -12,6 +12,7 @@ function createProcess(
     programCounter: 0,
     instructions: [],
     localMemory: {},
+    executionStack: [],
   }
 }
 

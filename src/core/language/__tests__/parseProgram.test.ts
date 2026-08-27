@@ -171,4 +171,38 @@ describe('parseProgram', () => {
       `),
     ).toThrow('Expected expression')
   })
+
+  it('parses if and else blocks', () => {
+    const program = parseProgram(`
+      process P1 {
+        int x = 10;
+
+        if (x > 5) {
+          x = 100;
+        } else {
+          x = 200;
+        }
+      }
+    `)
+
+    const instruction =
+      program.processes[0].instructions[1]
+
+    expect(instruction.type).toBe('IF')
+
+    if (instruction.type !== 'IF') {
+      throw new Error(
+        'Expected IF instruction',
+      )
+    }
+
+    expect(
+      instruction.thenBranch,
+    ).toHaveLength(1)
+
+    expect(
+      instruction.elseBranch,
+    ).toHaveLength(1)
+  })
+  
 })

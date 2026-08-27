@@ -11,6 +11,7 @@ import {
   arrayTarget,
   assign,
   declare,
+  ifInstruction,
   variableTarget,
 } from '../instructions/instructionFactories'
 import type { RuntimeValue } from '../memory/RuntimeValue'
@@ -121,12 +122,17 @@ class Parser {
       programCounter: 0,
       instructions,
       localMemory: {},
+      executionStack: [],
     }
   }
 
   private parseProcessInstruction(): Instruction {
     if (this.isTypeToken(this.peek().type)) {
       return this.parseLocalDeclaration()
+    }
+
+    if (this.match('IF')) {
+      return this.parseIfInstruction()
     }
 
     if (this.check('IDENTIFIER')) {
@@ -638,5 +644,58 @@ class Parser {
       message,
       token,
     )
+  }
+
+  private parseIfInstruction(): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "if"',
+    )
+
+    const condition = this.parseExpression()
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after IF condition',
+    )
+
+    const thenBranch = this.parseInstructionBlock()
+
+    let elseBranch: Instruction[] = []
+
+    if (this.match('ELSE')) {
+      elseBranch = this.parseInstructionBlock()
+    }
+
+    return ifInstruction(
+      condition,
+      thenBranch,
+      elseBranch,
+    )
+  }
+
+  private parseInstructionBlock(): Instruction[] {
+    this.consume(
+      'LEFT_BRACE',
+      'Expected "{" before block',
+    )
+
+    const instructions: Instruction[] = []
+
+    while (
+      !this.check('RIGHT_BRACE')
+      && !this.isAtEnd()
+    ) {
+      instructions.push(
+        this.parseProcessInstruction(),
+      )
+    }
+
+    this.consume(
+      'RIGHT_BRACE',
+      'Expected "}" after block',
+    )
+
+    return instructions
   }
 }

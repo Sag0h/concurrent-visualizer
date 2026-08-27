@@ -31,6 +31,8 @@ export type TokenType =
   | 'OR'
   | 'NOT'
   | 'EOF'
+  | 'IF'
+  | 'ELSE'
 
 export interface Token {
   readonly type: TokenType

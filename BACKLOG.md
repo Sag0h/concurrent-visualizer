@@ -141,8 +141,8 @@ Cada proceso concurrente debe poder comportarse como un programa
 secuencial normal.
 
 -   [ ] Bloques de instrucciones.
--   [ ] `if`.
--   [ ] `if / else`.
+-   [x] `if`.
+-   [x] `if / else`.
 -   [ ] `while`.
 -   [ ] `repeat / until`.
 -   [ ] `for`.

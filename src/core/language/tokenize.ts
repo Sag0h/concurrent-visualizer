@@ -9,6 +9,8 @@ const keywords: Record<string, TokenType> = {
   string: 'STRING_TYPE',
   true: 'BOOLEAN',
   false: 'BOOLEAN',
+  if: 'IF',
+  else: 'ELSE',
 }
 
 export function tokenize(source: string): Token[] {

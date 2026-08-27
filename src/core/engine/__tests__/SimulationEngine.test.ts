@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assign, declare, finish, noOp, variableTarget, arrayTarget } from '../../instructions/instructionFactories'
+import { assign, declare, finish, noOp, variableTarget, arrayTarget, ifInstruction} from '../../instructions/instructionFactories'
 import type { Process } from '../../process/Process'
 import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
 import { createExecutionState } from '../createExecutionState'
@@ -21,6 +21,7 @@ function createProcess(
     programCounter: 0,
     instructions,
     localMemory: {},
+    executionStack: [],
   }
 }
 
@@ -509,4 +510,53 @@ describe('SimulationEngine', () => {
     ).toBe(1)
   })
 
+  it('executes the then branch of an IF', () => {
+    const process = createProcess('P1', [
+      declare(
+        'LOCAL',
+        'x',
+        literal(10),
+      ),
+      ifInstruction(
+        binary(
+          '>',
+          variable('x'),
+          literal(5),
+        ),
+        [
+          assign(
+            variableTarget('x'),
+            literal(100),
+          ),
+        ],
+        [
+          assign(
+            variableTarget('x'),
+            literal(200),
+          ),
+        ],
+      ),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+    expect(process.localMemory.x).toBe(10)
+
+    engine.step()
+    expect(process.localMemory.x).toBe(10)
+
+    engine.step()
+    expect(process.localMemory.x).toBe(100)
+
+    expect(process.state).toBe('FINISHED')
+  })
 })

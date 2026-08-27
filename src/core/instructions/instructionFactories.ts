@@ -3,8 +3,10 @@ import type {
   FinishInstruction,
   NoOpInstruction,
   DeclareInstruction,
+  IfInstruction,
 } from './Instruction'
 
+import type { Instruction } from './Instruction'
 import type { AssignmentTarget } from './AssignmentTarget'
 import type { Expression } from '../expressions/Expression'
 
@@ -61,5 +63,18 @@ export function arrayTarget(
     type: 'ARRAY_ACCESS',
     arrayName,
     index,
+  }
+}
+
+export function ifInstruction(
+  condition: Expression,
+  thenBranch: Instruction[],
+  elseBranch: Instruction[] = [],
+): IfInstruction {
+  return {
+    type: 'IF',
+    condition,
+    thenBranch,
+    elseBranch,
   }
 }

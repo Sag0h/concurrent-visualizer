@@ -29,7 +29,14 @@ function App() {
   const [schedulerType, setSchedulerType] =
     useState<SchedulerType>('ROUND_ROBIN')
 
-  const [randomSeed, setRandomSeed] = useState(42)
+  const [useRandomSeed, setUseRandomSeed] = 
+    useState(false)
+
+  const [randomSeed, setRandomSeed] = 
+    useState(42)
+
+  const [activeSeed, setActiveSeed] =
+    useState(42)
 
   const [engine, setEngine] =
     useState<SimulationEngine | null>(null)
@@ -45,20 +52,27 @@ function App() {
 
   function handleBuild() {
     try {
-      const program = parseProgram(code)
+        const program = parseProgram(code)
 
-      const newEngine = new SimulationEngine(
-        createExecutionState(program),
-        createScheduler(
-          schedulerType,
-          randomSeed,
-        ),
-      )
+        const seed =
+          schedulerType === 'RANDOM'
+          && useRandomSeed
+            ? generateRandomSeed()
+            : randomSeed
 
-      setEngine(newEngine)
-      setSnapshot(newEngine.getSnapshot())
-      setError(null)
-      setIsDirty(false)
+        const newEngine = new SimulationEngine(
+          createExecutionState(program),
+          createScheduler(
+            schedulerType,
+            seed,
+          ),
+        )
+
+        setActiveSeed(seed)
+        setEngine(newEngine)
+        setSnapshot(newEngine.getSnapshot())
+        setError(null)
+        setIsDirty(false)
 
     } catch (buildError) {
       setEngine(null)
@@ -118,11 +132,40 @@ function App() {
       return
     }
 
-    engine.reset()
+    if (
+      schedulerType === 'RANDOM'
+      && useRandomSeed
+    ) {
+      try {
+        const program = parseProgram(code)
+        const newSeed = generateRandomSeed()
 
-    setSnapshot(
-      engine.getSnapshot(),
-    )
+        const newEngine = new SimulationEngine(
+          createExecutionState(program),
+          createScheduler(
+            schedulerType,
+            newSeed,
+          ),
+        )
+
+        setActiveSeed(newSeed)
+        setEngine(newEngine)
+        setSnapshot(
+          newEngine.getSnapshot(),
+        )
+
+        return
+      } catch (resetError) {
+        if (resetError instanceof Error) {
+          setError(resetError.message)
+        }
+
+        return
+      }
+    }
+
+    engine.reset()
+    setSnapshot(engine.getSnapshot())
   }
 
   function handleRun() {
@@ -139,6 +182,12 @@ function App() {
 
     setSnapshot(
       engine.getSnapshot(),
+    )
+  }
+
+  function generateRandomSeed(): number {
+    return Math.floor(
+      Math.random() * 2_147_483_647,
     )
   }
 
@@ -188,6 +237,21 @@ function App() {
               </select>
               {schedulerType === 'RANDOM' && (
                 <>
+                  <label className="random-seed-toggle">
+                    <input
+                      type="checkbox"
+                      checked={useRandomSeed}
+                      onChange={(event) => {
+                        setUseRandomSeed(
+                          event.target.checked,
+                        )
+
+                        invalidateBuild()
+                      }}
+                    />
+
+                    Random seed
+                  </label>
                   <label htmlFor="seed">
                     Seed
                   </label>
@@ -197,6 +261,7 @@ function App() {
                     className="seed-input"
                     type="number"
                     value={randomSeed}
+                    disabled={useRandomSeed}
                     onChange={(event) => {
                       setRandomSeed(
                         Number(event.target.value),
@@ -298,6 +363,13 @@ function App() {
                     )}
                   </strong>
                 </span>
+
+                {schedulerType === 'RANDOM' && (
+                  <span>
+                    Seed:{' '}
+                    <strong>{activeSeed}</strong>
+                  </span>
+                )}
 
                 <span>
                   Program:{' '}

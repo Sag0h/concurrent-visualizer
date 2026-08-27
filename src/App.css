@@ -227,3 +227,15 @@ h2 {
   font-weight: 600;
   color: #8a5a00;
 }
+
+.random-seed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.seed-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
