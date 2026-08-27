@@ -178,3 +178,18 @@ Antes de continuar después de una pausa:
 #### Próximo paso
 
 Conectar el lenguaje con la interfaz React: editor de código, `Build`, errores de tokenizer/parser, selector de scheduler, seed de Random, `Step`, `Run`, `Reset`, visualización de procesos/memoria e historial.
+
+### M4 — Loops y control de ejecución
+
+- Se agregó soporte para `for`.
+- Se agregó soporte para `foreach`.
+- Se agregó `break`.
+- Se agregó `continue`.
+- `break` afecta al loop más cercano.
+- `continue` respeta la semántica del tipo de loop:
+  - `while`: vuelve a evaluar la condición.
+  - `repeat / until`: evalúa `until`.
+  - `for`: ejecuta el incremento antes de volver a evaluar.
+  - `foreach`: avanza al siguiente elemento.
+- El `executionStack` fue extendido para representar distintos modos de finalización de bloques.
+- Los loops pueden contener `if`, otros loops, `break` y `continue` anidados.

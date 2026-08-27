@@ -423,6 +423,40 @@ function App() {
                             process.localMemory
                           }
                         />
+                        <h4>Call Stack</h4>
+
+                        {process.callStack.length === 0 ? (
+                          <p className="empty">
+                            No active function calls
+                          </p>
+                        ) : (
+                          <div className="call-stack">
+                            {[...process.callStack]
+                              .reverse()
+                              .map((frame, index) => (
+                                <div
+                                  className="call-frame"
+                                  key={`${frame.functionName}-${index}`}
+                                >
+                                  <div className="call-frame-header">
+                                    <strong>
+                                      {frame.functionName}()
+                                    </strong>
+
+                                    {index === 0 && (
+                                      <span className="active-frame">
+                                        ACTIVE
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <MemoryTable
+                                    memory={frame.localMemory}
+                                  />
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </article>
                     ),
                   )}

@@ -10,6 +10,8 @@ import type {
   ForeachInstruction,
   BreakInstruction,
   ContinueInstruction,
+  CallInstruction,
+  ReturnInstruction,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -144,5 +146,25 @@ export function breakInstruction(): BreakInstruction {
 export function continueInstruction(): ContinueInstruction {
   return {
     type: 'CONTINUE',
+  }
+}
+
+export function callInstruction(
+  functionName: string,
+  args: Expression[],
+): CallInstruction {
+  return {
+    type: 'CALL',
+    functionName,
+    arguments: args,
+  }
+}
+
+export function returnInstruction(
+  value?: Expression,
+): ReturnInstruction {
+  return {
+    type: 'RETURN',
+    value,
   }
 }

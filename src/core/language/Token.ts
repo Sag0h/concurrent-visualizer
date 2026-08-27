@@ -41,6 +41,8 @@ export type TokenType =
   | 'IN'
   | 'BREAK'
   | 'CONTINUE'
+  | 'FUNCTION'
+  | 'RETURN'
 
 export interface Token {
   readonly type: TokenType

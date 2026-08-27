@@ -31,7 +31,7 @@ export interface BinaryExpression {
 
 export interface UnaryExpression {
   readonly type: 'UNARY'
-  readonly operator: '!'
+  readonly operator: '!' | '-'
   readonly operand: Expression
 }
 

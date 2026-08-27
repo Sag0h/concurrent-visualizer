@@ -19,6 +19,8 @@ const keywords: Record<string, TokenType> = {
   in: 'IN',
   break: 'BREAK',
   continue: 'CONTINUE',
+  function: 'FUNCTION',
+  return: 'RETURN',
 }
 
 export function tokenize(source: string): Token[] {

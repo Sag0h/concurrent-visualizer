@@ -239,3 +239,32 @@ h2 {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.call-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.call-frame {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.call-frame-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.active-frame {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  background: #fff3cd;
+}

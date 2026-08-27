@@ -11,6 +11,7 @@ import {
   arrayTarget,
   assign,
   breakInstruction,
+  callInstruction,
   continueInstruction,
   declare,
   foreachInstruction,
@@ -19,6 +20,7 @@ import {
   repeatUntilInstruction,
   variableTarget,
   whileInstruction,
+  returnInstruction,
 } from '../instructions/instructionFactories'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 import type { Process } from '../process/Process'
@@ -26,6 +28,7 @@ import type { Program } from '../engine/Program'
 import type { Token, TokenType } from './Token'
 import { ParserError } from './ParserError'
 import { tokenize } from './tokenize'
+import type { FunctionDefinition } from './FunctionDefinition'
 
 export function parseProgram(
   source: string,
@@ -47,9 +50,31 @@ class Parser {
     const processes: Process[] = []
     const sharedMemory: Program['sharedMemory'] = {}
 
+    const functions: Record<
+      string,
+      FunctionDefinition
+    > = {}
+
     while (!this.isAtEnd()) {
       if (this.match('SHARED')) {
         this.parseSharedDeclaration(sharedMemory)
+        continue
+      }
+
+      if (this.match('FUNCTION')) {
+        const functionDefinition =
+          this.parseFunctionDefinition()
+
+        if (functions[functionDefinition.name]) {
+          throw this.error(
+            this.previous(),
+            `Function "${functionDefinition.name}" is already defined`,
+          )
+        }
+
+        functions[functionDefinition.name] =
+          functionDefinition
+
         continue
       }
 
@@ -60,13 +85,14 @@ class Parser {
 
       throw this.error(
         this.peek(),
-        'Expected "shared" or "process"',
+        'Expected "shared", "function" or "process"'
       )
     }
 
     return {
       processes,
       sharedMemory,
+      functions,
     }
   }
 
@@ -129,6 +155,7 @@ class Parser {
       instructions,
       localMemory: {},
       executionStack: [],
+      callStack: [],
     }
   }
 
@@ -157,6 +184,10 @@ class Parser {
       return this.parseForeachInstruction()
     }
 
+    if (this.match('RETURN')) {
+      return this.parseReturnInstruction()
+    }
+
     if (this.match('BREAK')) {
       this.consume(
         'SEMICOLON',
@@ -171,6 +202,13 @@ class Parser {
         'Expected ";" after "continue"',
       )
       return continueInstruction()
+    }
+
+    if (
+      this.check('IDENTIFIER')
+      && this.checkNext('LEFT_PAREN')
+    ) {
+      return this.parseFunctionCall()
     }
 
     if (this.check('IDENTIFIER')) {
@@ -379,6 +417,13 @@ class Parser {
     if (this.match('NOT')) {
       return unary(
         '!',
+        this.parseUnary(),
+      )
+    }
+
+    if (this.match('MINUS')) {
+      return unary(
+        '-',
         this.parseUnary(),
       )
     }
@@ -882,5 +927,117 @@ class Parser {
       collection,
       body,
     )
+  }
+
+  private parseFunctionDefinition(): FunctionDefinition {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected function name',
+    )
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after function name',
+    )
+
+    const parameters: string[] = []
+
+    if (!this.check('RIGHT_PAREN')) {
+      do {
+        this.parseType()
+
+        const parameter = this.consume(
+          'IDENTIFIER',
+          'Expected parameter name',
+        )
+
+        parameters.push(
+          parameter.lexeme,
+        )
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after parameters',
+    )
+
+    const body =
+      this.parseInstructionBlock()
+
+    return {
+      name: name.lexeme,
+      parameters,
+      body,
+    }
+  }
+
+  private checkNext(
+    type: TokenType,
+  ): boolean {
+    if (
+      this.current + 1
+      >= this.tokens.length
+    ) {
+      return false
+    }
+
+    return (
+      this.tokens[
+        this.current + 1
+      ].type === type
+    )
+  }
+
+  private parseFunctionCall(): Instruction {
+    const functionName = this.consume(
+      'IDENTIFIER',
+      'Expected function name',
+    )
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after function name',
+    )
+
+    const args: Expression[] = []
+
+    if (!this.check('RIGHT_PAREN')) {
+      do {
+        args.push(
+          this.parseExpression(),
+        )
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after arguments',
+    )
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after function call',
+    )
+
+    return callInstruction(
+      functionName.lexeme,
+      args,
+    )
+  }
+
+  private parseReturnInstruction(): Instruction {
+    if (this.match('SEMICOLON')) {
+      return returnInstruction()
+    }
+
+    const value = this.parseExpression()
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after return value',
+    )
+
+    return returnInstruction(value)
   }
 }

@@ -13,6 +13,7 @@ function createProcess(
     instructions: [],
     localMemory: {},
     executionStack: [],
+    callStack: [],
   }
 }
 

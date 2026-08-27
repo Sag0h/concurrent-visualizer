@@ -22,6 +22,7 @@ function createProcess(
     instructions,
     localMemory: {},
     executionStack: [],
+    callStack: [],
   }
 }
 
@@ -474,6 +475,7 @@ describe('SimulationEngine', () => {
           localMemory: {
             x: 5,
           },
+          callStack: [],
         },
       ],
     })

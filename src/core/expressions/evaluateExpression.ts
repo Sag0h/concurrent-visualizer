@@ -96,6 +96,8 @@ function evaluateUnaryExpression(
   switch (expression.operator) {
     case '!':
       return !requireBoolean(operand)
+    case '-':
+      return -requireNumber(operand)
   }
 }
 

@@ -63,6 +63,17 @@ export interface ContinueInstruction {
   readonly type: 'CONTINUE'
 }
 
+export interface CallInstruction {
+  readonly type: 'CALL'
+  readonly functionName: string
+  readonly arguments: Expression[]
+}
+
+export interface ReturnInstruction {
+  readonly type: 'RETURN'
+  readonly value?: Expression
+}
+
 export type Instruction =
   | NoOpInstruction
   | FinishInstruction
@@ -75,3 +86,5 @@ export type Instruction =
   | ForeachInstruction
   | BreakInstruction
   | ContinueInstruction
+  | CallInstruction
+  | ReturnInstruction

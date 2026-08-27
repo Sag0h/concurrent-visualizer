@@ -6,6 +6,8 @@ import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
 import type { Instruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
+import type { RuntimeValue } from '../memory/RuntimeValue'
+import type { Expression } from '../expressions/Expression'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -86,7 +88,7 @@ export class SimulationEngine {
         const value = evaluateExpression(
           instruction.expression,
           {
-            localMemory: process.localMemory,
+            localMemory:this.getActiveLocalMemory(process),
             sharedMemory: this.state.program.sharedMemory,
           },
         )
@@ -95,14 +97,14 @@ export class SimulationEngine {
           writeVariable(
             instruction.target.name,
             value,
-            process.localMemory,
+            this.getActiveLocalMemory(process),
             this.state.program.sharedMemory,
           )
         } else {
           const index = evaluateExpression(
             instruction.target.index,
             {
-              localMemory: process.localMemory,
+              localMemory: this.getActiveLocalMemory(process),
               sharedMemory: this.state.program.sharedMemory,
             },
           )
@@ -116,9 +118,12 @@ export class SimulationEngine {
 
           const arrayName = instruction.target.arrayName
 
+          const localMemory =
+            this.getActiveLocalMemory(process)
+
           const array =
-            arrayName in process.localMemory
-              ? process.localMemory[arrayName]
+            arrayName in localMemory
+              ? localMemory[arrayName]
               : this.state.program.sharedMemory[arrayName]
 
           if (!Array.isArray(array)) {
@@ -147,13 +152,15 @@ export class SimulationEngine {
         const value = evaluateExpression(
           instruction.initialValue,
           {
-            localMemory: process.localMemory,
+            localMemory: this.getActiveLocalMemory(process),
             sharedMemory: this.state.program.sharedMemory,
           },
         )
 
         if (instruction.scope === 'LOCAL') {
-          process.localMemory[instruction.name] = value
+          this.getActiveLocalMemory(process)[
+            instruction.name
+          ] = value
         } else {
           this.state.program.sharedMemory[instruction.name] = value
         }
@@ -166,7 +173,7 @@ export class SimulationEngine {
         const condition = evaluateExpression(
           instruction.condition,
           {
-            localMemory: process.localMemory,
+            localMemory: this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
           },
@@ -200,7 +207,7 @@ export class SimulationEngine {
         const condition = evaluateExpression(
           instruction.condition,
           {
-            localMemory: process.localMemory,
+            localMemory: this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
           },
@@ -235,7 +242,7 @@ export class SimulationEngine {
           const condition = evaluateExpression(
             instruction.condition,
             {
-              localMemory: process.localMemory,
+              localMemory: this.getActiveLocalMemory(process),
               sharedMemory:
                 this.state.program.sharedMemory,
             },
@@ -268,7 +275,7 @@ export class SimulationEngine {
         const collection = evaluateExpression(
           instruction.collection,
           {
-            localMemory: process.localMemory,
+            localMemory: this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
           },
@@ -285,7 +292,7 @@ export class SimulationEngine {
           break
         }
 
-        process.localMemory[
+        this.getActiveLocalMemory(process)[
           instruction.itemName
         ] = collection[0]
 
@@ -329,6 +336,90 @@ export class SimulationEngine {
         this.continueLoop(process)
         break
       
+      case 'CALL': {
+        const functionDefinition =
+          this.state.program.functions?.[
+            instruction.functionName
+          ]
+
+        if (!functionDefinition) {
+          throw new Error(
+            `Function "${instruction.functionName}" is not defined`,
+          )
+        }
+
+        if (
+          instruction.arguments.length
+          !== functionDefinition.parameters.length
+        ) {
+          throw new Error(
+            `Function "${instruction.functionName}" expected `
+            + `${functionDefinition.parameters.length} arguments `
+            + `but received ${instruction.arguments.length}`,
+          )
+        }
+
+        const callerMemory =
+          this.getActiveLocalMemory(process)
+
+        const argumentValues =
+          instruction.arguments.map(
+            (argument) =>
+              evaluateExpression(
+                argument,
+                {
+                  localMemory: callerMemory,
+                  sharedMemory:
+                    this.state.program.sharedMemory,
+                },
+              ),
+          )
+
+        const functionMemory: Record<
+          string,
+          RuntimeValue
+        > = {}
+
+        functionDefinition.parameters.forEach(
+          (parameter, index) => {
+            functionMemory[parameter] =
+              structuredClone(argumentValues[index])
+          },
+        )
+
+        process.callStack.push({
+          functionName:
+            functionDefinition.name,
+          localMemory: functionMemory,
+        })
+
+        if (
+          functionDefinition.body.length === 0
+        ) {
+          process.callStack.pop()
+          this.advanceProcess(process)
+          break
+        }
+
+        process.executionStack.push({
+          instructions:
+            functionDefinition.body,
+          programCounter: 0,
+          completionMode:
+            'FUNCTION_RETURN',
+        })
+
+        break
+      }
+
+      case 'RETURN': {
+        this.executeReturn(
+          process,
+          instruction.value,
+        )
+
+        break
+      }
     }
 
     this.state.stepCount++
@@ -359,6 +450,14 @@ export class SimulationEngine {
           programCounter: process.programCounter,
           localMemory: structuredClone(
             process.localMemory,
+          ),
+          callStack: process.callStack.map(
+            (frame) => ({
+              functionName: frame.functionName,
+              localMemory: structuredClone(
+                frame.localMemory,
+              ),
+            }),
           ),
         }),
       ),
@@ -458,6 +557,10 @@ export class SimulationEngine {
           frame,
         )
         return
+
+      case 'FUNCTION_RETURN':
+        this.completeFunctionCall(process)
+        return
     }
   }
 
@@ -476,7 +579,7 @@ export class SimulationEngine {
     const condition = evaluateExpression(
       loop.condition,
       {
-        localMemory: process.localMemory,
+        localMemory: this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
       },
@@ -546,7 +649,7 @@ export class SimulationEngine {
     const result = evaluateExpression(
       condition,
       {
-        localMemory: process.localMemory,
+        localMemory: this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
       },
@@ -582,7 +685,7 @@ export class SimulationEngine {
       return
     }
 
-    process.localMemory[
+    this.getActiveLocalMemory(process)[
       loop.itemName
     ] = loop.values[loop.index]
 
@@ -677,6 +780,10 @@ export class SimulationEngine {
         process.executionStack[index]
           .completionMode
 
+      if (mode === 'FUNCTION_RETURN') {
+        return -1
+      }
+
       if (
         mode === 'REPEAT_PARENT'
         || mode === 'CHECK_REPEAT_UNTIL'
@@ -688,5 +795,94 @@ export class SimulationEngine {
     }
 
     return -1
+  }
+
+  private completeFunctionCall(
+    process: Process,
+  ): void {
+    const frame = process.callStack.pop()
+
+    if (!frame) {
+      throw new Error(
+        'Function call stack is empty',
+      )
+    }
+
+    process.lastReturnValue =
+      frame.returnValue
+
+    this.advanceProcess(process)
+  }
+
+  private getActiveLocalMemory(
+    process: Process,
+  ) {
+    const functionFrame =
+      process.callStack[
+        process.callStack.length - 1
+      ]
+
+    return functionFrame?.localMemory
+      ?? process.localMemory
+  }
+
+  private executeReturn(
+    process: Process,
+    expression?: Expression,
+  ): void {
+    const callFrame =
+      process.callStack[
+        process.callStack.length - 1
+      ]
+
+    if (!callFrame) {
+      throw new Error(
+        'RETURN can only be used inside a function',
+      )
+    }
+
+    if (expression) {
+      callFrame.returnValue =
+        evaluateExpression(
+          expression,
+          {
+            localMemory:
+              this.getActiveLocalMemory(process),
+            sharedMemory:
+              this.state.program.sharedMemory,
+          },
+        )
+    }
+
+    this.unwindCurrentFunction(process)
+  }
+
+  private unwindCurrentFunction(
+    process: Process,
+  ): void {
+    let foundFunctionBoundary = false
+
+    while (
+      process.executionStack.length > 0
+    ) {
+      const frame =
+        process.executionStack.pop()
+
+      if (
+        frame?.completionMode
+        === 'FUNCTION_RETURN'
+      ) {
+        foundFunctionBoundary = true
+        break
+      }
+    }
+
+    if (!foundFunctionBoundary) {
+      throw new Error(
+        'Function execution frame not found',
+      )
+    }
+
+    this.completeFunctionCall(process)
   }
 }
