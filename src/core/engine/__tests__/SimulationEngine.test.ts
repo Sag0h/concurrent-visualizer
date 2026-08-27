@@ -11,6 +11,8 @@ import {
   variable,
 } from '../../expressions/expressionFactories'
 
+import { parseProgram } from '../../language/parseProgram'
+
 function createProcess(
   id: string,
   instructions: Process['instructions'],
@@ -26,6 +28,35 @@ function createProcess(
     expressionRuntimeStatus: 'IDLE',
     pendingEvaluations: [],
   }
+}
+
+function runSourceProgram(
+  source: string,
+  maxSteps = 1000,
+): Program {
+  const program = parseProgram(source)
+
+  const engine = new SimulationEngine(
+    createExecutionState(program),
+    new FirstReadyScheduler(),
+    maxSteps,
+  )
+
+  while (!engine.isFinished()) {
+    const progressed = engine.step()
+
+    if (!progressed) {
+      break
+    }
+  }
+
+  if (!engine.isFinished()) {
+    throw new Error(
+      `Program did not finish after ${engine.getState().stepCount} steps`,
+    )
+  }
+
+  return engine.getState().program
 }
 
 describe('SimulationEngine', () => {
@@ -607,4 +638,180 @@ describe('SimulationEngine', () => {
     expect(process.localMemory.x).toBe(3)
     expect(process.state).toBe('FINISHED')
   })
+
+  it('evaluates nested function calls inside return expressions', () => {
+    const program = runSourceProgram(`
+      shared int result = 0;
+
+      function double(int value) {
+        return value * 2;
+      }
+
+      function calculate(int value) {
+        return double(value) + 1;
+      }
+
+      process P1 {
+        result = calculate(5);
+      }
+    `)
+
+    expect(program.sharedMemory.result).toBe(11)
+  })
+
+  it('evaluates function calls in multiple call arguments', () => {
+    const program = runSourceProgram(`
+      shared int result = 0;
+
+      function double(int value) {
+        return value * 2;
+      }
+
+      function addAndSave(int a, int b) {
+        result = a + b;
+      }
+
+      process P1 {
+        addAndSave(
+          double(5),
+          double(10)
+        );
+      }
+    `)
+
+    expect(program.sharedMemory.result).toBe(30)
+  })
+    
+  it('evaluates deeply nested function call expressions', () => {
+    const program = runSourceProgram(`
+      shared int result = 0;
+
+      function double(int value) {
+        return value * 2;
+      }
+
+      process P1 {
+        result = double(double(5));
+      }
+    `)
+
+    expect(program.sharedMemory.result).toBe(20)
+  })
+
+  it('evaluates a function call used as a foreach collection', () => {
+    const program = runSourceProgram(`
+      shared int total = 0;
+
+      function getValues() {
+        return [10, 20, 30];
+      }
+
+      process P1 {
+        foreach (value in getValues()) {
+          total = total + value;
+        }
+      }
+    `)
+
+    expect(program.sharedMemory.total).toBe(60)
+  })
+
+  it('evaluates function calls in array assignment index and value', () => {
+    const program = runSourceProgram(`
+      shared int result = 0;
+
+      function getIndex() {
+        return 1;
+      }
+
+      function calculate() {
+        return 100;
+      }
+
+      process P1 {
+        int[] values = [10, 20, 30];
+
+        values[getIndex()] = calculate();
+
+        result = values[1];
+      }
+    `)
+
+    expect(program.sharedMemory.result).toBe(100)
+  })
+
+  it('evaluates a function call in an empty repeat-until condition', () => {
+    const program = runSourceProgram(`
+      shared int checks = 0;
+
+      function ready() {
+        checks = checks + 1;
+        return checks >= 3;
+      }
+
+      process P1 {
+        repeat {
+        } until (ready());
+      }
+    `)
+
+    expect(program.sharedMemory.checks).toBe(3)
+  })
+
+  it('evaluates a function call in a for condition', () => {
+    const program = runSourceProgram(`
+      shared int total = 0;
+
+      function canContinue(int value) {
+        return value < 4;
+      }
+
+      process P1 {
+        for (
+          int i = 0;
+          canContinue(i);
+          i = i + 1
+        ) {
+          total = total + i;
+        }
+      }
+    `)
+
+    expect(program.sharedMemory.total).toBe(6)
+  })
+
+  it('keeps suspended expression state isolated between processes', () => {
+    const program = runSourceProgram(`
+      shared int result1 = 0;
+      shared int result2 = 0;
+
+      function double(int value) {
+        return value * 2;
+      }
+
+      function calculate(int value) {
+        return double(value) + 1;
+      }
+
+      process P1 {
+        result1 = calculate(5);
+      }
+
+      process P2 {
+        result2 = calculate(10);
+      }
+    `)
+
+    expect(program.sharedMemory.result1).toBe(11)
+    expect(program.sharedMemory.result2).toBe(21)
+
+    expect(
+      program.processes[0].pendingEvaluations,
+    ).toEqual([])
+
+    expect(
+      program.processes[1].pendingEvaluations,
+    ).toEqual([])
+  })
+
 })

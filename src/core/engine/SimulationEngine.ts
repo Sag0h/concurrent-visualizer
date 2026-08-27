@@ -4,7 +4,7 @@ import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
-import type { CallInstruction, IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
+import type { CallInstruction, ForeachInstruction, IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 import type { PendingInstruction } from '../process/PendingInstruction'
@@ -124,13 +124,12 @@ step(): boolean {
           },
         )
 
-        this.applyAssignment(
+        this.completeAssignmentValue(
           process,
           instruction.target,
           value,
         )
 
-        this.advanceProcess(process)
         break
       }
 
@@ -253,6 +252,23 @@ step(): boolean {
 
       case 'REPEAT_UNTIL': {
         if (instruction.body.length === 0) {
+          if (
+            this.containsFunctionCall(
+              instruction.condition,
+            )
+          ) {
+            this.suspendExpression(
+              process,
+              instruction.condition,
+              {
+                type: 'REPEAT_UNTIL',
+                instruction,
+              },
+            )
+
+            break
+          }
+
           const condition = evaluateExpression(
             instruction.condition,
             {
@@ -263,15 +279,10 @@ step(): boolean {
             },
           )
 
-          if (typeof condition !== 'boolean') {
-            throw new Error(
-              'REPEAT UNTIL condition must evaluate to boolean',
-            )
-          }
-
-          if (condition) {
-            this.advanceProcess(process)
-          }
+          this.applyRepeatUntilCondition(
+            process,
+            condition,
+          )
 
           break
         }
@@ -289,6 +300,23 @@ step(): boolean {
       }
 
       case 'FOREACH': {
+        if (
+          this.containsFunctionCall(
+            instruction.collection,
+          )
+        ) {
+          this.suspendExpression(
+            process,
+            instruction.collection,
+            {
+              type: 'FOREACH_COLLECTION',
+              instruction,
+            },
+          )
+
+          break
+        }
+
         const collection = evaluateExpression(
           instruction.collection,
           {
@@ -299,32 +327,11 @@ step(): boolean {
           },
         )
 
-        if (!Array.isArray(collection)) {
-          throw new Error(
-            'FOREACH collection must be an array',
-          )
-        }
-
-        if (collection.length === 0) {
-          this.advanceProcess(process)
-          break
-        }
-
-        this.getActiveLocalMemory(process)[
-          instruction.itemName
-        ] = collection[0]
-
-        process.executionStack.push({
-          instructions: instruction.body,
-          programCounter: 0,
-          completionMode: 'FOREACH_NEXT',
-          foreachLoop: {
-            itemName: instruction.itemName,
-            values: [...collection],
-            body: instruction.body,
-            index: 0,
-          },
-        })
+        this.applyForeachCollection(
+          process,
+          instruction,
+          collection,
+        )
 
         break
       }
@@ -1176,13 +1183,11 @@ step(): boolean {
         return
 
       case 'ASSIGN':
-        this.applyAssignment(
+        this.completeAssignmentValue(
           process,
           pending.target,
           value,
         )
-
-        this.advanceProcess(process)
         return
 
       case 'IF':
@@ -1237,6 +1242,25 @@ step(): boolean {
           pending.argumentIndex,
           value,
         )
+        return
+
+      case 'FOREACH_COLLECTION':
+        this.applyForeachCollection(
+          process,
+          pending.instruction,
+          value,
+        )
+        return
+
+      case 'ASSIGN_TARGET_INDEX':
+        this.applyArrayAssignment(
+          process,
+          pending.arrayName,
+          value,
+          pending.value,
+        )
+
+        this.advanceProcess(process)
         return
     }
   }
@@ -1420,49 +1444,12 @@ step(): boolean {
       },
     )
 
-    if (
-      typeof index !== 'number'
-      || !Number.isInteger(index)
-    ) {
-      throw new Error(
-        'Array index must be an integer',
-      )
-    }
-
-    const arrayName = target.arrayName
-
-    const localMemory =
-      this.getActiveLocalMemory(process)
-
-    const array =
-      arrayName in localMemory
-        ? localMemory[arrayName]
-        : this.state.program.sharedMemory[
-            arrayName
-          ]
-
-    if (!Array.isArray(array)) {
-      throw new Error(
-        `Variable "${arrayName}" is not an array`,
-      )
-    }
-
-    if (
-      index < 0
-      || index >= array.length
-    ) {
-      throw new Error(
-        `Array index ${index} is out of bounds`,
-      )
-    }
-
-    if (Array.isArray(value)) {
-      throw new Error(
-        'Nested arrays are not supported yet',
-      )
-    }
-
-    array[index] = value
+    this.applyArrayAssignment(
+      process,
+      target.arrayName,
+      index,
+      value,
+    )
   }
 
   private applyIfCondition(
@@ -1768,4 +1755,120 @@ step(): boolean {
       process.pendingEvaluations.length - 1
     ]
   }
+
+  private applyForeachCollection(
+    process: Process,
+    instruction: ForeachInstruction,
+    collection: RuntimeValue,
+  ): void {
+    if (!Array.isArray(collection)) {
+      throw new Error(
+        'FOREACH collection must be an array',
+      )
+    }
+
+    if (collection.length === 0) {
+      this.advanceProcess(process)
+      return
+    }
+
+    this.getActiveLocalMemory(process)[
+      instruction.itemName
+    ] = collection[0]
+
+    process.executionStack.push({
+      instructions: instruction.body,
+      programCounter: 0,
+      completionMode: 'FOREACH_NEXT',
+      foreachLoop: {
+        itemName: instruction.itemName,
+        values: [...collection],
+        body: instruction.body,
+        index: 0,
+      },
+    })
+  }
+
+  private applyArrayAssignment(
+    process: Process,
+    arrayName: string,
+    index: RuntimeValue,
+    value: RuntimeValue,
+  ): void {
+    if (
+      typeof index !== 'number'
+      || !Number.isInteger(index)
+    ) {
+      throw new Error(
+        'Array index must be an integer',
+      )
+    }
+
+    const localMemory =
+      this.getActiveLocalMemory(process)
+
+    const array =
+      arrayName in localMemory
+        ? localMemory[arrayName]
+        : this.state.program.sharedMemory[
+            arrayName
+          ]
+
+    if (!Array.isArray(array)) {
+      throw new Error(
+        `Variable "${arrayName}" is not an array`,
+      )
+    }
+
+    if (
+      index < 0
+      || index >= array.length
+    ) {
+      throw new Error(
+        `Array index ${index} is out of bounds`,
+      )
+    }
+
+    if (Array.isArray(value)) {
+      throw new Error(
+        'Nested arrays are not supported yet',
+      )
+    }
+
+    array[index] = value
+  }
+
+  private completeAssignmentValue(
+    process: Process,
+    target: AssignmentTarget,
+    value: RuntimeValue,
+  ): void {
+    if (
+      target.type === 'ARRAY_ACCESS'
+      && this.containsFunctionCall(
+        target.index,
+      )
+    ) {
+      this.suspendExpression(
+        process,
+        target.index,
+        {
+          type: 'ASSIGN_TARGET_INDEX',
+          arrayName: target.arrayName,
+          value,
+        },
+      )
+
+      return
+    }
+
+    this.applyAssignment(
+      process,
+      target,
+      value,
+    )
+
+    this.advanceProcess(process)
+  }
+
 }

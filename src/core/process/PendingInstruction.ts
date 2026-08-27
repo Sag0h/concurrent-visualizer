@@ -5,9 +5,12 @@ import type {
   RepeatUntilInstruction,
   ReturnInstruction,
   CallInstruction,
+  ForeachInstruction,
 } from '../instructions/Instruction'
 
 import type { ExecutionFrame } from './ExecutionFrame'
+
+import type { RuntimeValue } from '../memory/RuntimeValue'
 
 export type PendingInstruction =
   | {
@@ -47,4 +50,13 @@ export type PendingInstruction =
   | {
     readonly type: 'FOR_CONDITION'
     readonly frame: ExecutionFrame
+  }
+  | {
+    readonly type: 'FOREACH_COLLECTION'
+    readonly instruction: ForeachInstruction
+  }
+  | {
+    readonly type: 'ASSIGN_TARGET_INDEX'
+    readonly arrayName: string
+    readonly value: RuntimeValue
   }
