@@ -231,6 +231,276 @@ function App() {
     )
   }
 
+  const handleEditorKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    const textarea = event.currentTarget
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const indentation = '    '
+
+    function updateEditor(
+      newCode: string,
+      newSelectionStart: number,
+      newSelectionEnd: number,
+    ) {
+      setCode(newCode)
+      invalidateBuild()
+
+      requestAnimationFrame(() => {
+        textarea.selectionStart = newSelectionStart
+        textarea.selectionEnd = newSelectionEnd
+      })
+    }
+
+    if (event.key === 'Tab') {
+      event.preventDefault()
+
+      const hasSelection = start !== end
+
+      const lineStart =
+        code.lastIndexOf('\n', start - 1) + 1
+
+      if (event.shiftKey) {
+        if (!hasSelection) {
+          const line = code.slice(
+            lineStart,
+            code.indexOf('\n', lineStart) === -1
+              ? code.length
+              : code.indexOf('\n', lineStart),
+          )
+
+          const spacesToRemove =
+            Math.min(
+              indentation.length,
+              line.length - line.trimStart().length,
+            )
+
+          if (spacesToRemove === 0) {
+            return
+          }
+
+          const newCode =
+            code.slice(0, lineStart) +
+            code.slice(lineStart + spacesToRemove)
+
+          const newCursor =
+            Math.max(
+              lineStart,
+              start - spacesToRemove,
+            )
+
+          updateEditor(
+            newCode,
+            newCursor,
+            newCursor,
+          )
+
+          return
+        }
+
+        const selectedStart =
+          code.lastIndexOf('\n', start - 1) + 1
+
+        const nextNewLine =
+          code.indexOf('\n', end)
+
+        const selectedEnd =
+          nextNewLine === -1
+            ? code.length
+            : nextNewLine
+
+        const selectedText =
+          code.slice(selectedStart, selectedEnd)
+
+        const lines = selectedText.split('\n')
+
+        let removedFromFirstLine = 0
+        let totalRemoved = 0
+
+        const unindentedLines =
+          lines.map((line, index) => {
+            const spacesToRemove =
+              Math.min(
+                indentation.length,
+                line.length - line.trimStart().length,
+              )
+
+            if (index === 0) {
+              removedFromFirstLine = spacesToRemove
+            }
+
+            totalRemoved += spacesToRemove
+
+            return line.slice(spacesToRemove)
+          })
+
+        const replacement =
+          unindentedLines.join('\n')
+
+        const newCode =
+          code.slice(0, selectedStart) +
+          replacement +
+          code.slice(selectedEnd)
+
+        const newStart =
+          Math.max(
+            selectedStart,
+            start - removedFromFirstLine,
+          )
+
+        const newEnd =
+          Math.max(
+            newStart,
+            end - totalRemoved,
+          )
+
+        updateEditor(
+          newCode,
+          newStart,
+          newEnd,
+        )
+
+        return
+      }
+
+      if (hasSelection) {
+        const selectedStart =
+          code.lastIndexOf('\n', start - 1) + 1
+
+        const nextNewLine =
+          code.indexOf('\n', end)
+
+        const selectedEnd =
+          nextNewLine === -1
+            ? code.length
+            : nextNewLine
+
+        const selectedText =
+          code.slice(selectedStart, selectedEnd)
+
+        const lines =
+          selectedText.split('\n')
+
+        const indentedText =
+          lines
+            .map((line) => indentation + line)
+            .join('\n')
+
+        const newCode =
+          code.slice(0, selectedStart) +
+          indentedText +
+          code.slice(selectedEnd)
+
+        const newStart =
+          start + indentation.length
+
+        const newEnd =
+          end + indentation.length * lines.length
+
+        updateEditor(
+          newCode,
+          newStart,
+          newEnd,
+        )
+
+        return
+      }
+
+      const newCode =
+        code.slice(0, start) +
+        indentation +
+        code.slice(end)
+
+      updateEditor(
+        newCode,
+        start + indentation.length,
+        start + indentation.length,
+      )
+
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+
+      const lineStart =
+        code.lastIndexOf('\n', start - 1) + 1
+
+      const currentLine =
+        code.slice(lineStart, start)
+
+      const currentIndentation =
+        currentLine.match(/^\s*/)?.[0] ?? ''
+
+      const beforeCursor =
+        code.slice(0, start)
+
+      const afterCursor =
+        code.slice(end)
+
+      const trimmedBeforeCursor =
+        currentLine.trimEnd()
+
+      const shouldIndent =
+        trimmedBeforeCursor.endsWith('{')
+
+      const isBetweenBraces =
+        shouldIndent &&
+        afterCursor.startsWith('}')
+
+      if (isBetweenBraces) {
+        const insertion =
+          '\n' +
+          currentIndentation +
+          indentation +
+          '\n' +
+          currentIndentation
+
+        const newCode =
+          beforeCursor +
+          insertion +
+          afterCursor
+
+        const newCursor =
+          start +
+          1 +
+          currentIndentation.length +
+          indentation.length
+
+        updateEditor(
+          newCode,
+          newCursor,
+          newCursor,
+        )
+
+        return
+      }
+
+      const nextIndentation =
+        shouldIndent
+          ? currentIndentation + indentation
+          : currentIndentation
+
+      const insertion =
+        '\n' + nextIndentation
+
+      const newCode =
+        beforeCursor +
+        insertion +
+        afterCursor
+
+      const newCursor =
+        start + insertion.length
+
+      updateEditor(
+        newCode,
+        newCursor,
+        newCursor,
+      )
+    }
+  }
+
   return (
     <main className="app">
       <header className="header">
@@ -322,6 +592,7 @@ function App() {
               setCode(event.target.value)
               invalidateBuild()
             }}
+            onKeyDown={handleEditorKeyDown}
             spellCheck={false}
           />
 
