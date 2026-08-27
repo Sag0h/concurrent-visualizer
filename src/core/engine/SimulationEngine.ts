@@ -185,12 +185,80 @@ export class SimulationEngine {
         process.executionStack.push({
           instructions: selectedBranch,
           programCounter: 0,
+          completionMode: 'ADVANCE_PARENT',
         })
 
         if (selectedBranch.length === 0) {
           process.executionStack.pop()
           this.advanceProcess(process)
         }
+
+        break
+      }
+      case 'WHILE': {
+        const condition = evaluateExpression(
+          instruction.condition,
+          {
+            localMemory: process.localMemory,
+            sharedMemory:
+              this.state.program.sharedMemory,
+          },
+        )
+
+        if (typeof condition !== 'boolean') {
+          throw new Error(
+            'WHILE condition must evaluate to boolean',
+          )
+        }
+
+        if (!condition) {
+          this.advanceProcess(process)
+          break
+        }
+
+        if (instruction.body.length === 0) {
+          break
+        }
+
+        process.executionStack.push({
+          instructions: instruction.body,
+          programCounter: 0,
+          completionMode: 'REPEAT_PARENT',
+        })
+
+        break
+      }
+
+      case 'REPEAT_UNTIL': {
+        if (instruction.body.length === 0) {
+          const condition = evaluateExpression(
+            instruction.condition,
+            {
+              localMemory: process.localMemory,
+              sharedMemory:
+                this.state.program.sharedMemory,
+            },
+          )
+
+          if (typeof condition !== 'boolean') {
+            throw new Error(
+              'REPEAT UNTIL condition must evaluate to boolean',
+            )
+          }
+
+          if (condition) {
+            this.advanceProcess(process)
+          }
+
+          break
+        }
+
+        process.executionStack.push({
+          instructions: instruction.body,
+          programCounter: 0,
+          completionMode: 'CHECK_REPEAT_UNTIL',
+          repeatCondition: instruction.condition,
+        })
 
         break
       }
@@ -249,7 +317,7 @@ export class SimulationEngine {
     ]
   }
 
-  private advanceProcess(
+private advanceProcess(
     process: Process,
   ): void {
     const frame =
@@ -266,10 +334,57 @@ export class SimulationEngine {
 
     if (
       frame.programCounter
-      >= frame.instructions.length
+      < frame.instructions.length
     ) {
+      return
+    }
+
+    const completedFrame =
       process.executionStack.pop()
 
+    if (!completedFrame) {
+      return
+    }
+
+    if (
+      completedFrame.completionMode
+      === 'CHECK_REPEAT_UNTIL'
+    ) {
+      const condition =
+        completedFrame.repeatCondition
+
+      if (!condition) {
+        throw new Error(
+          'Repeat frame is missing its condition',
+        )
+      }
+
+      const result = evaluateExpression(
+        condition,
+        {
+          localMemory: process.localMemory,
+          sharedMemory:
+            this.state.program.sharedMemory,
+        },
+      )
+
+      if (typeof result !== 'boolean') {
+        throw new Error(
+          'REPEAT UNTIL condition must evaluate to boolean',
+        )
+      }
+
+      if (result) {
+        this.advanceProcess(process)
+      }
+
+      return
+    }
+
+    if (
+      completedFrame.completionMode
+      === 'ADVANCE_PARENT'
+    ) {
       this.advanceProcess(process)
     }
   }

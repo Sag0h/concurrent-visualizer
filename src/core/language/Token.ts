@@ -33,6 +33,9 @@ export type TokenType =
   | 'EOF'
   | 'IF'
   | 'ELSE'
+  | 'WHILE'
+  | 'REPEAT'
+  | 'UNTIL'
 
 export interface Token {
   readonly type: TokenType

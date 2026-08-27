@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assign, declare, finish, noOp, variableTarget, arrayTarget, ifInstruction} from '../../instructions/instructionFactories'
+import { assign, declare, finish, noOp, variableTarget, arrayTarget, ifInstruction, whileInstruction} from '../../instructions/instructionFactories'
 import type { Process } from '../../process/Process'
 import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
 import { createExecutionState } from '../createExecutionState'
@@ -557,6 +557,50 @@ describe('SimulationEngine', () => {
     engine.step()
     expect(process.localMemory.x).toBe(100)
 
+    expect(process.state).toBe('FINISHED')
+  })
+
+  it('executes a WHILE loop until its condition becomes false', () => {
+    const process = createProcess('P1', [
+      declare(
+        'LOCAL',
+        'x',
+        literal(0),
+      ),
+      whileInstruction(
+        binary(
+          '<',
+          variable('x'),
+          literal(3),
+        ),
+        [
+          assign(
+            variableTarget('x'),
+            binary(
+              '+',
+              variable('x'),
+              literal(1),
+            ),
+          ),
+        ],
+      ),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      engine.step()
+    }
+
+    expect(process.localMemory.x).toBe(3)
     expect(process.state).toBe('FINISHED')
   })
 })

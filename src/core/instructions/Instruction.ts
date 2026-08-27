@@ -29,6 +29,17 @@ export interface IfInstruction {
   readonly elseBranch: Instruction[]
 }
 
+export interface WhileInstruction {
+  readonly type: 'WHILE'
+  readonly condition: Expression
+  readonly body: Instruction[]
+}
+
+export interface RepeatUntilInstruction {
+  readonly type: 'REPEAT_UNTIL'
+  readonly condition: Expression
+  readonly body: Instruction[]
+}
 
 export type Instruction =
   | NoOpInstruction
@@ -36,3 +47,5 @@ export type Instruction =
   | AssignmentInstruction
   | DeclareInstruction
   | IfInstruction
+  | WhileInstruction
+  | RepeatUntilInstruction

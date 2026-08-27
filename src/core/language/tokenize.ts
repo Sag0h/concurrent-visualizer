@@ -11,6 +11,9 @@ const keywords: Record<string, TokenType> = {
   false: 'BOOLEAN',
   if: 'IF',
   else: 'ELSE',
+  while: 'WHILE',
+  repeat: 'REPEAT',
+  until: 'UNTIL',
 }
 
 export function tokenize(source: string): Token[] {

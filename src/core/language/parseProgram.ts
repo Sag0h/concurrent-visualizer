@@ -12,7 +12,9 @@ import {
   assign,
   declare,
   ifInstruction,
+  repeatUntilInstruction,
   variableTarget,
+  whileInstruction,
 } from '../instructions/instructionFactories'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 import type { Process } from '../process/Process'
@@ -133,6 +135,14 @@ class Parser {
 
     if (this.match('IF')) {
       return this.parseIfInstruction()
+    }
+
+    if (this.match('WHILE')) {
+      return this.parseWhileInstruction()
+    }
+
+    if (this.match('REPEAT')) {
+      return this.parseRepeatUntilInstruction()
     }
 
     if (this.check('IDENTIFIER')) {
@@ -698,4 +708,57 @@ class Parser {
 
     return instructions
   }
+
+  private parseWhileInstruction(): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "while"',
+    )
+
+    const condition = this.parseExpression()
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after WHILE condition',
+    )
+
+    const body = this.parseInstructionBlock()
+
+    return whileInstruction(
+      condition,
+      body,
+    )
+  }
+
+  private parseRepeatUntilInstruction(): Instruction {
+    const body = this.parseInstructionBlock()
+
+    this.consume(
+      'UNTIL',
+      'Expected "until" after repeat block',
+    )
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "until"',
+    )
+
+    const condition = this.parseExpression()
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after UNTIL condition',
+    )
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after repeat-until',
+    )
+
+    return repeatUntilInstruction(
+      body,
+      condition,
+    )
+  }
+
 }

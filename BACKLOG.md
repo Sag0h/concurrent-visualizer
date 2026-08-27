@@ -143,7 +143,7 @@ secuencial normal.
 -   [ ] Bloques de instrucciones.
 -   [x] `if`.
 -   [x] `if / else`.
--   [ ] `while`.
+-   [x] `while`.
 -   [ ] `repeat / until`.
 -   [ ] `for`.
 -   [ ] `foreach`.

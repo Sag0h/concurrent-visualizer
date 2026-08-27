@@ -4,6 +4,8 @@ import type {
   NoOpInstruction,
   DeclareInstruction,
   IfInstruction,
+  WhileInstruction,
+  RepeatUntilInstruction,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -76,5 +78,27 @@ export function ifInstruction(
     condition,
     thenBranch,
     elseBranch,
+  }
+}
+
+export function whileInstruction(
+  condition: Expression,
+  body: Instruction[],
+): WhileInstruction {
+  return {
+    type: 'WHILE',
+    condition,
+    body,
+  }
+}
+
+export function repeatUntilInstruction(
+  body: Instruction[],
+  condition: Expression,
+): RepeatUntilInstruction {
+  return {
+    type: 'REPEAT_UNTIL',
+    body,
+    condition,
   }
 }
