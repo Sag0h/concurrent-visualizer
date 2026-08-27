@@ -144,7 +144,7 @@ secuencial normal.
 -   [x] `if`.
 -   [x] `if / else`.
 -   [x] `while`.
--   [ ] `repeat / until`.
+-   [x] `repeat / until`.
 -   [ ] `for`.
 -   [ ] `foreach`.
 -   [ ] `break`.
