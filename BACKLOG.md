@@ -138,47 +138,139 @@ procesos paso a paso.
 ## M4 --- Lenguaje secuencial
 
 Cada proceso concurrente debe poder comportarse como un programa
-secuencial normal.
+secuencial normal antes de introducir primitivas específicamente
+concurrentes.
 
--   [x] Bloques de instrucciones.
--   [x] `if`.
--   [x] `if / else`.
--   [x] `while`.
--   [x] `repeat / until`.
--   [x] `for`.
--   [x] `foreach`.
--   [x] `break`.
--   [x] `continue`.
--   [x] Funciones.
--   [x] Parámetros.
--   [x] Variables locales de función.
--   [x] `return`.
--   [x] Call stack.
--   [ ] Funciones vacías.
--   [ ] `yield`.
--   [ ] `sleep(ticks)`.
--   [ ] Tiempo simulado.
+### Control de flujo
+
+- [x] Bloques de instrucciones.
+- [x] `if`.
+- [x] `if / else`.
+- [x] `while`.
+- [x] `repeat / until`.
+- [x] `for`.
+- [x] `foreach`.
+- [x] `break`.
+- [x] `continue`.
+
+### Funciones
+
+- [x] Definiciones de funciones.
+- [x] Llamadas a funciones.
+- [x] Parámetros.
+- [x] Variables locales de función.
+- [x] Call stack independiente por proceso.
+- [x] Llamadas anidadas.
+- [x] `return;`.
+- [x] `return expression;`.
+- [x] `return` desde bloques de control anidados.
+- [x] Funciones utilizadas como expresiones.
+- [x] Llamadas a funciones anidadas dentro de expresiones.
+- [x] Funciones vacías.
+
+### Runtime de expresiones suspendibles
+
+- [x] `FunctionCallExpression` en el AST.
+- [x] Suspensión y reanudación de expresiones.
+- [x] Pila `pendingEvaluations` independiente por proceso.
+- [x] Continuaciones anidadas.
+- [x] Evaluación suspendible en `DECLARE`.
+- [x] Evaluación suspendible en `ASSIGN`.
+- [x] Evaluación suspendible en condiciones de `if`.
+- [x] Evaluación suspendible en condiciones de `while`.
+- [x] Evaluación suspendible en condiciones de `repeat / until`.
+- [x] Evaluación suspendible en condiciones de `for`.
+- [x] Evaluación suspendible en colecciones de `foreach`.
+- [x] Evaluación suspendible en `return`.
+- [x] Evaluación suspendible en argumentos de llamadas.
+- [x] Evaluación suspendible en índices de arrays.
+- [x] Evaluación suspendible en targets de asignación a arrays.
+- [x] Múltiples llamadas dentro de una misma expresión.
+- [x] Aislamiento del runtime suspendible entre procesos.
+
+### Robustez del runtime
+
+- [x] `step()` informa si hubo progreso.
+- [x] Restaurar proceso a `READY` ante errores de runtime.
+- [x] Evitar loops infinitos de `Run` cuando no hay progreso.
+- [x] Registrar en historial únicamente instrucciones completadas.
+- [x] Mostrar errores de runtime en la interfaz.
+- [x] Auditar usos directos de `evaluateExpression()`.
+
+### Tests
+
+- [x] Tests unitarios del engine.
+- [x] Tests de integración parser + engine.
+- [x] Test de llamadas anidadas.
+- [x] Test de llamadas en múltiples argumentos.
+- [x] Test de llamadas en `foreach`.
+- [x] Test de llamadas en índices de arrays.
+- [x] Test de llamadas en `repeat / until`.
+- [x] Test de llamadas en condición de `for`.
+- [x] Test de aislamiento entre procesos.
+
+**Estado:** M4 COMPLETADO.
 
 ------------------------------------------------------------------------
 
 ## M5 --- Atomicidad e interferencia
 
--   [ ] Definir formalmente qué constituye una acción atómica en el
-    simulador.
--   [ ] Distinguir instrucciones del pseudocódigo de microoperaciones
-    internas.
--   [ ] Descomponer operaciones cuando sea necesario para visualizar
-    interferencia.
--   [ ] Implementar secciones atómicas.
--   [ ] Registrar accesos concurrentes a memoria.
--   [ ] Visualizar interleavings.
--   [ ] Crear ejemplo real de race condition.
--   [ ] Mantener historial de lecturas y escrituras.
--   [ ] Permitir nivel de detalle por instrucción o por operación
-    atómica.
+Este milestone introduce la primera semántica específicamente concurrente
+del simulador. Antes de implementar primitivas de sincronización debe quedar
+definida la unidad mínima de ejecución que puede intercalarse con otro proceso.
 
-**Caso de prueba:** dos procesos ejecutan `x = x + 1` y debe ser posible
-observar una ejecución problemática cuando la semántica lo permita.
+### Modelo de ejecución
+
+-   [ ] Definir formalmente qué constituye una acción atómica en el simulador.
+-   [ ] Distinguir instrucciones del pseudocódigo de microoperaciones internas.
+-   [ ] Definir qué microoperaciones pueden intercalarse entre procesos.
+-   [ ] Definir cómo interactúan las microoperaciones con `step()` y los schedulers.
+-   [ ] Permitir nivel de detalle por instrucción o por operación atómica.
+
+### Microoperaciones y memoria
+
+-   [ ] Diseñar representación interna de microoperaciones.
+-   [ ] Descomponer operaciones cuando sea necesario para visualizar interferencia.
+-   [ ] Representar explícitamente lecturas de memoria compartida.
+-   [ ] Representar explícitamente escrituras de memoria compartida.
+-   [ ] Representar operaciones intermedias necesarias para expresiones como `x = x + 1`.
+-   [ ] Mantener historial de lecturas y escrituras.
+-   [ ] Registrar qué proceso realizó cada acceso y en qué step.
+
+### Interferencia e interleavings
+
+-   [ ] Registrar accesos concurrentes a memoria.
+-   [ ] Visualizar interleavings a nivel de microoperación.
+-   [ ] Crear ejemplo real y reproducible de race condition.
+-   [ ] Mantener compatibilidad con seeds reproducibles del scheduler Random.
+
+### Atomicidad explícita
+
+-   [ ] Definir sintaxis/representación de secciones atómicas.
+-   [ ] Implementar secciones atómicas.
+-   [ ] Impedir interleavings dentro de una sección atómica.
+-   [ ] Visualizar cuándo un proceso está ejecutando una región atómica.
+-   [ ] Agregar tests que comparen ejecución protegida y no protegida.
+
+**Caso de prueba principal:** dos procesos ejecutan:
+
+```text
+shared int x = 0;
+
+process P1 {
+    x = x + 1;
+}
+
+process P2 {
+    x = x + 1;
+}
+```
+
+Debe existir una ejecución válida donde ambos procesos lean `x = 0` antes
+de escribir y el resultado final sea `x = 1`.
+
+Al proteger correctamente la operación mediante atomicidad explícita, el
+resultado deberá ser `x = 2`.
 
 ------------------------------------------------------------------------
 
@@ -245,52 +337,84 @@ correcto.
 
 ------------------------------------------------------------------------
 
-## M10 --- Parser del pseudocódigo
+## M10 --- Extensiones del parser y lenguaje concurrente
 
-El parser se incorpora cuando el motor ya sea funcional.
+El parser base ya fue implementado en M3.5 y extendido durante M4.
+Este milestone queda reservado para integrar al lenguaje las primitivas
+concurrentes desarrolladas en milestones posteriores.
 
--   [ ] Definir sintaxis inicial.
--   [ ] Tokenizer.
--   [ ] Parser.
--   [ ] AST.
--   [ ] Variables y declaraciones.
--   [ ] Expresiones.
--   [ ] Estructuras de control.
--   [ ] Funciones.
--   [ ] Procesos.
--   [ ] `await`.
--   [ ] Semáforos.
--   [ ] Mensajes de error.
--   [ ] Posiciones de línea y columna.
--   [ ] Transformar AST en representación ejecutable.
+### Base ya disponible
 
-Flujo esperado:
+-   [x] Sintaxis inicial.
+-   [x] Tokenizer.
+-   [x] Parser descendente recursivo.
+-   [x] AST.
+-   [x] Variables y declaraciones.
+-   [x] Expresiones.
+-   [x] Estructuras de control.
+-   [x] Funciones y llamadas como expresiones.
+-   [x] Procesos.
+-   [x] Mensajes de error.
+-   [x] Posiciones de línea y columna.
+-   [x] Transformar código fuente en representación ejecutable.
 
-`Pseudocódigo → Parser → AST → Simulation Engine`
+### Extensiones concurrentes
+
+-   [ ] Parsear secciones atómicas.
+-   [ ] Parsear `await`.
+-   [ ] Parsear semáforos y operaciones `P` / `V`.
+-   [ ] Parsear primitivas temporales cuando se incorporen.
+-   [ ] Parsear monitores.
+-   [ ] Parsear primitivas de pasaje de mensajes.
+-   [ ] Mantener errores de sintaxis precisos para las nuevas primitivas.
+-   [ ] Agregar tests de parser por cada extensión concurrente.
+
+Flujo vigente:
+
+`Pseudocódigo → Tokenizer → Parser → AST/Program → Simulation Engine`
 
 ------------------------------------------------------------------------
 
-## M11 --- Interfaz visual
+## M11 --- Visualización avanzada
 
--   [ ] Editor de código.
--   [ ] Play.
--   [ ] Pause.
--   [ ] Step.
--   [ ] Reset.
--   [ ] Ejecución aleatoria.
--   [ ] Selector de scheduler.
+La interfaz base ya fue implementada en M3.5. Este milestone amplía el
+Visualizer a medida que aparecen conceptos específicamente concurrentes.
+
+### Base ya disponible
+
+-   [x] Editor de código.
+-   [x] Build del programa.
+-   [x] Step.
+-   [x] Run.
+-   [x] Reset.
+-   [x] Ejecución aleatoria.
+-   [x] Selector de scheduler.
+-   [x] Seed reproducible para Random.
+-   [x] Panel de procesos.
+-   [x] Estado de cada proceso.
+-   [x] Program counter.
+-   [x] Memoria compartida.
+-   [x] Memoria local.
+-   [x] Call stack.
+-   [x] Historial de ejecución.
+-   [x] Errores de tokenizer, parser y runtime.
+
+### Visualización concurrente avanzada
+
+-   [ ] Play / Pause continuo.
 -   [ ] Control de velocidad.
--   [ ] Panel de procesos.
--   [ ] Estado de cada proceso.
--   [ ] Instrucción actual.
--   [ ] Memoria compartida.
--   [ ] Memoria local.
+-   [ ] Instrucción y microoperación actual.
+-   [ ] Timeline visual de interleavings.
+-   [ ] Historial visual de lecturas y escrituras.
+-   [ ] Visualización de regiones atómicas.
 -   [ ] Semáforos.
--   [ ] Colas de espera.
--   [ ] Timeline.
--   [ ] Event log.
--   [ ] Diagnósticos.
+-   [ ] Colas de procesos bloqueados.
+-   [ ] Condiciones de `await`.
+-   [ ] Diagnósticos de concurrencia.
+-   [ ] Visualización de deadlocks.
 -   [ ] Reproducción de contraejemplos.
+-   [ ] Visualización de canales y mensajes.
+-   [ ] Visualización del tiempo simulado cuando se incorpore.
 
 ------------------------------------------------------------------------
 
@@ -331,6 +455,26 @@ Se reutiliza el mismo motor de simulación.
 
 ------------------------------------------------------------------------
 
+## M13.5 --- Scheduling avanzado y tiempo simulado
+
+Estas funcionalidades se separan del lenguaje secuencial porque modifican
+la relación entre procesos, scheduler y progreso temporal de la simulación.
+
+-   [ ] Definir modelo de tiempo simulado.
+-   [ ] Definir tick global de simulación.
+-   [ ] Definir semántica de `yield`.
+-   [ ] Implementar `yield`.
+-   [ ] Definir semántica de `sleep(ticks)`.
+-   [ ] Implementar `sleep(ticks)`.
+-   [ ] Representar procesos temporalmente no ejecutables.
+-   [ ] Despertar procesos cuando corresponda.
+-   [ ] Definir qué ocurre con el tiempo cuando ningún proceso está `READY`.
+-   [ ] Integrar tiempo simulado con historial y snapshots.
+-   [ ] Visualizar tick/tiempo actual.
+-   [ ] Agregar tests deterministas de `yield` y `sleep`.
+
+------------------------------------------------------------------------
+
 ## M14 --- Temas avanzados
 
 No forman parte obligatoria de la primera versión.
@@ -349,7 +493,7 @@ No forman parte obligatoria de la primera versión.
 
 La primera versión seria debería apuntar a:
 
--   Pseudocódigo básico.
+-   Pseudocódigo básico y parser ejecutable.
 -   Procesos.
 -   Variables locales y compartidas.
 -   Estructuras de control.
@@ -378,7 +522,7 @@ Un ticket se considera terminado cuando:
 2.  Se verificó manualmente y/o mediante tests según corresponda.
 3.  No rompe tests existentes.
 4.  Se actualizó este backlog.
-5.  Se actualizó `docs/PROGRESS.md`.
+5.  Se actualizó `PROGRESS.md`.
 6.  Si introdujo una decisión arquitectónica relevante, se documentó en
     `docs/DECISIONS.md`.
 7.  Si modificó la arquitectura actual, se actualizó

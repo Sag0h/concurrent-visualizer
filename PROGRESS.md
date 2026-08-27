@@ -7,11 +7,11 @@
 
 **Fase:** M4 — Control de ejecución, funciones y runtime de expresiones suspendibles.
 
-**Último milestone completado:** M3.5 — Lenguaje y Visualizer MVP ejecutable.
+**Último milestone completado:** M4 — Control de ejecución, funciones y runtime de expresiones suspendibles.
 
-**Estado M4:** loops y control de flujo implementados; funciones con parámetros, call stack por proceso y `return` implementadas; llamadas a funciones dentro de expresiones ya pueden suspender y reanudar `DECLARE`, `ASSIGN` y condiciones de control de flujo.
+**Estado M4:** completado. El lenguaje y el engine soportan estructuras de control, loops, funciones, parámetros, call stack por proceso, `return` y llamadas a funciones dentro de expresiones sin introducir atomicidad artificial. El runtime suspendible utiliza una pila de evaluaciones pendientes por proceso y soporta continuaciones anidadas.
 
-**Próximo objetivo:** terminar de integrar el runtime suspendible con todos los contextos de expresión restantes (`RETURN`, argumentos de llamadas y colecciones/índices cuando corresponda), consolidar tests y cerrar M4 antes de avanzar a primitivas de concurrencia.
+**Próximo objetivo:** actualizar la documentación técnica que todavía describa la arquitectura anterior (`docs/ARCHITECTURE.md`, `docs/DECISIONS.md` y `docs/SYNTAX.md`), verificar el backlog y comenzar el siguiente milestone orientado a primitivas específicamente concurrentes.
 
 ------------------------------------------------------------------------
 
@@ -361,3 +361,18 @@ También se probaron funciones con `return`, incluyendo retornos desde estructur
 5. Actualizar `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` y `docs/SYNTAX.md` si todavía describen la arquitectura previa.
 6. Recién después avanzar a primitivas específicamente concurrentes.
 
+
+## 2026-08-27 — M4 completado: runtime suspendible
+
+### Pila de evaluaciones pendientes
+
+Durante las pruebas de llamadas anidadas se detectó una limitación importante del diseño inicial del runtime suspendible.
+
+Un único estado pendiente por proceso no era suficiente para representar casos como:
+
+```text
+result = calculate(5);
+
+function calculate(int value) {
+  return double(value) + 1;
+}
