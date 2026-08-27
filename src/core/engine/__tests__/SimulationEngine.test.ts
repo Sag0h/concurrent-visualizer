@@ -438,4 +438,75 @@ describe('SimulationEngine', () => {
       99,
     ])
   })
+
+  it('exposes a simulation snapshot for visualization', () => {
+    const process = createProcess('P1', [
+      declare('LOCAL', 'x', literal(5)),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {
+        counter: 10,
+      },
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(engine.getSnapshot()).toEqual({
+      stepCount: 1,
+
+      sharedMemory: {
+        counter: 10,
+      },
+
+      processes: [
+        {
+          id: 'P1',
+          state: 'FINISHED',
+          programCounter: 1,
+          localMemory: {
+            x: 5,
+          },
+        },
+      ],
+    })
+  })
+
+  it('returns memory copies in the visualization snapshot', () => {
+    const process = createProcess('P1', [])
+
+    process.localMemory.x = 1
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {
+        counter: 2,
+      },
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    const snapshot = engine.getSnapshot()
+
+    snapshot.sharedMemory.counter = 999
+    snapshot.processes[0].localMemory.x = 999
+
+    expect(
+      engine.getState().program.sharedMemory.counter,
+    ).toBe(2)
+
+    expect(
+      engine.getState().program.processes[0].localMemory.x,
+    ).toBe(1)
+  })
+
 })

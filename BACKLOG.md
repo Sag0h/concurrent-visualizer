@@ -98,7 +98,7 @@ procesos paso a paso.
 -   [x] Expresiones booleanas.
 -   [x] Comparaciones.
 -   [x] Arrays básicos.
--   [ ] Exponer estado de memoria para visualización.
+-   [x] Exponer estado de memoria para visualización.
 
 ------------------------------------------------------------------------
 

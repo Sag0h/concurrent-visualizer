@@ -2,6 +2,7 @@ import type { ExecutionState } from './ExecutionState'
 import type { Scheduler } from '../scheduler/Scheduler'
 import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
+import type { SimulationSnapshot } from './SimulationSnapshot'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -166,6 +167,27 @@ export class SimulationEngine {
       process.state = 'FINISHED'
     } else {
       process.state = 'READY'
+    }
+  }
+
+  getSnapshot(): SimulationSnapshot {
+    return {
+      stepCount: this.state.stepCount,
+
+      sharedMemory: structuredClone(
+        this.state.program.sharedMemory,
+      ),
+
+      processes: this.state.program.processes.map(
+        (process) => ({
+          id: process.id,
+          state: process.state,
+          programCounter: process.programCounter,
+          localMemory: structuredClone(
+            process.localMemory,
+          ),
+        }),
+      ),
     }
   }
 
