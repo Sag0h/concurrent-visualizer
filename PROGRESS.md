@@ -109,3 +109,13 @@ Antes de continuar después de una pausa:
 - Se agregó un límite máximo configurable de steps.
 - Se agregó `hasReachedStepLimit()`.
 - El límite evita ejecuciones infinitas sin control.
+
+### M3 — Declaraciones y expresiones
+
+- Se agregaron expresiones literales, variables, binarias y unarias.
+- Se implementó evaluación de expresiones aritméticas, booleanas y comparaciones.
+- Se agregaron factories para construir expresiones.
+- Se agregó la instrucción `ASSIGN`.
+- Se agregó la instrucción `DECLARE`.
+- El engine puede declarar y modificar variables locales y compartidas.
+- Se agregaron tests de scopes, shadowing, declaraciones y asignaciones.

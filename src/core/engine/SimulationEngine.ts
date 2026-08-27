@@ -1,6 +1,7 @@
 import type { ExecutionState } from './ExecutionState'
 import type { Scheduler } from '../scheduler/Scheduler'
-
+import { evaluateExpression } from '../expressions/evaluateExpression'
+import { writeVariable } from '../memory/writeVariable'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -76,6 +77,46 @@ export class SimulationEngine {
         process.state = 'FINISHED'
         this.state.stepCount++
         return
+
+      case 'ASSIGN': {
+        const value = evaluateExpression(
+          instruction.expression,
+          {
+            localMemory: process.localMemory,
+            sharedMemory: this.state.program.sharedMemory,
+          },
+        )
+
+        writeVariable(
+          instruction.target,
+          value,
+          process.localMemory,
+          this.state.program.sharedMemory,
+        )
+
+        process.programCounter++
+        break
+      }
+
+      case 'DECLARE': {
+        const value = evaluateExpression(
+          instruction.initialValue,
+          {
+            localMemory: process.localMemory,
+            sharedMemory: this.state.program.sharedMemory,
+          },
+        )
+
+        if (instruction.scope === 'LOCAL') {
+          process.localMemory[instruction.name] = value
+        } else {
+          this.state.program.sharedMemory[instruction.name] = value
+        }
+
+        process.programCounter++
+        break
+      }
+      
     }
 
     this.state.stepCount++

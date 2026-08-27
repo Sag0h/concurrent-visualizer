@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { finish, noOp } from '../../instructions/instructionFactories'
+import { assign, declare, finish, noOp } from '../../instructions/instructionFactories'
 import type { Process } from '../../process/Process'
 import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
 import { createExecutionState } from '../createExecutionState'
 import type { Program } from '../Program'
 import { SimulationEngine } from '../SimulationEngine'
+import {
+  binary,
+  literal,
+  variable,
+} from '../../expressions/expressionFactories'
 
 function createProcess(
   id: string,
@@ -207,5 +212,165 @@ describe('SimulationEngine', () => {
     expect(engine.getState().stepCount).toBe(2)
     expect(engine.hasReachedStepLimit()).toBe(true)
     expect(process.programCounter).toBe(2)
+  })
+
+  it('assigns values to local variables', () => {
+    const process = createProcess('P1', [
+      assign('x', {
+        type: 'LITERAL',
+        value: 10,
+      }),
+    ])
+
+    process.localMemory.x = 0
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(process.localMemory.x).toBe(10)
+  })
+
+  it('assigns values to shared variables', () => {
+    const process = createProcess('P1', [
+      assign('counter', {
+        type: 'BINARY',
+        operator: '+',
+        left: {
+          type: 'VARIABLE',
+          name: 'counter',
+        },
+        right: {
+          type: 'LITERAL',
+          value: 1,
+        },
+      }),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {
+        counter: 0,
+      },
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(program.sharedMemory.counter).toBe(1)
+  })
+
+  it('assigns to local memory when a variable shadows shared memory', () => {
+    const process = createProcess('P1', [
+      assign('x', {
+        type: 'LITERAL',
+        value: 20,
+      }),
+    ])
+
+    process.localMemory.x = 1
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {
+        x: 100,
+      },
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(process.localMemory.x).toBe(20)
+    expect(program.sharedMemory.x).toBe(100)
+  })
+
+  it('declares a local variable', () => {
+    const process = createProcess('P1', [
+      declare('LOCAL', 'x', literal(10)),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(process.localMemory.x).toBe(10)
+  })
+
+  it('declares a shared variable', () => {
+    const process = createProcess('P1', [
+      declare('SHARED', 'counter', literal(0)),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(program.sharedMemory.counter).toBe(0)
+  })
+
+  it('executes declarations and assignments sequentially', () => {
+    const process = createProcess('P1', [
+      declare('LOCAL', 'x', literal(5)),
+      assign(
+        'x',
+        binary(
+          '+',
+          variable('x'),
+          literal(3),
+        ),
+      ),
+      finish(),
+    ])
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+    expect(process.localMemory.x).toBe(5)
+
+    engine.step()
+    expect(process.localMemory.x).toBe(8)
+
+    engine.step()
+    expect(process.state).toBe('FINISHED')
   })
 })

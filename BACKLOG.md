@@ -86,16 +86,17 @@ procesos paso a paso.
 
 ## M3 --- Variables y memoria
 
--   [ ] Variables locales por proceso.
--   [ ] Memoria compartida.
--   [ ] Tipo `int`.
--   [ ] Tipo `bool`.
+-   [x] Variables locales por proceso.
+-   [x] Memoria compartida.
+-   [x] Tipo `int`.
+-   [x] Tipo `bool`.
 -   [ ] Evaluar necesidad de `string`.
--   [ ] Asignaciones.
--   [ ] Lectura de variables.
--   [ ] Expresiones aritméticas.
--   [ ] Expresiones booleanas.
--   [ ] Comparaciones.
+-   [x] Declaración de variables locales y compartidas.
+-   [x] Asignaciones.
+-   [x] Lectura de variables.
+-   [x] Expresiones aritméticas.
+-   [x] Expresiones booleanas.
+-   [x] Comparaciones.
 -   [ ] Arrays básicos.
 -   [ ] Exponer estado de memoria para visualización.
 

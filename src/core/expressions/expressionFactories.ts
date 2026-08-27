@@ -1,0 +1,46 @@
+import type { RuntimeValue } from '../memory/RuntimeValue'
+import type {
+  BinaryExpression,
+  Expression,
+  LiteralExpression,
+  VariableExpression,
+  UnaryExpression,
+} from './Expression'
+
+export function literal(value: RuntimeValue): LiteralExpression {
+  return {
+    type: 'LITERAL',
+    value,
+  }
+}
+
+export function variable(name: string): VariableExpression {
+  return {
+    type: 'VARIABLE',
+    name,
+  }
+}
+
+export function unary(
+  operator: UnaryExpression['operator'],
+  operand: Expression,
+): UnaryExpression {
+  return {
+    type: 'UNARY',
+    operator,
+    operand,
+  }
+}
+
+export function binary(
+  operator: BinaryExpression['operator'],
+  left: Expression,
+  right: Expression,
+): BinaryExpression {
+  return {
+    type: 'BINARY',
+    operator,
+    left,
+    right,
+  }
+}
