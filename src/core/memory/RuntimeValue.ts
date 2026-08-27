@@ -1,3 +1,8 @@
-export type RuntimeValue =
+export type PrimitiveValue =
   | number
   | boolean
+  | string
+  
+export type RuntimeValue =
+  | PrimitiveValue
+  | PrimitiveValue[]

@@ -5,6 +5,7 @@ import type {
   LiteralExpression,
   VariableExpression,
   UnaryExpression,
+  ArrayAccessExpression
 } from './Expression'
 
 export function literal(value: RuntimeValue): LiteralExpression {
@@ -42,5 +43,16 @@ export function binary(
     operator,
     left,
     right,
+  }
+}
+
+export function arrayAccess(
+  array: Expression,
+  index: Expression,
+): ArrayAccessExpression {
+  return {
+    type: 'ARRAY_ACCESS',
+    array,
+    index,
   }
 }

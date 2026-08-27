@@ -5,6 +5,7 @@ import type {
   DeclareInstruction,
 } from './Instruction'
 
+import type { AssignmentTarget } from './AssignmentTarget'
 import type { Expression } from '../expressions/Expression'
 
 export function noOp(): NoOpInstruction {
@@ -33,12 +34,32 @@ export function declare(
 }
 
 export function assign(
-  target: string,
+  target: AssignmentTarget,
   expression: Expression,
 ): AssignmentInstruction {
   return {
     type: 'ASSIGN',
     target,
     expression,
+  }
+}
+
+export function variableTarget(
+  name: string,
+): AssignmentTarget {
+  return {
+    type: 'VARIABLE',
+    name,
+  }
+}
+
+export function arrayTarget(
+  arrayName: string,
+  index: Expression,
+): AssignmentTarget {
+  return {
+    type: 'ARRAY_ACCESS',
+    arrayName,
+    index,
   }
 }

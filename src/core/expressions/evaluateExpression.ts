@@ -18,7 +18,9 @@ export function evaluateExpression(
     
     case 'UNARY':
       return evaluateUnaryExpression(expression, context)
-  }
+    case 'ARRAY_ACCESS':
+      return evaluateArrayAccess(expression, context)  
+    }
 }
 
 function readVariable(
@@ -45,7 +47,7 @@ function evaluateBinaryExpression(
 
   switch (expression.operator) {
     case '+':
-      return requireNumber(left) + requireNumber(right)
+      return addValues(left, right)
 
     case '-':
       return requireNumber(left) - requireNumber(right)
@@ -97,6 +99,29 @@ function evaluateUnaryExpression(
   }
 }
 
+function addValues(
+  left: RuntimeValue,
+  right: RuntimeValue,
+): RuntimeValue {
+  if (
+    typeof left === 'number'
+    && typeof right === 'number'
+  ) {
+    return left + right
+  }
+
+  if (
+    typeof left === 'string'
+    && typeof right === 'string'
+  ) {
+    return left + right
+  }
+
+  throw new Error(
+    'Operator "+" requires two numbers or two strings',
+  )
+}
+
 function requireNumber(value: RuntimeValue): number {
   if (typeof value !== 'number') {
     throw new Error(`Expected number but received ${typeof value}`)
@@ -111,4 +136,36 @@ function requireBoolean(value: RuntimeValue): boolean {
   }
 
   return value
+}
+
+function evaluateArrayAccess(
+  expression: Extract<Expression, { type: 'ARRAY_ACCESS' }>,
+  context: ExpressionContext,
+): RuntimeValue {
+  const array = evaluateExpression(
+    expression.array,
+    context,
+  )
+
+  const index = evaluateExpression(
+    expression.index,
+    context,
+  )
+
+  if (!Array.isArray(array)) {
+    throw new Error('Expected array')
+  }
+
+  if (
+    typeof index !== 'number'
+    || !Number.isInteger(index)
+  ) {
+    throw new Error('Array index must be an integer')
+  }
+
+  if (index < 0 || index >= array.length) {
+    throw new Error(`Array index ${index} is out of bounds`)
+  }
+
+  return array[index]
 }

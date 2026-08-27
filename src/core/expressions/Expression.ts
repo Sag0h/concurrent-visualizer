@@ -35,8 +35,15 @@ export interface UnaryExpression {
   readonly operand: Expression
 }
 
+export interface ArrayAccessExpression {
+  readonly type: 'ARRAY_ACCESS'
+  readonly array: Expression
+  readonly index: Expression
+}
+
 export type Expression =
   | LiteralExpression
   | VariableExpression
   | BinaryExpression
   | UnaryExpression
+  | ArrayAccessExpression

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assign, declare, finish, noOp } from '../../instructions/instructionFactories'
+import { assign, declare, finish, noOp, variableTarget, arrayTarget } from '../../instructions/instructionFactories'
 import type { Process } from '../../process/Process'
 import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
 import { createExecutionState } from '../createExecutionState'
@@ -216,7 +216,7 @@ describe('SimulationEngine', () => {
 
   it('assigns values to local variables', () => {
     const process = createProcess('P1', [
-      assign('x', {
+      assign(variableTarget('x'), {
         type: 'LITERAL',
         value: 10,
       }),
@@ -241,7 +241,7 @@ describe('SimulationEngine', () => {
 
   it('assigns values to shared variables', () => {
     const process = createProcess('P1', [
-      assign('counter', {
+      assign(variableTarget('counter'), {
         type: 'BINARY',
         operator: '+',
         left: {
@@ -274,7 +274,7 @@ describe('SimulationEngine', () => {
 
   it('assigns to local memory when a variable shadows shared memory', () => {
     const process = createProcess('P1', [
-      assign('x', {
+      assign(variableTarget('x'), {
         type: 'LITERAL',
         value: 20,
       }),
@@ -344,7 +344,7 @@ describe('SimulationEngine', () => {
     const process = createProcess('P1', [
       declare('LOCAL', 'x', literal(5)),
       assign(
-        'x',
+        variableTarget('x'),
         binary(
           '+',
           variable('x'),
@@ -372,5 +372,70 @@ describe('SimulationEngine', () => {
 
     engine.step()
     expect(process.state).toBe('FINISHED')
+  })
+
+  it('assigns a value to an array element', () => {
+    const process = createProcess('P1', [
+      assign(
+        arrayTarget(
+          'numbers',
+          literal(1),
+        ),
+        literal(50),
+      ),
+    ])
+
+    process.localMemory.numbers = [10, 20, 30]
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(process.localMemory.numbers).toEqual([
+      10,
+      50,
+      30,
+    ])
+  })
+
+  it('assigns to an array using a variable index', () => {
+    const process = createProcess('P1', [
+      assign(
+        arrayTarget(
+          'numbers',
+          variable('i'),
+        ),
+        literal(99),
+      ),
+    ])
+
+    process.localMemory.numbers = [10, 20, 30]
+    process.localMemory.i = 2
+
+    const program: Program = {
+      processes: [process],
+      sharedMemory: {},
+    }
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+
+    expect(process.localMemory.numbers).toEqual([
+      10,
+      20,
+      99,
+    ])
   })
 })

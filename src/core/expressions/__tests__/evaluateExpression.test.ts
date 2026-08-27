@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Expression } from '../Expression'
 import { evaluateExpression } from '../evaluateExpression'
 import {
+  arrayAccess,
   binary,
   literal,
   unary,
@@ -192,5 +193,98 @@ describe('evaluateExpression', () => {
         sharedMemory: {},
       }),
     ).toBe(true)
+  })
+
+  it('reads a value from an array', () => {
+    const expression = arrayAccess(
+      variable('numbers'),
+      literal(1),
+    )
+
+    expect(
+      evaluateExpression(expression, {
+        localMemory: {
+          numbers: [10, 20, 30],
+        },
+        sharedMemory: {},
+      }),
+    ).toBe(20)
+  })
+
+  it('reads an array using a variable as index', () => {
+    const expression = arrayAccess(
+      variable('numbers'),
+      variable('i'),
+    )
+
+    expect(
+      evaluateExpression(expression, {
+        localMemory: {
+          numbers: [10, 20, 30],
+          i: 2,
+        },
+        sharedMemory: {},
+      }),
+    ).toBe(30)
+  })
+
+  it('throws when an array index is out of bounds', () => {
+    const expression = arrayAccess(
+      variable('numbers'),
+      literal(10),
+    )
+
+    expect(() =>
+      evaluateExpression(expression, {
+        localMemory: {
+          numbers: [10, 20, 30],
+        },
+        sharedMemory: {},
+      }),
+    ).toThrow('Array index 10 is out of bounds')
+  })
+
+  it('evaluates string literals', () => {
+    expect(
+      evaluateExpression(
+        literal('hello'),
+        {
+          localMemory: {},
+          sharedMemory: {},
+        },
+      ),
+    ).toBe('hello')
+  })
+
+  it('concatenates strings with the plus operator', () => {
+    const expression = binary(
+      '+',
+      literal('Hello '),
+      literal('world'),
+    )
+
+    expect(
+      evaluateExpression(expression, {
+        localMemory: {},
+        sharedMemory: {},
+      }),
+    ).toBe('Hello world')
+  })
+
+  it('does not mix strings and numbers with plus', () => {
+    const expression = binary(
+      '+',
+      literal('value: '),
+      literal(10),
+    )
+
+    expect(() =>
+      evaluateExpression(expression, {
+        localMemory: {},
+        sharedMemory: {},
+      }),
+    ).toThrow(
+      'Operator "+" requires two numbers or two strings',
+    )
   })
 })

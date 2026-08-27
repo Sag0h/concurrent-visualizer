@@ -90,14 +90,14 @@ procesos paso a paso.
 -   [x] Memoria compartida.
 -   [x] Tipo `int`.
 -   [x] Tipo `bool`.
--   [ ] Evaluar necesidad de `string`.
+-   [x] Tipo `string`.
 -   [x] Declaración de variables locales y compartidas.
 -   [x] Asignaciones.
 -   [x] Lectura de variables.
 -   [x] Expresiones aritméticas.
 -   [x] Expresiones booleanas.
 -   [x] Comparaciones.
--   [ ] Arrays básicos.
+-   [x] Arrays básicos.
 -   [ ] Exponer estado de memoria para visualización.
 
 ------------------------------------------------------------------------

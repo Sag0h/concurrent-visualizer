@@ -1,3 +1,5 @@
+import type { Expression } from '../expressions/Expression'
+import type { AssignmentTarget } from './AssignmentTarget'
 export interface NoOpInstruction {
   readonly type: 'NO_OP'
 }
@@ -6,11 +8,10 @@ export interface FinishInstruction {
   readonly type: 'FINISH'
 }
 
-import type { Expression } from '../expressions/Expression'
 
 export interface AssignmentInstruction {
   readonly type: 'ASSIGN'
-  readonly target: string
+  readonly target: AssignmentTarget
   readonly expression: Expression
 }
 
@@ -20,6 +21,8 @@ export interface DeclareInstruction {
   readonly name: string
   readonly initialValue: Expression
 }
+
+
 
 export type Instruction =
   | NoOpInstruction

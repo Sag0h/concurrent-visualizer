@@ -87,17 +87,58 @@ export class SimulationEngine {
           },
         )
 
-        writeVariable(
-          instruction.target,
-          value,
-          process.localMemory,
-          this.state.program.sharedMemory,
-        )
+        if (instruction.target.type === 'VARIABLE') {
+          writeVariable(
+            instruction.target.name,
+            value,
+            process.localMemory,
+            this.state.program.sharedMemory,
+          )
+        } else {
+          const index = evaluateExpression(
+            instruction.target.index,
+            {
+              localMemory: process.localMemory,
+              sharedMemory: this.state.program.sharedMemory,
+            },
+          )
+
+          if (
+            typeof index !== 'number'
+            || !Number.isInteger(index)
+          ) {
+            throw new Error('Array index must be an integer')
+          }
+
+          const arrayName = instruction.target.arrayName
+
+          const array =
+            arrayName in process.localMemory
+              ? process.localMemory[arrayName]
+              : this.state.program.sharedMemory[arrayName]
+
+          if (!Array.isArray(array)) {
+            throw new Error(`Variable "${arrayName}" is not an array`)
+          }
+
+          if (index < 0 || index >= array.length) {
+            throw new Error(
+              `Array index ${index} is out of bounds`,
+            )
+          }
+
+          if (Array.isArray(value)) {
+            throw new Error(
+              'Nested arrays are not supported yet',
+            )
+          }
+
+          array[index] = value
+        }
 
         process.programCounter++
         break
       }
-
       case 'DECLARE': {
         const value = evaluateExpression(
           instruction.initialValue,
@@ -116,7 +157,7 @@ export class SimulationEngine {
         process.programCounter++
         break
       }
-      
+
     }
 
     this.state.stepCount++
