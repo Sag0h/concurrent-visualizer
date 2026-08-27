@@ -106,33 +106,33 @@ procesos paso a paso.
 
 - [x] Definir y documentar sintaxis V0 del pseudocódigo.
 - [x] Crear tokenizer mínimo.
-- [ ] Crear parser mínimo.
-- [ ] Parsear variables compartidas.
-- [ ] Parsear procesos.
-- [ ] Parsear variables locales.
-- [ ] Parsear asignaciones.
-- [ ] Parsear expresiones.
-- [ ] Parsear arrays básicos.
-- [ ] Convertir código en `Program`.
-- [ ] Mostrar errores de sintaxis.
-- [ ] Crear editor de código.
-- [ ] Permitir agregar procesos desde la UI.
-- [ ] Ejecutar el código escrito por el usuario.
-- [ ] Selector de scheduler.
-- [ ] First Ready.
-- [ ] Round Robin.
-- [ ] Random.
-- [ ] Seed configurable para Random.
-- [ ] Botón `Step`.
-- [ ] Botón `Reset`.
-- [ ] Botón `Run`.
-- [ ] Mostrar `stepCount`.
-- [ ] Mostrar procesos.
-- [ ] Mostrar estado de cada proceso.
-- [ ] Mostrar `programCounter`.
-- [ ] Mostrar memoria local.
-- [ ] Mostrar memoria compartida.
-- [ ] Mostrar historial de ejecución.
+- [x] Crear parser mínimo.
+- [x] Parsear variables compartidas.
+- [x] Parsear procesos.
+- [x] Parsear variables locales.
+- [x] Parsear asignaciones.
+- [x] Parsear expresiones.
+- [x] Parsear arrays básicos.
+- [x] Convertir código en `Program`.
+- [x] Mostrar errores de sintaxis.
+- [x] Crear editor de código.
+- [x] Permitir agregar procesos desde la UI.
+- [x] Ejecutar el código escrito por el usuario.
+- [x] Selector de scheduler.
+- [x] First Ready.
+- [x] Round Robin.
+- [x] Random.
+- [x] Seed configurable para Random.
+- [x] Botón `Step`.
+- [x] Botón `Reset`.
+- [x] Botón `Run`.
+- [x] Mostrar `stepCount`.
+- [x] Mostrar procesos.
+- [x] Mostrar estado de cada proceso.
+- [x] Mostrar `programCounter`.
+- [x] Mostrar memoria local.
+- [x] Mostrar memoria compartida.
+- [x] Mostrar historial de ejecución.
 ------------------------------------------------------------------------
 
 ## M4 --- Lenguaje secuencial

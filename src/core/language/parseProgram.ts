@@ -30,10 +30,11 @@ export function parseProgram(
 
 class Parser {
   private current = 0
+  private readonly tokens: Token[]
 
-  constructor(
-    private readonly tokens: Token[],
-  ) {}
+  constructor(tokens: Token[]) {
+    this.tokens = tokens
+  }
 
   parseProgram(): Program {
     const processes: Process[] = []
@@ -284,22 +285,34 @@ class Parser {
     ) {
       const operatorToken = this.previous()
 
-      const operator = {
-        LESS: '<',
-        LESS_EQUAL: '<=',
-        GREATER: '>',
-        GREATER_EQUAL: '>=',
-      }[operatorToken.type]
+      let operator: '<' | '<=' | '>' | '>='
 
-      if (!operator) {
-        throw this.error(
-          operatorToken,
-          'Invalid comparison operator',
-        )
+      switch (operatorToken.type) {
+        case 'LESS':
+          operator = '<'
+          break
+
+        case 'LESS_EQUAL':
+          operator = '<='
+          break
+
+        case 'GREATER':
+          operator = '>'
+          break
+
+        case 'GREATER_EQUAL':
+          operator = '>='
+          break
+
+        default:
+          throw this.error(
+            operatorToken,
+            'Invalid comparison operator',
+          )
       }
 
       expression = binary(
-        operator as '<' | '<=' | '>' | '>=',
+        operator,
         expression,
         this.parseTerm(),
       )
@@ -384,6 +397,47 @@ class Parser {
       return literal(
         this.previous().lexeme === 'true',
       )
+    }
+
+    if (this.match('LEFT_BRACKET')) {
+      const values: Array<number | boolean | string> = []
+
+      if (!this.check('RIGHT_BRACKET')) {
+        do {
+          if (this.match('NUMBER')) {
+            values.push(
+              Number(this.previous().lexeme),
+            )
+            continue
+          }
+
+          if (this.match('STRING')) {
+            values.push(
+              this.previous().lexeme,
+            )
+            continue
+          }
+
+          if (this.match('BOOLEAN')) {
+            values.push(
+              this.previous().lexeme === 'true',
+            )
+            continue
+          }
+
+          throw this.error(
+            this.peek(),
+            'Expected array literal value',
+          )
+        } while (this.match('COMMA'))
+      }
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after array literal',
+      )
+
+      return literal(values)
     }
 
     if (this.match('IDENTIFIER')) {
