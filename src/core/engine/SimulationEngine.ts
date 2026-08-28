@@ -463,7 +463,7 @@ step(): boolean {
           this.advanceProcess(process)
           break
         }
-        
+
         process.atomicDepth += 1
 
         process.executionStack.push({
@@ -1843,6 +1843,13 @@ step(): boolean {
         phase: 'READ',
         pendingExpression:
           structuredClone(instruction.expression),
+
+        pendingTargetIndex:
+          instruction.target.type === 'ARRAY_ACCESS'
+            ? structuredClone(
+                instruction.target.index,
+              )
+            : undefined,
       }
 
       process.microOperationRuntime = runtime
@@ -1881,7 +1888,21 @@ step(): boolean {
             `result = ${JSON.stringify(value)}`,
           )
 
-          runtime.phase = 'WRITE'
+          if (
+            runtime.instruction.target.type
+            === 'ARRAY_ACCESS'
+          ) {
+            runtime.phase = 'TARGET_READ'
+          } else {
+            runtime.targetLocation =
+              this.resolveMicroOperationTargetLocation(
+                process,
+                runtime,
+              )
+
+            runtime.phase = 'WRITE'
+          }
+
           return
         }
 
@@ -1941,7 +1962,95 @@ step(): boolean {
           )}`,
         )
 
+        if (
+          runtime.instruction.target.type
+          === 'ARRAY_ACCESS'
+        ) {
+          runtime.phase = 'TARGET_READ'
+        } else {
+          runtime.targetLocation =
+            this.resolveMicroOperationTargetLocation(
+              process,
+              runtime,
+            )
+
+          runtime.phase = 'WRITE'
+        }
+
+        return
+      }
+
+      case 'TARGET_READ': {
+        if (
+          runtime.instruction.target.type
+          !== 'ARRAY_ACCESS'
+        ) {
+          throw new Error(
+            'TARGET_READ requires an array assignment target',
+          )
+        }
+
+        if (!runtime.pendingTargetIndex) {
+          throw new Error(
+            'Array assignment target has no pending index',
+          )
+        }
+
+        const read =
+          this.findNextSharedMemoryRead(
+            process,
+            runtime.pendingTargetIndex,
+          )
+
+        if (read) {
+          const value =
+            this.readSharedMemoryLocation(
+              read.location,
+            )
+
+          const locationDescription =
+            this.formatMemoryLocation(
+              read.location,
+            )
+
+          this.recordMicroOperation(
+            process,
+            'SHARED_READ',
+            `${locationDescription} = ${JSON.stringify(
+              value,
+            )}`,
+            read.location,
+          )
+
+          runtime.pendingTargetIndex =
+            this.replaceExpressionWithValue(
+              runtime.pendingTargetIndex,
+              read.expression,
+              value,
+            )
+
+          return
+        }
+
+        runtime.targetLocation =
+          this.resolveMicroOperationTargetLocation(
+            process,
+            runtime,
+          )
+
+        if (!runtime.targetLocation) {
+          throw new Error(
+            'Shared assignment target could not be resolved',
+          )
+        }
+
         runtime.phase = 'WRITE'
+
+        this.executeAssignmentMicroOperation(
+          process,
+          instruction,
+        )
+
         return
       }
 
@@ -1952,14 +2061,18 @@ step(): boolean {
           )
         }
 
-        const target =
-          runtime.instruction.target
-
         const location =
-          this.resolveAssignmentTargetLocation(
+          runtime.targetLocation
+          ?? this.resolveMicroOperationTargetLocation(
             process,
-            target,
+            runtime,
           )
+
+        if (!location) {
+          throw new Error(
+            'Shared assignment target could not be resolved',
+          )
+        }
 
         if (!location) {
           throw new Error(
@@ -2488,6 +2601,42 @@ step(): boolean {
           : undefined,
       atomicDepth: process.atomicDepth,
     })
+  }
+
+  private resolveMicroOperationTargetLocation(
+    process: Process,
+    runtime: NonNullable<
+      Process['microOperationRuntime']
+    >,
+  ): MemoryLocation | undefined {
+    const target = runtime.instruction.target
+
+    if (target.type === 'VARIABLE') {
+      return this.resolveAssignmentTargetLocation(
+        process,
+        target,
+      )
+    }
+
+    if (!runtime.pendingTargetIndex) {
+      return undefined
+    }
+
+    const index =
+      this.evaluateArrayIndex(
+        process,
+        runtime.pendingTargetIndex,
+      )
+
+    if (index === undefined) {
+      return undefined
+    }
+
+    return {
+      type: 'ARRAY_ELEMENT',
+      arrayName: target.arrayName,
+      index,
+    }
   }
 
   private resolveAssignmentTargetLocation(

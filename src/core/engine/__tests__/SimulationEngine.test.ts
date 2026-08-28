@@ -1234,4 +1234,97 @@ describe('SimulationEngine', () => {
       expect(process.atomicDepth).toBe(0)
     }
   })
+
+  it('captures a shared array target index before the write', () => {
+    const source = `
+      shared int index = 0;
+      shared int[] values = [0, 0];
+
+      process P1 {
+        values[index] = 10;
+      }
+
+      process P2 {
+        index = 1;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    expect(engine.isFinished()).toBe(true)
+
+    expect(
+      engine.getState().program.sharedMemory.values,
+    ).toEqual([10, 0])
+  })
+
+  it('captures multiple shared reads used in an array target index', () => {
+    const source = `
+      shared int i = 0;
+      shared int offset = 1;
+      shared int[] values = [0, 0, 0, 0];
+
+      process P1 {
+        values[i + offset] = 50;
+      }
+
+      process P2 {
+        i = 2;
+        offset = 0;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    expect(engine.isFinished()).toBe(true)
+
+    expect(
+      engine.getState().program.sharedMemory.values,
+    ).toEqual([0, 50, 0, 0])
+
+    const targetReads =
+      engine
+        .getState()
+        .microOperationHistory
+        ?.filter(
+          (event) =>
+            event.processId === 'P1'
+            && event.type === 'SHARED_READ',
+        ) ?? []
+
+    expect(
+      targetReads.map(
+        (event) => event.description,
+      ),
+    ).toEqual([
+      'i = 0',
+      'offset = 1',
+    ])
+  })
 })
