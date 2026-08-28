@@ -5,14 +5,18 @@
 
 ## Estado actual
 
-**Fase:** M4 — Control de ejecución, funciones y runtime de expresiones suspendibles.
+**Fase:** transición M5 → M6.
 
-**Último milestone completado:** M4 — Control de ejecución, funciones y runtime de expresiones suspendibles.
+**Último milestone completado:** M5 — Atomicidad e interferencia.
 
-**Estado M4:** completado. El lenguaje y el engine soportan estructuras de control, loops, funciones, parámetros, call stack por proceso, `return` y llamadas a funciones dentro de expresiones sin introducir atomicidad artificial. El runtime suspendible utiliza una pila de evaluaciones pendientes por proceso y soporta continuaciones anidadas.
+**Estado M5:** completado. El engine ejecuta accesos relevantes a memoria
+compartida mediante microoperaciones intercalables, conserva los valores
+observados por cada lectura, permite reproducir race conditions reales,
+detecta conflictos sobre ubicaciones concretas de memoria y soporta
+secciones `atomic` que impiden interleavings entre sus microoperaciones.
 
-**Próximo objetivo:** actualizar la documentación técnica que todavía describa la arquitectura anterior (`docs/ARCHITECTURE.md`, `docs/DECISIONS.md` y `docs/SYNTAX.md`), verificar el backlog y comenzar el siguiente milestone orientado a primitivas específicamente concurrentes.
-
+**Próximo objetivo:** M6 — implementar `<await (B); S>` siguiendo la
+semántica utilizada por la cátedra.
 ------------------------------------------------------------------------
 
 ## 2026-08-26 --- Inicio del proyecto
@@ -376,3 +380,481 @@ result = calculate(5);
 function calculate(int value) {
   return double(value) + 1;
 }
+```
+
+## 2026-08-28 — M5 completado: atomicidad e interferencia
+
+### Microoperaciones como unidad de ejecución concurrente
+
+M5 introduce la primera semántica específicamente concurrente del simulador.
+
+Hasta M4, una instrucción del pseudocódigo podía ejecutarse esencialmente como una única transición del engine. Esto no era suficiente para representar interferencias reales sobre memoria compartida.
+
+Se consolidó la distinción entre:
+
+- instrucciones visibles del pseudocódigo;
+- microoperaciones internas del runtime.
+
+Una instrucción como:
+
+```text
+x = x + 1;
+```
+
+puede ejecutarse conceptualmente como:
+
+```text
+SHARED_READ x
+COMPUTE x + 1
+SHARED_WRITE x
+```
+
+Cada microoperación constituye una unidad mínima de ejecución atómica.
+
+Entre dos microoperaciones el scheduler puede seleccionar otro proceso, permitiendo representar interleavings reales.
+
+### Runtime de asignaciones compartidas
+
+Se agregó un runtime específico para mantener el estado de una asignación compartida parcialmente ejecutada.
+
+Este runtime permite conservar:
+
+- la expresión pendiente;
+- los valores ya leídos;
+- el valor calculado;
+- el índice pendiente de un target de array;
+- la ubicación concreta de destino;
+- la fase actual de la operación.
+
+Esto permite que una instrucción pueda comenzar en un step y finalizar varios steps después sin perder su estado intermedio.
+
+Las fases utilizadas actualmente para las asignaciones compartidas son conceptualmente:
+
+```text
+READ
+COMPUTE
+TARGET_READ
+WRITE
+```
+
+`TARGET_READ` permite resolver explícitamente lecturas compartidas utilizadas para determinar la ubicación de destino de una asignación a un array.
+
+### Captura de lecturas compartidas
+
+Las lecturas de memoria compartida capturan el valor observado en el momento del `SHARED_READ`.
+
+Las microoperaciones posteriores utilizan ese valor capturado aunque otro proceso modifique la memoria antes de que termine la instrucción.
+
+Por ejemplo, dos procesos ejecutando:
+
+```text
+x = x + 1;
+```
+
+pueden producir:
+
+```text
+P1 SHARED_READ  x = 0
+P2 SHARED_READ  x = 0
+P1 COMPUTE      result = 1
+P2 COMPUTE      result = 1
+P1 SHARED_WRITE x = 1
+P2 SHARED_WRITE x = 1
+```
+
+El resultado final válido es `x = 1`, reproduciendo un lost update real sin introducir comportamiento especial para ese ejemplo.
+
+### MemoryLocation
+
+Se introdujo `MemoryLocation` para representar ubicaciones concretas de memoria compartida.
+
+Actualmente distingue:
+
+```text
+VARIABLE
+ARRAY_ELEMENT
+```
+
+Esto permite diferenciar correctamente accesos como:
+
+```text
+x
+values[0]
+values[1]
+```
+
+Dos accesos a elementos diferentes del mismo array no son tratados automáticamente como accesos a la misma ubicación.
+
+### Arrays compartidos e índices
+
+Los accesos a elementos de arrays compartidos fueron integrados al modelo de microoperaciones.
+
+También se resolvió el caso donde el índice utilizado como target depende de memoria compartida.
+
+Ejemplo:
+
+```text
+shared int index = 0;
+shared int[] values = [0, 0];
+
+process P1 {
+    values[index] = 10;
+}
+
+process P2 {
+    index = 1;
+}
+```
+
+La ubicación de destino se resuelve utilizando el valor del índice capturado durante la ejecución de la asignación, en lugar de volver a consultar el valor actual de `index` al momento del `WRITE`.
+
+Una ejecución válida puede producir:
+
+```text
+P1 COMPUTE       result = 10
+P2 COMPUTE       result = 1
+P1 SHARED_READ   index = 0
+P2 SHARED_WRITE  index = 1
+P1 SHARED_WRITE  values[0] = 10
+```
+
+Aunque `index` vale `1` cuando ocurre el último `WRITE`, P1 escribe correctamente sobre `values[0]`, porque esa fue la ubicación determinada a partir del valor observado anteriormente.
+
+También se soportan expresiones de índice que requieren múltiples lecturas compartidas.
+
+Por ejemplo:
+
+```text
+shared int i = 0;
+shared int offset = 1;
+shared int[] values = [0, 0, 0, 0];
+
+process P1 {
+    values[i + offset] = 50;
+}
+```
+
+Las lecturas de `i` y `offset` se realizan como microoperaciones independientes y sus valores quedan capturados para calcular posteriormente la ubicación de destino.
+
+### Historial de microoperaciones
+
+`ExecutionState` mantiene un historial específico de microoperaciones separado conceptualmente del historial de instrucciones fuente.
+
+Cada `MicroOperationEvent` puede registrar:
+
+- step;
+- proceso;
+- tipo de microoperación;
+- descripción;
+- ubicación de memoria asociada;
+- profundidad atómica.
+
+La UI permite observar el interleaving a este nivel de detalle.
+
+Esto permite mantener dos perspectivas diferentes de una misma ejecución:
+
+- una cercana al pseudocódigo escrito por el usuario;
+- otra detallada, orientada a comprender la concurrencia y la interferencia.
+
+### Detección de conflictos de memoria
+
+Se agregó análisis de accesos sobre memoria compartida.
+
+Dos accesos son considerados conflictivos cuando:
+
+- pertenecen a procesos diferentes;
+- afectan la misma `MemoryLocation`;
+- al menos uno de ellos es una escritura.
+
+Las combinaciones relevantes son:
+
+```text
+READ  + WRITE
+WRITE + READ
+WRITE + WRITE
+```
+
+Dos lecturas sobre la misma ubicación no constituyen un conflicto.
+
+Se agregó además un resumen de conflictos agrupado por ubicación de memoria para facilitar su visualización.
+
+### Conflicto de acceso vs data race
+
+Se decidió no tratar automáticamente todo conflicto de memoria como una data race confirmada.
+
+Los conflictos detectados actualmente se clasifican como:
+
+```text
+POTENTIAL_RACE
+SYNCHRONIZED
+```
+
+`POTENTIAL_RACE` indica que existe una combinación de accesos conflictivos que no está completamente protegida por el mecanismo de atomicidad conocido actualmente por el engine.
+
+`SYNCHRONIZED` indica que ambos accesos conflictivos ocurrieron dentro de regiones protegidas por la atomicidad explícita soportada actualmente.
+
+Esta clasificación deja abierta la evolución futura hacia un análisis más formal cuando existan semáforos, monitores, relaciones happens-before y otros mecanismos de sincronización.
+
+### Visualización de interferencias
+
+La interfaz fue extendida para mostrar:
+
+- historial de microoperaciones;
+- lecturas compartidas;
+- escrituras compartidas;
+- ubicaciones concretas de memoria;
+- conflictos potenciales;
+- accesos sincronizados;
+- cantidad de potenciales races;
+- información resumida de conflictos.
+
+Los accesos clasificados como `POTENTIAL_RACE` y `SYNCHRONIZED` se distinguen visualmente.
+
+### Sintaxis `atomic`
+
+Se agregó soporte al lenguaje para regiones:
+
+```text
+atomic {
+    // instrucciones
+}
+```
+
+El tokenizer reconoce `atomic` como keyword.
+
+El parser genera una instrucción `ATOMIC` cuyo cuerpo contiene las instrucciones de la región.
+
+El engine mantiene `atomicDepth` por proceso para representar si se encuentra dentro de una o más regiones atómicas.
+
+### Semántica de atomicidad
+
+Una región `atomic` no elimina las microoperaciones internas.
+
+Por ejemplo:
+
+```text
+atomic {
+    x = x + 1;
+}
+```
+
+continúa generando conceptualmente:
+
+```text
+SHARED_READ x
+COMPUTE
+SHARED_WRITE x
+```
+
+La diferencia es que, una vez ingresado al bloque `atomic`, el scheduler no puede seleccionar otro proceso hasta abandonar completamente la región.
+
+Esto permite conservar la visualización detallada de la ejecución sin permitir interleavings con otros procesos dentro de la sección atómica.
+
+### Atomicidad anidada
+
+Se soportan regiones `atomic` anidadas mediante `atomicDepth`.
+
+Conceptualmente:
+
+```text
+atomic {
+    atomic {
+        x = x + 1;
+    }
+}
+```
+
+produce una evolución de profundidad equivalente a:
+
+```text
+0 -> 1 -> 2 -> 1 -> 0
+```
+
+El proceso conserva la exclusividad mientras `atomicDepth > 0`.
+
+### Atomicidad y control de flujo
+
+Durante la implementación se detectó que `return`, `break` y `continue` podían abandonar frames de ejecución sin pasar por la finalización normal de una región atómica.
+
+Esto podía dejar `atomicDepth > 0` permanentemente y mantener incorrectamente al proceso como propietario de la ejecución.
+
+Se centralizó la eliminación de execution frames para detectar los frames `EXIT_ATOMIC` descartados durante un unwind y reducir correctamente `atomicDepth`.
+
+Se verificaron casos anidados como:
+
+```text
+while
+    if
+        atomic
+            if
+                continue
+```
+
+```text
+while
+    if
+        atomic
+            if
+                if
+                    break
+```
+
+y:
+
+```text
+function
+    while
+        if
+            atomic
+                if
+                    return expression
+```
+
+Esto permite abandonar correctamente una región atómica incluso cuando el flujo de control no llega naturalmente al final de su bloque.
+
+### Regiones atómicas vacías
+
+Se agregó soporte explícito para:
+
+```text
+atomic {
+}
+```
+
+Una región vacía no deja `atomicDepth` activo ni crea un frame de ejecución que pueda bloquear incorrectamente la simulación.
+
+### Protección unilateral
+
+Se estableció que utilizar `atomic` solamente en uno de dos procesos que acceden a la misma ubicación no es suficiente para considerar el acceso sincronizado.
+
+Por ejemplo:
+
+```text
+shared int x = 0;
+
+process P1 {
+    atomic {
+        x = x + 1;
+    }
+}
+
+process P2 {
+    x = x + 1;
+}
+```
+
+continúa pudiendo producir interferencia.
+
+P2 puede realizar un `SHARED_READ` antes de que P1 ingrese en su región atómica y conservar ese valor para una escritura posterior.
+
+Por lo tanto, bajo el modelo actual:
+
+```text
+P1 atomic + P2 normal -> POTENTIAL_RACE
+P1 atomic + P2 atomic -> SYNCHRONIZED
+```
+
+Esto refleja que ambos participantes deben respetar el protocolo de protección para garantizar exclusión mutua.
+
+### Caso principal de M5
+
+El programa:
+
+```text
+shared int x = 0;
+
+process P1 {
+    x = x + 1;
+}
+
+process P2 {
+    x = x + 1;
+}
+```
+
+puede producir correctamente una ejecución con resultado final:
+
+```text
+x = 1
+```
+
+debido a un lost update.
+
+Al proteger ambas operaciones:
+
+```text
+shared int x = 0;
+
+process P1 {
+    atomic {
+        x = x + 1;
+    }
+}
+
+process P2 {
+    atomic {
+        x = x + 1;
+    }
+}
+```
+
+el resultado final es:
+
+```text
+x = 2
+```
+
+y los accesos conflictivos correspondientes pueden clasificarse como sincronizados.
+
+### Robustez y tests
+
+Se agregaron tests para cubrir los distintos componentes incorporados durante M5, incluyendo:
+
+- interleavings de microoperaciones;
+- lost updates;
+- lecturas y escrituras compartidas;
+- elementos de arrays compartidos;
+- ubicaciones concretas de memoria;
+- conflictos entre procesos;
+- clasificación de conflictos;
+- atomicidad;
+- ausencia de interleavings dentro de `atomic`;
+- regiones atómicas anidadas;
+- regiones atómicas vacías;
+- `break` dentro de regiones atómicas;
+- `continue` dentro de regiones atómicas;
+- `return` dentro de regiones atómicas;
+- liberación correcta de `atomicDepth`;
+- captura de índices compartidos utilizados como targets de arrays;
+- múltiples lecturas compartidas dentro de expresiones de índice.
+
+Las pruebas existentes del lenguaje secuencial y del runtime suspendible continúan funcionando.
+
+### Estado de M5
+
+M5 queda completado.
+
+El simulador ya puede representar una diferencia fundamental entre ejecución secuencial y concurrente: una instrucción aparentemente simple puede estar compuesta por varias acciones atómicas intercalables y producir resultados diferentes según el scheduling.
+
+También dispone de su primer mecanismo explícito para impedir esos interleavings mediante regiones `atomic`.
+
+El objetivo pendiente de permitir elegir entre granularidad por instrucción y granularidad por microoperación no bloquea el cierre semántico de M5 y se traslada a trabajo futuro de visualización/experiencia de ejecución.
+
+### Próximo objetivo
+
+M6 introduce:
+
+```text
+<await (B); S>
+```
+
+Antes de implementarlo debe verificarse la semántica exacta utilizada por el material actual de la cátedra, especialmente:
+
+- evaluación de la guarda `B`;
+- comportamiento cuando `B` es falsa;
+- transición del proceso a `BLOCKED`;
+- criterio de reactivación;
+- atomicidad de la evaluación y ejecución;
+- relación entre `await` y las acciones atómicas ya implementadas.
+
+El diseño de M6 debe reutilizar la infraestructura construida durante M5 en lugar de introducir un mecanismo de ejecución paralelo.

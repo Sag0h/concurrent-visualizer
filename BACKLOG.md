@@ -224,69 +224,48 @@ definida la unidad mínima de ejecución que puede intercalarse con otro proceso
 ### Modelo de ejecución
 
 - [x] Definir formalmente qué constituye una acción atómica en el simulador.
-
 - [x] Distinguir instrucciones del pseudocódigo de microoperaciones internas.
-
 - [x] Definir qué microoperaciones pueden intercalarse entre procesos.
-
 - [x] Definir cómo interactúan las microoperaciones con `step()` y los schedulers.
-
 - [ ] Permitir nivel de detalle por instrucción o por operación atómica.
 
 ### Microoperaciones y memoria
 
 - [x] Diseñar representación interna de microoperaciones.
-
 - [x] Descomponer operaciones cuando sea necesario para visualizar interferencia.
-
 - [x] Representar explícitamente lecturas de memoria compartida.
-
 - [x] Representar explícitamente escrituras de memoria compartida.
-
 - [x] Representar operaciones intermedias necesarias para expresiones como `x = x + 1`.
-
 - [x] Mantener historial de lecturas y escrituras.
-
 - [x] Registrar qué proceso realizó cada acceso y en qué step.
-
 - [x] Representar ubicaciones concretas de memoria compartida mediante `MemoryLocation`.
-
 - [x] Soportar accesos a elementos de arrays compartidos a nivel de microoperación.
 
 ### Interferencia e interleavings
 
 - [x] Registrar accesos concurrentes a memoria.
-
 - [x] Visualizar interleavings a nivel de microoperación.
-
 - [x] Crear ejemplo real y reproducible de race condition.
-
 - [x] Mantener compatibilidad con seeds reproducibles del scheduler Random.
-
 - [x] Detectar accesos potencialmente conflictivos sobre la misma ubicación de memoria.
-
 - [x] Resumir conflictos por ubicación de memoria.
-
 - [x] Visualizar conflictos de acceso en la UI.
-
 - [x] Distinguir formalmente conflicto de acceso de data race.
 
 ### Atomicidad explícita
 - [x] Definir sintaxis/representación de secciones atómicas.
-  
 - [x] Implementar secciones atómicas.
-  
 - [x] Impedir interleavings dentro de una sección atómica.
-  
 - [x] Visualizar cuándo un acceso está sincronizado por atomicidad.
-  
 - [x] Agregar tests que comparen ejecución protegida y no protegida.
-  
 - [x] Soportar regiones atómicas anidadas.
-  
 - [x] Mantener atomicidad correctamente ante return, break y continue.
-  
 - [x] Soportar regiones atómicas vacías.
+- [x] Capturar valores leídos de memoria compartida para preservar la semántica del interleaving.
+- [x] Soportar índices compartidos en targets de arrays.
+- [x] Soportar expresiones de índice con múltiples lecturas compartidas.
+- [x] Capturar la ubicación de destino antes del `WRITE`.
+- [x] Clasificar conflictos como `POTENTIAL_RACE` o `SYNCHRONIZED`.
 
 **Caso de prueba principal:** dos procesos ejecutan:
 
@@ -307,6 +286,8 @@ de escribir y el resultado final sea `x = 1`.
 
 Al proteger correctamente la operación mediante atomicidad explícita, el
 resultado deberá ser `x = 2`.
+
+**Estado:** M5 COMPLETADO.
 
 ------------------------------------------------------------------------
 
@@ -396,7 +377,8 @@ concurrentes desarrolladas en milestones posteriores.
 
 ### Extensiones concurrentes
 
--   [ ] Parsear secciones atómicas.
+-   [x] Parsear secciones atómicas.
+-   [x] Agregar tests de tokenizer/parser para `atomic`.
 -   [ ] Parsear `await`.
 -   [ ] Parsear semáforos y operaciones `P` / `V`.
 -   [ ] Parsear primitivas temporales cuando se incorporen.
