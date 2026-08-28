@@ -459,6 +459,11 @@ step(): boolean {
       }
 
       case 'ATOMIC': {
+        if (instruction.body.length === 0) {
+          this.advanceProcess(process)
+          break
+        }
+        
         process.atomicDepth += 1
 
         process.executionStack.push({
@@ -594,6 +599,36 @@ step(): boolean {
     )
   }
 
+  private exitAtomicFrame(
+    process: Process,
+  ): void {
+    process.atomicDepth -= 1
+
+    if (process.atomicDepth < 0) {
+      throw new Error(
+        'Atomic depth cannot be negative',
+      )
+    }
+  }
+
+  private discardExecutionFramesFrom(
+    process: Process,
+    startIndex: number,
+  ): ExecutionFrame[] {
+    const removedFrames =
+      process.executionStack.splice(startIndex)
+
+    for (const frame of removedFrames) {
+      if (
+        frame.completionMode === 'EXIT_ATOMIC'
+      ) {
+        this.exitAtomicFrame(process)
+      }
+    }
+
+    return removedFrames
+  }
+
   private completeFrame(
     process: Process,
     frame: ExecutionFrame,
@@ -639,16 +674,9 @@ step(): boolean {
         return
 
       case 'EXIT_ATOMIC': {
-        process.atomicDepth -= 1
-
-        if (process.atomicDepth < 0) {
-          throw new Error(
-            'Atomic depth cannot be negative',
-          )
-        }
-
+        this.exitAtomicFrame(process)
         this.advanceProcess(process)
-        break
+        return
       }
 
     }
@@ -809,7 +837,8 @@ step(): boolean {
       )
     }
 
-    process.executionStack.splice(
+    this.discardExecutionFramesFrom(
+      process,
       loopIndex,
     )
 
@@ -831,7 +860,8 @@ step(): boolean {
     const loopFrame =
       process.executionStack[loopIndex]
 
-    process.executionStack.splice(
+    this.discardExecutionFramesFrom(
+      process,
       loopIndex,
     )
 
@@ -977,9 +1007,18 @@ step(): boolean {
       const frame =
         process.executionStack.pop()
 
+      if (!frame) {
+        break
+      }
+
       if (
-        frame?.completionMode
-        === 'FUNCTION_RETURN'
+        frame.completionMode === 'EXIT_ATOMIC'
+      ) {
+        this.exitAtomicFrame(process)
+      }
+
+      if (
+        frame.completionMode === 'FUNCTION_RETURN'
       ) {
         foundFunctionBoundary = true
         break
