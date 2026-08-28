@@ -168,3 +168,12 @@ export function returnInstruction(
     value,
   }
 }
+
+export function atomicInstruction(
+  body: Instruction[],
+): Instruction {
+  return {
+    type: 'ATOMIC',
+    body,
+  }
+}

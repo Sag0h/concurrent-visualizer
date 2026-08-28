@@ -28,6 +28,7 @@ function createProcess(
     callStack: [],
     expressionRuntimeStatus: 'IDLE',
     pendingEvaluations: [],
+    atomicDepth: 0,
   }
 }
 
@@ -1033,4 +1034,110 @@ describe('SimulationEngine', () => {
       },
     ])
   })
+
+  it('prevents interleaving inside atomic sections', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        atomic {
+          x = x + 1;
+        }
+      }
+
+      process P2 {
+        atomic {
+          x = x + 1;
+        }
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    expect(program.sharedMemory.x).toBe(2)
+  })
+
+  it('executes shared-memory micro-operations without switching process inside atomic', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        atomic {
+          x = x + 1;
+        }
+      }
+
+      process P2 {
+        atomic {
+          x = x + 1;
+        }
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    const memoryOperations =
+      engine
+        .getState()
+        .microOperationHistory
+        ?.filter(
+          (event) =>
+            event.type === 'SHARED_READ'
+            || event.type === 'SHARED_WRITE'
+            || event.type === 'COMPUTE',
+        )
+
+    expect(
+      memoryOperations?.map(
+        (event) => event.processId,
+      ),
+    ).toEqual([
+      'P1',
+      'P1',
+      'P1',
+      'P2',
+      'P2',
+      'P2',
+    ])
+
+    expect(
+      memoryOperations?.map(
+        (event) => event.description,
+      ),
+    ).toEqual([
+      'x = 0',
+      'result = 1',
+      'x = 1',
+      'x = 1',
+      'result = 2',
+      'x = 2',
+    ])
+  })
+
 })

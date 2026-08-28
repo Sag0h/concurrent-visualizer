@@ -22,6 +22,7 @@ import {
   variableTarget,
   whileInstruction,
   returnInstruction,
+  atomicInstruction,
 } from '../instructions/instructionFactories'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 import type { Process } from '../process/Process'
@@ -159,6 +160,7 @@ class Parser {
       callStack: [],
       expressionRuntimeStatus: 'IDLE',
       pendingEvaluations: [],
+      atomicDepth: 0,
     }
   }
 
@@ -189,6 +191,10 @@ class Parser {
 
     if (this.match('RETURN')) {
       return this.parseReturnInstruction()
+    }
+
+    if (this.match('ATOMIC')) {
+      return this.parseAtomicInstruction()
     }
 
     if (this.match('BREAK')) {
@@ -1050,6 +1056,12 @@ class Parser {
       functionName.lexeme,
       args,
     )
+  }
+
+  private parseAtomicInstruction(): Instruction {
+    const body = this.parseInstructionBlock()
+
+    return atomicInstruction(body)
   }
 
   private parseReturnInstruction(): Instruction {

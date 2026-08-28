@@ -62,9 +62,18 @@ step(): boolean {
     return false
   }
 
-  const process = this.scheduler.selectNext(
-    this.state.program.processes,
-  )
+  const atomicProcess =
+    this.state.program.processes.find(
+      (candidate) =>
+        candidate.state === 'READY'
+        && candidate.atomicDepth > 0,
+    )
+
+  const process =
+    atomicProcess
+    ?? this.scheduler.selectNext(
+      this.state.program.processes,
+    )
 
   if (!process) {
     return false
@@ -421,6 +430,7 @@ step(): boolean {
 
         break
       }
+
       case 'RETURN': {
         if (
           instruction.value
@@ -444,6 +454,18 @@ step(): boolean {
           process,
           instruction.value,
         )
+
+        break
+      }
+
+      case 'ATOMIC': {
+        process.atomicDepth += 1
+
+        process.executionStack.push({
+          instructions: instruction.body,
+          programCounter: 0,
+          completionMode: 'EXIT_ATOMIC',
+        })
 
         break
       }
@@ -615,6 +637,20 @@ step(): boolean {
       case 'FUNCTION_RETURN':
         this.completeFunctionCall(process)
         return
+
+      case 'EXIT_ATOMIC': {
+        process.atomicDepth -= 1
+
+        if (process.atomicDepth < 0) {
+          throw new Error(
+            'Atomic depth cannot be negative',
+          )
+        }
+
+        this.advanceProcess(process)
+        break
+      }
+
     }
   }
 

@@ -926,7 +926,7 @@ function App() {
 
                                     {hasConflict && (
                                       <span className="memory-conflict-indicator">
-                                        Conflict
+                                        Potential race
                                       </span>
                                     )}
                                   </td>
@@ -939,7 +939,7 @@ function App() {
 
                       <div className="memory-conflicts">
                         <div className="memory-conflicts-header">
-                          <h3>Memory Conflicts</h3>
+                          <h3>Potential Memory Races</h3>
 
                           <span className="memory-conflict-count">
                             {

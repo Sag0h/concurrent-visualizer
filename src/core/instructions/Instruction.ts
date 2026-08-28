@@ -74,6 +74,11 @@ export interface ReturnInstruction {
   readonly value?: Expression
 }
 
+export interface AtomicInstruction {
+  readonly type: 'ATOMIC'
+  readonly body: Instruction[]
+}
+
 export type Instruction =
   | NoOpInstruction
   | FinishInstruction
@@ -88,3 +93,4 @@ export type Instruction =
   | ContinueInstruction
   | CallInstruction
   | ReturnInstruction
+  | AtomicInstruction

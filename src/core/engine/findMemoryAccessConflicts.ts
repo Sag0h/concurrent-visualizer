@@ -72,6 +72,7 @@ export function findMemoryAccessConflicts(
       conflicts.push({
         first,
         second,
+        classification: 'POTENTIAL_RACE',
       })
     }
   }

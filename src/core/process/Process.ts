@@ -23,4 +23,5 @@ export interface Process {
   pendingEvaluations: PendingEvaluation[]
   expressionRuntimeStatus: ExpressionRuntimeStatus
   microOperationRuntime?: MicroOperationRuntime
+  atomicDepth: number
 }

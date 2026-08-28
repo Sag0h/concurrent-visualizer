@@ -10,6 +10,7 @@ export type FrameCompletionMode =
   | 'FOR_INCREMENT'
   | 'FOREACH_NEXT'
   | 'FUNCTION_RETURN'
+  | 'EXIT_ATOMIC'
 
 export interface ForLoopRuntime {
   readonly condition: Expression

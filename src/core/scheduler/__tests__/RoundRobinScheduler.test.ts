@@ -16,6 +16,7 @@ function createProcess(
     callStack: [],
     expressionRuntimeStatus: 'IDLE',
     pendingEvaluations: [],
+    atomicDepth: 0,
   }
 }
 

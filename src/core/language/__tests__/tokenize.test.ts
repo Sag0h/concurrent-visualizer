@@ -158,4 +158,13 @@ describe('tokenize', () => {
       ),
     ).toThrow('Unterminated string')
   })
+
+  it('tokenizes atomic as a keyword', () => {
+    const tokens = tokenize(`
+      atomic {
+      }
+    `)
+
+    expect(tokens[0].type).toBe('ATOMIC')
+  })
 })

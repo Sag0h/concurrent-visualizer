@@ -43,6 +43,7 @@ export type TokenType =
   | 'CONTINUE'
   | 'FUNCTION'
   | 'RETURN'
+  | 'ATOMIC'
 
 export interface Token {
   readonly type: TokenType

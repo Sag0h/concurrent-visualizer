@@ -216,41 +216,72 @@ concurrentes.
 ## M5 --- Atomicidad e interferencia
 
 Este milestone introduce la primera semántica específicamente concurrente
+
 del simulador. Antes de implementar primitivas de sincronización debe quedar
+
 definida la unidad mínima de ejecución que puede intercalarse con otro proceso.
 
 ### Modelo de ejecución
 
--   [x] Definir formalmente qué constituye una acción atómica en el simulador.
--   [ ] Distinguir instrucciones del pseudocódigo de microoperaciones internas.
--   [ ] Definir qué microoperaciones pueden intercalarse entre procesos.
--   [ ] Definir cómo interactúan las microoperaciones con `step()` y los schedulers.
--   [ ] Permitir nivel de detalle por instrucción o por operación atómica.
+- [x] Definir formalmente qué constituye una acción atómica en el simulador.
+
+- [x] Distinguir instrucciones del pseudocódigo de microoperaciones internas.
+
+- [x] Definir qué microoperaciones pueden intercalarse entre procesos.
+
+- [x] Definir cómo interactúan las microoperaciones con `step()` y los schedulers.
+
+- [ ] Permitir nivel de detalle por instrucción o por operación atómica.
 
 ### Microoperaciones y memoria
 
--   [ ] Diseñar representación interna de microoperaciones.
--   [ ] Descomponer operaciones cuando sea necesario para visualizar interferencia.
--   [ ] Representar explícitamente lecturas de memoria compartida.
--   [ ] Representar explícitamente escrituras de memoria compartida.
--   [ ] Representar operaciones intermedias necesarias para expresiones como `x = x + 1`.
--   [ ] Mantener historial de lecturas y escrituras.
--   [ ] Registrar qué proceso realizó cada acceso y en qué step.
+- [x] Diseñar representación interna de microoperaciones.
+
+- [x] Descomponer operaciones cuando sea necesario para visualizar interferencia.
+
+- [x] Representar explícitamente lecturas de memoria compartida.
+
+- [x] Representar explícitamente escrituras de memoria compartida.
+
+- [x] Representar operaciones intermedias necesarias para expresiones como `x = x + 1`.
+
+- [x] Mantener historial de lecturas y escrituras.
+
+- [x] Registrar qué proceso realizó cada acceso y en qué step.
+
+- [x] Representar ubicaciones concretas de memoria compartida mediante `MemoryLocation`.
+
+- [x] Soportar accesos a elementos de arrays compartidos a nivel de microoperación.
 
 ### Interferencia e interleavings
 
--   [ ] Registrar accesos concurrentes a memoria.
--   [ ] Visualizar interleavings a nivel de microoperación.
--   [ ] Crear ejemplo real y reproducible de race condition.
--   [ ] Mantener compatibilidad con seeds reproducibles del scheduler Random.
+- [x] Registrar accesos concurrentes a memoria.
+
+- [x] Visualizar interleavings a nivel de microoperación.
+
+- [x] Crear ejemplo real y reproducible de race condition.
+
+- [x] Mantener compatibilidad con seeds reproducibles del scheduler Random.
+
+- [x] Detectar accesos potencialmente conflictivos sobre la misma ubicación de memoria.
+
+- [x] Resumir conflictos por ubicación de memoria.
+
+- [x] Visualizar conflictos de acceso en la UI.
+
+- [x] Distinguir formalmente conflicto de acceso de data race.
 
 ### Atomicidad explícita
 
--   [ ] Definir sintaxis/representación de secciones atómicas.
--   [ ] Implementar secciones atómicas.
--   [ ] Impedir interleavings dentro de una sección atómica.
--   [ ] Visualizar cuándo un proceso está ejecutando una región atómica.
--   [ ] Agregar tests que comparen ejecución protegida y no protegida.
+- [ ] Definir sintaxis/representación de secciones atómicas.
+
+- [ ] Implementar secciones atómicas.
+
+- [ ] Impedir interleavings dentro de una sección atómica.
+
+- [ ] Visualizar cuándo un proceso está ejecutando una región atómica.
+
+- [ ] Agregar tests que comparen ejecución protegida y no protegida.
 
 **Caso de prueba principal:** dos procesos ejecutan:
 

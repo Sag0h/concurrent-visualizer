@@ -274,4 +274,28 @@ describe('parseProgram', () => {
       ],
     })
   })
+
+  it('parses atomic blocks', () => {
+    const program = parseProgram(`
+      shared int x = 0;
+
+      process P1 {
+        atomic {
+          x = x + 1;
+        }
+      }
+    `)
+
+    expect(
+      program.processes[0].instructions[0],
+    ).toMatchObject({
+      type: 'ATOMIC',
+      body: [
+        {
+          type: 'ASSIGN',
+        },
+      ],
+    })
+  })
+
 })
