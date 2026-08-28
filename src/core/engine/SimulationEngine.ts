@@ -17,7 +17,7 @@ import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { FunctionDefinition } from '../language/FunctionDefinition'
 import type { PendingEvaluation } from '../process/PendingEvaluation'
 import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
-
+import type { MemoryLocation } from '../memory/MemoryLocation'
 export class SimulationEngine {
   private state: ExecutionState
   private readonly scheduler: Scheduler
@@ -99,8 +99,7 @@ step(): boolean {
 
       case 'ASSIGN': {
         if (
-          instruction.target.type === 'VARIABLE'
-          && !this.containsFunctionCall(
+          !this.containsFunctionCall(
             instruction.expression,
           )
           && (
@@ -1447,6 +1446,101 @@ step(): boolean {
     this.startNextPendingFunction(process)
   }
 
+  private evaluateArrayIndex(
+    process: Process,
+    expression: Expression,
+  ): number | undefined {
+    if (
+      this.containsFunctionCall(expression)
+      || this.findNextSharedMemoryRead(
+        process,
+        expression,
+      )
+    ) {
+      return undefined
+    }
+
+    const value = evaluateExpression(
+      expression,
+      {
+        localMemory:
+          this.getActiveLocalMemory(process),
+        sharedMemory:
+          this.state.program.sharedMemory,
+      },
+    )
+
+    if (
+      typeof value !== 'number'
+      || !Number.isInteger(value)
+    ) {
+      throw new Error(
+        'Array index must evaluate to an integer',
+      )
+    }
+
+    return value
+  }
+
+  private readSharedMemoryLocation(
+    location: MemoryLocation,
+  ): RuntimeValue {
+    if (location.type === 'VARIABLE') {
+      const value =
+        this.state.program.sharedMemory[
+          location.name
+        ]
+
+      if (value === undefined) {
+        throw new Error(
+          `Shared variable "${location.name}" is not defined`,
+        )
+      }
+
+      return structuredClone(value)
+    }
+
+    const array =
+      this.state.program.sharedMemory[
+        location.arrayName
+      ]
+
+    if (!Array.isArray(array)) {
+      throw new Error(
+        `Shared variable "${location.arrayName}" is not an array`,
+      )
+    }
+
+    if (
+      location.index < 0
+      || location.index >= array.length
+    ) {
+      throw new Error(
+        `Array index ${location.index} is out of bounds`,
+      )
+    }
+
+    const value = array[location.index]
+
+    if (value === undefined) {
+      throw new Error(
+        `Shared array element "${location.arrayName}[${location.index}]" is not defined`,
+      )
+    }
+
+    return structuredClone(value)
+  }
+
+  private formatMemoryLocation(
+      location: MemoryLocation,
+  ): string {
+    if (location.type === 'VARIABLE') {
+      return location.name
+    }
+
+    return `${location.arrayName}[${location.index}]`
+  }
+
   private findNextSharedMemoryRead(
     process: Process,
     expression: Expression,
@@ -1466,7 +1560,10 @@ step(): boolean {
 
         return {
           expression,
-          variableName: expression.name,
+          location: {
+            type: 'VARIABLE',
+            name: expression.name,
+          },
         }
       }
 
@@ -1488,7 +1585,51 @@ step(): boolean {
           expression.operand,
         )
 
-      case 'ARRAY_ACCESS':
+      case 'ARRAY_ACCESS': {
+        if (
+          expression.array.type === 'VARIABLE'
+        ) {
+          const arrayName =
+            expression.array.name
+
+          const localMemory =
+            this.getActiveLocalMemory(process)
+
+          const isSharedArray =
+            !(arrayName in localMemory)
+            && arrayName
+              in this.state.program.sharedMemory
+
+          if (isSharedArray) {
+            const indexRead =
+              this.findNextSharedMemoryRead(
+                process,
+                expression.index,
+              )
+
+            if (indexRead) {
+              return indexRead
+            }
+
+            const index =
+              this.evaluateArrayIndex(
+                process,
+                expression.index,
+              )
+
+            if (index !== undefined) {
+              return {
+                expression,
+                location: {
+                  type: 'ARRAY_ELEMENT',
+                  arrayName,
+                  index,
+                },
+              }
+            }
+          }
+        }
+
         return (
           this.findNextSharedMemoryRead(
             process,
@@ -1499,6 +1640,7 @@ step(): boolean {
             expression.index,
           )
         )
+      }
 
       case 'FUNCTION_CALL':
         for (const argument of expression.arguments) {
@@ -1601,12 +1743,7 @@ step(): boolean {
       { type: 'ASSIGN' }
     >,
   ): void {
-    if (instruction.target.type !== 'VARIABLE') {
-      throw new Error(
-        'Micro-operation assignment runtime currently supports variable targets only',
-      )
-    }
-
+    
     let runtime = process.microOperationRuntime
 
     if (!runtime) {
@@ -1636,8 +1773,6 @@ step(): boolean {
           )
 
         if (!read) {
-          runtime.phase = 'COMPUTE'
-
           const value = evaluateExpression(
             runtime.pendingExpression,
             {
@@ -1649,30 +1784,31 @@ step(): boolean {
           )
 
           runtime.computedValue = value
+
           this.recordMicroOperation(
             process,
             'COMPUTE',
             `result = ${JSON.stringify(value)}`,
           )
+
           runtime.phase = 'WRITE'
           return
         }
 
         const value =
-          this.state.program.sharedMemory[
-            read.variableName
-          ]
-
-        if (value === undefined) {
-          throw new Error(
-            `Shared variable "${read.variableName}" is not defined`,
+          this.readSharedMemoryLocation(
+            read.location,
           )
-        }
+
+        const locationDescription =
+          this.formatMemoryLocation(
+            read.location,
+          )
 
         this.recordMicroOperation(
           process,
           'SHARED_READ',
-          `${read.variableName} = ${JSON.stringify(value)}`,
+          `${locationDescription} = ${JSON.stringify(value)}`,
         )
 
         runtime.pendingExpression =
@@ -1705,13 +1841,14 @@ step(): boolean {
                 this.state.program.sharedMemory,
             },
           )
-          this.recordMicroOperation(
-            process,
-            'COMPUTE',
-            `result = ${JSON.stringify(
-              runtime.computedValue,
-            )}`,
-          )
+
+        this.recordMicroOperation(
+          process,
+          'COMPUTE',
+          `result = ${JSON.stringify(
+            runtime.computedValue,
+          )}`,
+        )
 
         runtime.phase = 'WRITE'
         return
@@ -1727,23 +1864,30 @@ step(): boolean {
         const target =
           runtime.instruction.target
 
-        if (target.type !== 'VARIABLE') {
+        const location =
+          this.resolveAssignmentTargetLocation(
+            process,
+            target,
+          )
+
+        if (!location) {
           throw new Error(
-            'Micro-operation assignment runtime currently supports variable targets only',
+            'Shared assignment target could not be resolved',
           )
         }
 
-        writeVariable(
-          target.name,
+        this.writeSharedMemoryLocation(
+          location,
           runtime.computedValue,
-          this.getActiveLocalMemory(process),
-          this.state.program.sharedMemory,
         )
+
+        const locationDescription =
+          this.formatMemoryLocation(location)
 
         this.recordMicroOperation(
           process,
           'SHARED_WRITE',
-          `${target.name} = ${JSON.stringify(
+          `${locationDescription} = ${JSON.stringify(
             runtime.computedValue,
           )}`,
         )
@@ -2248,4 +2392,110 @@ step(): boolean {
     })
   }
 
+  private resolveAssignmentTargetLocation(
+    process: Process,
+    target: AssignmentTarget,
+  ): MemoryLocation | undefined {
+    if (target.type === 'VARIABLE') {
+      const localMemory =
+        this.getActiveLocalMemory(process)
+
+      if (target.name in localMemory) {
+        return undefined
+      }
+
+      if (
+        target.name
+        in this.state.program.sharedMemory
+      ) {
+        return {
+          type: 'VARIABLE',
+          name: target.name,
+        }
+      }
+
+      return undefined
+    }
+
+    const localMemory =
+      this.getActiveLocalMemory(process)
+
+    if (target.arrayName in localMemory) {
+      return undefined
+    }
+
+    if (
+      !(target.arrayName
+        in this.state.program.sharedMemory)
+    ) {
+      return undefined
+    }
+
+    const indexRead =
+      this.findNextSharedMemoryRead(
+        process,
+        target.index,
+      )
+
+    if (indexRead) {
+      return undefined
+    }
+
+    const index =
+      this.evaluateArrayIndex(
+        process,
+        target.index,
+      )
+
+    if (index === undefined) {
+      return undefined
+    }
+
+    return {
+      type: 'ARRAY_ELEMENT',
+      arrayName: target.arrayName,
+      index,
+    }
+  }
+
+  private writeSharedMemoryLocation(
+    location: MemoryLocation,
+    value: RuntimeValue,
+  ): void {
+    if (location.type === 'VARIABLE') {
+      this.state.program.sharedMemory[
+        location.name
+      ] = structuredClone(value)
+
+      return
+    }
+
+    const array =
+      this.state.program.sharedMemory[
+        location.arrayName
+      ]
+
+    if (!Array.isArray(array)) {
+      throw new Error(
+        `Shared variable "${location.arrayName}" is not an array`,
+      )
+    }
+
+    if (
+      location.index < 0
+      || location.index >= array.length
+    ) {
+      throw new Error(
+        `Array index ${location.index} is out of bounds`,
+      )
+    }
+
+    if (Array.isArray(value)) {
+      throw new Error(
+        'Nested arrays are not supported yet',
+      )
+    }
+
+    array[location.index] = value
+  }
 }
