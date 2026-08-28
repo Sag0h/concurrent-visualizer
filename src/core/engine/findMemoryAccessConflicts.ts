@@ -69,10 +69,16 @@ export function findMemoryAccessConflicts(
         continue
       }
 
+      const classification =
+        first.atomicDepth > 0
+        && second.atomicDepth > 0
+          ? 'SYNCHRONIZED'
+          : 'POTENTIAL_RACE'
+
       conflicts.push({
         first,
         second,
-        classification: 'POTENTIAL_RACE',
+        classification,
       })
     }
   }

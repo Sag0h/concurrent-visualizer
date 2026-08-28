@@ -8,4 +8,5 @@ export interface MicroOperationEvent {
   readonly type: MicroOperationType
   readonly description: string
   readonly location?: MemoryLocation
+  readonly atomicDepth: number
 }

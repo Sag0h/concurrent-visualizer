@@ -2447,6 +2447,7 @@ step(): boolean {
         location
           ? structuredClone(location)
           : undefined,
+      atomicDepth: process.atomicDepth,
     })
   }
 

@@ -506,6 +506,18 @@ function App() {
     }
   }
 
+  const potentialRaces =
+    snapshot?.memoryAccessConflicts.filter(
+      (conflict) =>
+        conflict.classification === 'POTENTIAL_RACE',
+    ) ?? []
+
+  const synchronizedConflicts =
+    snapshot?.memoryAccessConflicts.filter(
+      (conflict) =>
+        conflict.classification === 'SYNCHRONIZED',
+    ) ?? []
+
   return (
     <main className="app">
       <header className="header">
@@ -881,34 +893,35 @@ function App() {
                         <tbody>
                           {snapshot.microOperationHistory.map(
                             (entry, index) => {
-                              const hasConflict =
-                                snapshot.memoryAccessConflicts.some(
-                                  (conflict) =>
-                                    (
-                                      conflict.first.step
-                                        === entry.step
-                                      && conflict.first.processId
-                                        === entry.processId
-                                      && conflict.first.type
-                                        === entry.type
-                                    )
-                                    || (
-                                      conflict.second.step
-                                        === entry.step
-                                      && conflict.second.processId
-                                        === entry.processId
-                                      && conflict.second.type
-                                        === entry.type
-                                    ),
+                              const belongsToConflict = (
+                                conflict: typeof snapshot.memoryAccessConflicts[number],
+                              ) =>
+                                (
+                                  conflict.first.step === entry.step
+                                  && conflict.first.processId === entry.processId
+                                  && conflict.first.type === entry.type
                                 )
+                                || (
+                                  conflict.second.step === entry.step
+                                  && conflict.second.processId === entry.processId
+                                  && conflict.second.type === entry.type
+                                )
+
+                              const hasPotentialRace =
+                                potentialRaces.some(belongsToConflict)
+
+                              const hasSynchronizedAccess =
+                                synchronizedConflicts.some(belongsToConflict)
 
                               return (
                                 <tr
                                   key={`${entry.step}-${entry.processId}-${entry.type}-${index}`}
                                   className={
-                                    hasConflict
+                                    hasPotentialRace
                                       ? 'memory-conflict-row'
-                                      : undefined
+                                      : hasSynchronizedAccess
+                                        ? 'memory-synchronized-row'
+                                        : undefined
                                   }
                                 >
                                   <td>{entry.step}</td>
@@ -924,9 +937,15 @@ function App() {
                                   <td>
                                     {entry.description}
 
-                                    {hasConflict && (
+                                    {hasPotentialRace && (
                                       <span className="memory-conflict-indicator">
                                         Potential race
+                                      </span>
+                                    )}
+
+                                    {hasSynchronizedAccess && (
+                                      <span className="memory-synchronized-indicator">
+                                        Synchronized
                                       </span>
                                     )}
                                   </td>
@@ -939,17 +958,25 @@ function App() {
 
                       <div className="memory-conflicts">
                         <div className="memory-conflicts-header">
-                          <h3>Potential Memory Races</h3>
+                          <h3>Memory Access Analysis</h3>
 
-                          <span className="memory-conflict-count">
-                            {
-                              snapshot
-                                .memoryAccessConflicts
-                                .length
-                            }
-                          </span>
+                          <div>
+                            <span className="memory-conflict-count">
+                              {potentialRaces.length}{' '}
+                              potential race
+                              {potentialRaces.length === 1 ? '' : 's'}
+                            </span>
+
+                            {' · '}
+
+                            <span className="memory-synchronized-count">
+                              {synchronizedConflicts.length}{' '}
+                              synchronized
+                            </span>
+                          </div>
                         </div>
-                        {snapshot.memoryConflictSummaries.length > 0 && (
+                        {potentialRaces.length > 0
+                          && snapshot.memoryConflictSummaries.length > 0 && (
                           <div className="memory-conflict-summary-grid">
                             {snapshot.memoryConflictSummaries.map(
                               (summary, index) => {
@@ -986,8 +1013,7 @@ function App() {
                             )}
                           </div>
                         )}
-                        {snapshot.memoryAccessConflicts.length
-                          === 0 ? (
+                        {potentialRaces.length === 0 ? (
                             <p className="empty">
                               No conflicting shared-memory accesses detected.
                             </p>
@@ -1002,7 +1028,7 @@ function App() {
                               </thead>
 
                               <tbody>
-                                {snapshot.memoryAccessConflicts.map(
+                                {potentialRaces.map(
                                   (conflict, index) => {
                                     const location =
                                       conflict.first.location
@@ -1075,6 +1101,77 @@ function App() {
                                 )}
                               </tbody>
                             </table>
+                          )}
+                          {synchronizedConflicts.length > 0 && (
+                            <>
+                              <h4>Synchronized Shared-Memory Accesses</h4>
+
+                              <table>
+                                <thead>
+                                  <tr>
+                                    <th>Location</th>
+                                    <th>First access</th>
+                                    <th>Second access</th>
+                                    <th>Status</th>
+                                  </tr>
+                                </thead>
+
+                                <tbody>
+                                  {synchronizedConflicts.map(
+                                    (conflict, index) => {
+                                      const location =
+                                        conflict.first.location
+
+                                      const locationDescription =
+                                        location?.type === 'VARIABLE'
+                                          ? location.name
+                                          : location?.type === 'ARRAY_ELEMENT'
+                                            ? `${location.arrayName}[${location.index}]`
+                                            : 'Unknown'
+
+                                      return (
+                                        <tr
+                                          key={`synchronized-${conflict.first.step}-${conflict.second.step}-${index}`}
+                                          className="memory-synchronized-row"
+                                        >
+                                          <td>
+                                            <code>
+                                              {locationDescription}
+                                            </code>
+                                          </td>
+
+                                          <td>
+                                            <strong>
+                                              {conflict.first.processId}
+                                            </strong>
+                                            {' · '}
+                                            {conflict.first.type}
+                                            {' · Step '}
+                                            {conflict.first.step}
+                                          </td>
+
+                                          <td>
+                                            <strong>
+                                              {conflict.second.processId}
+                                            </strong>
+                                            {' · '}
+                                            {conflict.second.type}
+                                            {' · Step '}
+                                            {conflict.second.step}
+                                          </td>
+
+                                          <td>
+                                            <span className="memory-synchronized-indicator">
+                                              Synchronized
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      )
+                                    },
+                                  )}
+                                </tbody>
+                              </table>
+                            </>
                           )}
                       </div>
                     </>

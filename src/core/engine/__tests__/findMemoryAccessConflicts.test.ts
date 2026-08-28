@@ -18,6 +18,7 @@ describe('findMemoryAccessConflicts', () => {
           type: 'VARIABLE',
           name: 'x',
         },
+        atomicDepth: 0,
       },
       {
         step: 2,
@@ -28,6 +29,7 @@ describe('findMemoryAccessConflicts', () => {
           type: 'VARIABLE',
           name: 'x',
         },
+        atomicDepth: 0,
       },
     ]
 
@@ -50,6 +52,7 @@ describe('findMemoryAccessConflicts', () => {
           type: 'VARIABLE',
           name: 'x',
         },
+        atomicDepth: 0,
       },
       {
         step: 2,
@@ -60,6 +63,7 @@ describe('findMemoryAccessConflicts', () => {
           type: 'VARIABLE',
           name: 'x',
         },
+        atomicDepth: 0,
       },
     ]
 
@@ -80,6 +84,7 @@ describe('findMemoryAccessConflicts', () => {
           arrayName: 'values',
           index: 0,
         },
+        atomicDepth: 0,
       },
       {
         step: 2,
@@ -91,6 +96,7 @@ describe('findMemoryAccessConflicts', () => {
           arrayName: 'values',
           index: 1,
         },
+        atomicDepth: 0,
       },
     ]
 
@@ -111,6 +117,7 @@ describe('findMemoryAccessConflicts', () => {
           arrayName: 'values',
           index: 0,
         },
+        atomicDepth: 0,
       },
       {
         step: 2,
@@ -122,6 +129,7 @@ describe('findMemoryAccessConflicts', () => {
           arrayName: 'values',
           index: 0,
         },
+        atomicDepth: 0,
       },
     ]
 
@@ -187,5 +195,75 @@ describe('findMemoryAccessConflicts', () => {
       snapshot.memoryConflictSummaries[0]
         .conflictCount,
     ).toBeGreaterThan(0)
+  })
+
+  it('classifies accesses inside atomic sections as synchronized', () => {
+    const events = [
+      {
+        step: 1,
+        processId: 'P1',
+        type: 'SHARED_WRITE' as const,
+        description: 'x = 1',
+        location: {
+          type: 'VARIABLE' as const,
+          name: 'x',
+        },
+        atomicDepth: 1,
+      },
+      {
+        step: 2,
+        processId: 'P2',
+        type: 'SHARED_WRITE' as const,
+        description: 'x = 2',
+        location: {
+          type: 'VARIABLE' as const,
+          name: 'x',
+        },
+        atomicDepth: 1,
+      },
+    ]
+
+    const conflicts =
+      findMemoryAccessConflicts(events)
+
+    expect(conflicts).toHaveLength(1)
+
+    expect(
+      conflicts[0].classification,
+    ).toBe('SYNCHRONIZED')
+  })
+
+  it('keeps conflict as potential race when only one access is atomic', () => {
+    const events = [
+      {
+        step: 1,
+        processId: 'P1',
+        type: 'SHARED_WRITE' as const,
+        description: 'x = 1',
+        location: {
+          type: 'VARIABLE' as const,
+          name: 'x',
+        },
+        atomicDepth: 1,
+      },
+      {
+        step: 2,
+        processId: 'P2',
+        type: 'SHARED_WRITE' as const,
+        description: 'x = 2',
+        location: {
+          type: 'VARIABLE' as const,
+          name: 'x',
+        },
+        atomicDepth: 0,
+      },
+    ]
+
+    const conflicts =
+      findMemoryAccessConflicts(events)
+
+    expect(
+      conflicts[0].classification,
+    ).toBe('POTENTIAL_RACE')
   })
 })

@@ -401,3 +401,21 @@ h2 {
 .memory-conflict-summary-card code {
   font-weight: 700;
 }
+
+.memory-synchronized-row {
+  background: rgba(46, 160, 67, 0.08);
+}
+
+.memory-synchronized-indicator {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(46, 160, 67, 0.15);
+}
+
+.memory-synchronized-count {
+  font-weight: 600;
+}

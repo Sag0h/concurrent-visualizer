@@ -939,6 +939,7 @@ describe('SimulationEngine', () => {
           type: 'VARIABLE',
           name: 'x',
         },
+        atomicDepth: 0,
       },
       {
         step: 2,
@@ -946,6 +947,7 @@ describe('SimulationEngine', () => {
         type: 'COMPUTE',
         description: 'result = 1',
         location: undefined,
+        atomicDepth: 0,
       },
       {
         step: 3,
@@ -956,6 +958,7 @@ describe('SimulationEngine', () => {
           type: 'VARIABLE',
           name: 'x',
         },
+        atomicDepth: 0,
       },
     ])
   })
