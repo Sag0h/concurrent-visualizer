@@ -518,6 +518,7 @@ describe('SimulationEngine', () => {
       
       microOperationHistory: [],
       memoryAccessConflicts: [],
+      memoryConflictSummaries: [],
       processes: [
         {
           id: 'P1',

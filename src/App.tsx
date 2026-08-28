@@ -949,7 +949,43 @@ function App() {
                             }
                           </span>
                         </div>
+                        {snapshot.memoryConflictSummaries.length > 0 && (
+                          <div className="memory-conflict-summary-grid">
+                            {snapshot.memoryConflictSummaries.map(
+                              (summary, index) => {
+                                const locationDescription =
+                                  summary.location.type === 'VARIABLE'
+                                    ? summary.location.name
+                                    : `${summary.location.arrayName}[${summary.location.index}]`
 
+                                return (
+                                  <div
+                                    className="memory-conflict-summary-card"
+                                    key={`${locationDescription}-${index}`}
+                                  >
+                                    <code>
+                                      {locationDescription}
+                                    </code>
+
+                                    <span>
+                                      {
+                                        summary.processes.join(', ')
+                                      }
+                                    </span>
+
+                                    <span>
+                                      {summary.conflictCount}{' '}
+                                      conflict
+                                      {summary.conflictCount === 1
+                                        ? ''
+                                        : 's'}
+                                    </span>
+                                  </div>
+                                )
+                              },
+                            )}
+                          </div>
+                        )}
                         {snapshot.memoryAccessConflicts.length
                           === 0 ? (
                             <p className="empty">

@@ -380,3 +380,24 @@ h2 {
   font-family: monospace;
   font-weight: 600;
 }
+
+.memory-conflict-summary-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.memory-conflict-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+}
+
+.memory-conflict-summary-card code {
+  font-weight: 700;
+}

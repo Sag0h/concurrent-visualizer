@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { MicroOperationEvent } from '../MicroOperationEvent'
 import { findMemoryAccessConflicts } from '../findMemoryAccessConflicts'
+import { parseProgram } from '../../language/parseProgram'
+import { SimulationEngine } from '../SimulationEngine'
+import { createExecutionState } from '../createExecutionState'
+import { RoundRobinScheduler } from '../../scheduler/RoundRobinScheduler'
 
 describe('findMemoryAccessConflicts', () => {
   it('detects accesses from different processes to the same variable when one writes', () => {
@@ -124,5 +128,64 @@ describe('findMemoryAccessConflicts', () => {
     expect(
       findMemoryAccessConflicts(events),
     ).toHaveLength(1)
+  })
+
+  it('summarizes memory access conflicts by location', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        x = x + 1;
+      }
+
+      process P2 {
+        x = x + 1;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    const snapshot = engine.getSnapshot()
+
+    expect(
+      snapshot.memoryConflictSummaries,
+    ).toHaveLength(1)
+
+    expect(
+      snapshot.memoryConflictSummaries[0],
+    ).toMatchObject({
+      location: {
+        type: 'VARIABLE',
+        name: 'x',
+      },
+    })
+
+    expect(
+      snapshot.memoryConflictSummaries[0]
+        .processes,
+    ).toEqual(
+      expect.arrayContaining([
+        'P1',
+        'P2',
+      ]),
+    )
+
+    expect(
+      snapshot.memoryConflictSummaries[0]
+        .conflictCount,
+    ).toBeGreaterThan(0)
   })
 })

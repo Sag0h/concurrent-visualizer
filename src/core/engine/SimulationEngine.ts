@@ -19,6 +19,7 @@ import type { PendingEvaluation } from '../process/PendingEvaluation'
 import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
 import { findMemoryAccessConflicts } from './findMemoryAccessConflicts'
+import { summarizeMemoryAccessConflicts } from './summarizeMemoryAccessConflicts'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -474,6 +475,10 @@ step(): boolean {
 }
 
   getSnapshot(): SimulationSnapshot {
+    const memoryAccessConflicts =
+      findMemoryAccessConflicts(
+        this.state.microOperationHistory ?? [],
+      )
     return {
       stepCount: this.state.stepCount,
 
@@ -504,6 +509,10 @@ step(): boolean {
       memoryAccessConflicts:
         findMemoryAccessConflicts(
           this.state.microOperationHistory ?? [],
+        ),
+      memoryConflictSummaries:
+        summarizeMemoryAccessConflicts(
+          memoryAccessConflicts,
         ),
 
     }

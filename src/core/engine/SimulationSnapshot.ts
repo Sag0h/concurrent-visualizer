@@ -3,13 +3,14 @@ import type { ProcessId } from '../process/ProcessId'
 import type { ProcessState } from '../process/ProcessState'
 import type { MicroOperationEvent } from './MicroOperationEvent'
 import type { MemoryAccessConflict } from './MemoryAccessConflict'
-
+import type { MemoryConflictSummary } from './MemoryConflictSummary'
 export interface SimulationSnapshot {
   readonly stepCount: number
   readonly sharedMemory: Memory
   readonly processes: ProcessSnapshot[]
   readonly microOperationHistory: MicroOperationEvent[]
   readonly memoryAccessConflicts: MemoryAccessConflict[]
+  readonly memoryConflictSummaries: MemoryConflictSummary[]
 }
 
 export interface FunctionCallSnapshot {
