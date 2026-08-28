@@ -268,3 +268,67 @@ h2 {
   font-weight: bold;
   background: #fff3cd;
 }
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.history-header h2 {
+  margin: 0;
+}
+
+.history-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.history-tab {
+  padding: 7px 12px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.history-tab:hover:not(:disabled) {
+  background: #eee;
+}
+
+.history-tab.active {
+  background: white;
+  border: 1px solid #ccc;
+  font-weight: 600;
+}
+
+.micro-operation {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.micro-operation-shared_read {
+  background: #e8f1ff;
+}
+
+.micro-operation-compute {
+  background: #fff3cd;
+}
+
+.micro-operation-shared_write {
+  background: #d1e7dd;
+}
+
+.micro-operation-instruction {
+  background: #eee;
+}

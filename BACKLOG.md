@@ -221,7 +221,7 @@ definida la unidad mínima de ejecución que puede intercalarse con otro proceso
 
 ### Modelo de ejecución
 
--   [ ] Definir formalmente qué constituye una acción atómica en el simulador.
+-   [x] Definir formalmente qué constituye una acción atómica en el simulador.
 -   [ ] Distinguir instrucciones del pseudocódigo de microoperaciones internas.
 -   [ ] Definir qué microoperaciones pueden intercalarse entre procesos.
 -   [ ] Definir cómo interactúan las microoperaciones con `step()` y los schedulers.

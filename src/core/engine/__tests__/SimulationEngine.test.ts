@@ -12,6 +12,7 @@ import {
 } from '../../expressions/expressionFactories'
 
 import { parseProgram } from '../../language/parseProgram'
+import { RoundRobinScheduler } from '../../scheduler/RoundRobinScheduler'
 
 function createProcess(
   id: string,
@@ -274,36 +275,52 @@ describe('SimulationEngine', () => {
     expect(process.localMemory.x).toBe(10)
   })
 
-  it('assigns values to shared variables', () => {
-    const process = createProcess('P1', [
-      assign(variableTarget('counter'), {
-        type: 'BINARY',
-        operator: '+',
-        left: {
-          type: 'VARIABLE',
-          name: 'counter',
-        },
-        right: {
-          type: 'LITERAL',
-          value: 1,
-        },
-      }),
-    ])
-
-    const program: Program = {
-      processes: [process],
+  it('assigns values to shared variables through micro-operations', () => {
+    const program = {
       sharedMemory: {
         counter: 0,
       },
+      processes: [
+        createProcess('P1', [
+          {
+            type: 'ASSIGN',
+            target: {
+              type: 'VARIABLE',
+              name: 'counter',
+            },
+            expression: {
+              type: 'BINARY',
+              operator: '+',
+              left: {
+                type: 'VARIABLE',
+                name: 'counter',
+              },
+              right: {
+                type: 'LITERAL',
+                value: 1,
+              },
+            },
+          },
+        ]),
+      ],
     }
 
     const engine = new SimulationEngine(
-      createExecutionState(program),
+      {
+        program,
+        history: [],
+        stepCount: 0,
+      },
       new FirstReadyScheduler(),
     )
 
     engine.step()
+    expect(program.sharedMemory.counter).toBe(0)
 
+    engine.step()
+    expect(program.sharedMemory.counter).toBe(0)
+
+    engine.step()
     expect(program.sharedMemory.counter).toBe(1)
   })
 
@@ -495,10 +512,11 @@ describe('SimulationEngine', () => {
 
     expect(engine.getSnapshot()).toEqual({
       stepCount: 1,
-
       sharedMemory: {
         counter: 10,
       },
+      
+      microOperationHistory: [],
 
       processes: [
         {
@@ -814,4 +832,120 @@ describe('SimulationEngine', () => {
     ).toEqual([])
   })
 
+    it('allows a lost update through interleaved shared-memory micro-operations', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        x = x + 1;
+      }
+
+      process P2 {
+        x = x + 1;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    expect(program.sharedMemory.x).toBe(1)
+
+    expect(
+      engine
+        .getState()
+        .microOperationHistory
+        ?.map((event) => ({
+          processId: event.processId,
+          type: event.type,
+          description: event.description,
+        })),
+    ).toEqual([
+      {
+        processId: 'P1',
+        type: 'SHARED_READ',
+        description: 'x = 0',
+      },
+      {
+        processId: 'P2',
+        type: 'SHARED_READ',
+        description: 'x = 0',
+      },
+      {
+        processId: 'P1',
+        type: 'COMPUTE',
+        description: 'result = 1',
+      },
+      {
+        processId: 'P2',
+        type: 'COMPUTE',
+        description: 'result = 1',
+      },
+      {
+        processId: 'P1',
+        type: 'SHARED_WRITE',
+        description: 'x = 1',
+      },
+      {
+        processId: 'P2',
+        type: 'SHARED_WRITE',
+        description: 'x = 1',
+      },
+    ])
+  })
+
+  it('exposes micro-operation history in the simulation snapshot', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        x = x + 1;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    engine.step()
+    engine.step()
+    engine.step()
+
+    const snapshot = engine.getSnapshot()
+
+    expect(snapshot.microOperationHistory).toEqual([
+      {
+        step: 1,
+        processId: 'P1',
+        type: 'SHARED_READ',
+        description: 'x = 0',
+      },
+      {
+        step: 2,
+        processId: 'P1',
+        type: 'COMPUTE',
+        description: 'result = 1',
+      },
+      {
+        step: 3,
+        processId: 'P1',
+        type: 'SHARED_WRITE',
+        description: 'x = 1',
+      },
+    ])
+  })
 })

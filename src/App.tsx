@@ -231,6 +231,11 @@ function App() {
     )
   }
 
+  const [historyMode, setHistoryMode] =
+    useState<'instructions' | 'microoperations'>(
+      'instructions',
+    )
+
   const handleEditorKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
@@ -789,12 +794,77 @@ function App() {
               </section>
 
               <section>
-                <h2>Execution History</h2>
+                <div className="history-header">
+                  <h2>Execution History</h2>
+
+                  <div className="history-tabs">
+                    <button
+                      type="button"
+                      className={
+                        historyMode === 'instructions'
+                          ? 'history-tab active'
+                          : 'history-tab'
+                      }
+                      onClick={() =>
+                        setHistoryMode('instructions')
+                      }
+                    >
+                      Instructions
+                    </button>
+
+                    <button
+                      type="button"
+                      className={
+                        historyMode === 'microoperations'
+                          ? 'history-tab active'
+                          : 'history-tab'
+                      }
+                      onClick={() =>
+                        setHistoryMode('microoperations')
+                      }
+                    >
+                      Micro-operations
+                    </button>
+                  </div>
+                </div>
 
                 <div className="history">
-                  {engine.getState().history.length === 0 ? (
+                  {historyMode === 'instructions' ? (
+                    engine.getState().history.length === 0 ? (
+                      <p className="empty">
+                        No instructions executed yet.
+                      </p>
+                    ) : (
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Step</th>
+                            <th>Process</th>
+                            <th>Instruction</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {engine
+                            .getState()
+                            .history
+                            .map((entry) => (
+                              <tr
+                                key={`${entry.step}-${entry.processId}`}
+                              >
+                                <td>{entry.step}</td>
+                                <td>{entry.processId}</td>
+                                <td>
+                                  {entry.instructionType}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    )
+                  ) : snapshot.microOperationHistory.length === 0 ? (
                     <p className="empty">
-                      No instructions executed yet.
+                      No micro-operations executed yet.
                     </p>
                   ) : (
                     <table>
@@ -802,23 +872,30 @@ function App() {
                         <tr>
                           <th>Step</th>
                           <th>Process</th>
-                          <th>Instruction</th>
+                          <th>Operation</th>
+                          <th>Detail</th>
                         </tr>
                       </thead>
 
                       <tbody>
-                        {engine
-                          .getState()
-                          .history
-                          .map((entry) => (
-                            <tr key={entry.step}>
+                        {snapshot.microOperationHistory.map(
+                          (entry, index) => (
+                            <tr
+                              key={`${entry.step}-${entry.processId}-${entry.type}-${index}`}
+                            >
                               <td>{entry.step}</td>
                               <td>{entry.processId}</td>
                               <td>
-                                {entry.instructionType}
+                                <span
+                                  className={`micro-operation micro-operation-${entry.type.toLowerCase()}`}
+                                >
+                                  {entry.type}
+                                </span>
                               </td>
+                              <td>{entry.description}</td>
                             </tr>
-                          ))}
+                          ),
+                        )}
                       </tbody>
                     </table>
                   )}

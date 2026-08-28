@@ -5,12 +5,11 @@ import type { Memory } from '../memory/Memory'
 import type { ExecutionFrame } from './ExecutionFrame'
 import type { FunctionCallFrame } from './FunctionCallFrame'
 import type { RuntimeValue } from '../memory/RuntimeValue'
-
 import type { PendingEvaluation } from './PendingEvaluation'
-
 import type {
   ExpressionRuntimeStatus,
 } from '../expressions/ExpressionRuntime'
+import type { MicroOperationRuntime } from '../engine/MicroOperationRuntime'
 
 export interface Process {
   readonly id: ProcessId
@@ -23,4 +22,5 @@ export interface Process {
   lastReturnValue?: RuntimeValue
   pendingEvaluations: PendingEvaluation[]
   expressionRuntimeStatus: ExpressionRuntimeStatus
+  microOperationRuntime?: MicroOperationRuntime
 }

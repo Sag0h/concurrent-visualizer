@@ -16,6 +16,7 @@ import type {
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { FunctionDefinition } from '../language/FunctionDefinition'
 import type { PendingEvaluation } from '../process/PendingEvaluation'
+import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -97,6 +98,31 @@ step(): boolean {
         return true
 
       case 'ASSIGN': {
+        if (
+          instruction.target.type === 'VARIABLE'
+          && !this.containsFunctionCall(
+            instruction.expression,
+          )
+          && (
+            process.microOperationRuntime
+            || this.isSharedAssignmentTarget(
+              process,
+              instruction.target,
+            )
+            || this.findNextSharedMemoryRead(
+              process,
+              instruction.expression,
+            )
+          )
+        ) {
+          this.executeAssignmentMicroOperation(
+            process,
+            instruction,
+          )
+
+          break
+        }
+
         if (
           this.containsFunctionCall(
             instruction.expression,
@@ -452,6 +478,9 @@ step(): boolean {
 
       sharedMemory: structuredClone(
         this.state.program.sharedMemory,
+      ),
+      microOperationHistory: structuredClone(
+        this.state.microOperationHistory ?? [],
       ),
 
       processes: this.state.program.processes.map(
@@ -1418,6 +1447,335 @@ step(): boolean {
     this.startNextPendingFunction(process)
   }
 
+  private findNextSharedMemoryRead(
+    process: Process,
+    expression: Expression,
+  ): SharedMemoryRead | undefined {
+    switch (expression.type) {
+      case 'VARIABLE': {
+        const localMemory =
+          this.getActiveLocalMemory(process)
+
+        if (
+          expression.name in localMemory
+          || !(expression.name
+            in this.state.program.sharedMemory)
+        ) {
+          return undefined
+        }
+
+        return {
+          expression,
+          variableName: expression.name,
+        }
+      }
+
+      case 'BINARY':
+        return (
+          this.findNextSharedMemoryRead(
+            process,
+            expression.left,
+          )
+          ?? this.findNextSharedMemoryRead(
+            process,
+            expression.right,
+          )
+        )
+
+      case 'UNARY':
+        return this.findNextSharedMemoryRead(
+          process,
+          expression.operand,
+        )
+
+      case 'ARRAY_ACCESS':
+        return (
+          this.findNextSharedMemoryRead(
+            process,
+            expression.array,
+          )
+          ?? this.findNextSharedMemoryRead(
+            process,
+            expression.index,
+          )
+        )
+
+      case 'FUNCTION_CALL':
+        for (const argument of expression.arguments) {
+          const read =
+            this.findNextSharedMemoryRead(
+              process,
+              argument,
+            )
+
+          if (read) {
+            return read
+          }
+        }
+
+        return undefined
+
+      default:
+        return undefined
+    }
+  }
+
+  private replaceExpressionWithValue(
+    expression: Expression,
+    target: Expression,
+    value: RuntimeValue,
+  ): Expression {
+    if (expression === target) {
+      return {
+        type: 'LITERAL',
+        value: structuredClone(value),
+      }
+    }
+
+    switch (expression.type) {
+      case 'BINARY':
+        return {
+          ...expression,
+          left: this.replaceExpressionWithValue(
+            expression.left,
+            target,
+            value,
+          ),
+          right: this.replaceExpressionWithValue(
+            expression.right,
+            target,
+            value,
+          ),
+        }
+
+      case 'UNARY':
+        return {
+          ...expression,
+          operand:
+            this.replaceExpressionWithValue(
+              expression.operand,
+              target,
+              value,
+            ),
+        }
+
+      case 'ARRAY_ACCESS':
+        return {
+          ...expression,
+          array:
+            this.replaceExpressionWithValue(
+              expression.array,
+              target,
+              value,
+            ),
+          index:
+            this.replaceExpressionWithValue(
+              expression.index,
+              target,
+              value,
+            ),
+        }
+
+      case 'FUNCTION_CALL':
+        return {
+          ...expression,
+          arguments: expression.arguments.map(
+            (argument) =>
+              this.replaceExpressionWithValue(
+                argument,
+                target,
+                value,
+              ),
+          ),
+        }
+
+      default:
+        return expression
+    }
+  }
+
+  private executeAssignmentMicroOperation(
+    process: Process,
+    instruction: Extract<
+      Instruction,
+      { type: 'ASSIGN' }
+    >,
+  ): void {
+    if (instruction.target.type !== 'VARIABLE') {
+      throw new Error(
+        'Micro-operation assignment runtime currently supports variable targets only',
+      )
+    }
+
+    let runtime = process.microOperationRuntime
+
+    if (!runtime) {
+      runtime = {
+        type: 'SHARED_ASSIGNMENT',
+        instruction,
+        phase: 'READ',
+        pendingExpression:
+          structuredClone(instruction.expression),
+      }
+
+      process.microOperationRuntime = runtime
+    }
+
+    if (runtime.type !== 'SHARED_ASSIGNMENT') {
+      throw new Error(
+        'Invalid micro-operation runtime',
+      )
+    }
+
+    switch (runtime.phase) {
+      case 'READ': {
+        const read =
+          this.findNextSharedMemoryRead(
+            process,
+            runtime.pendingExpression,
+          )
+
+        if (!read) {
+          runtime.phase = 'COMPUTE'
+
+          const value = evaluateExpression(
+            runtime.pendingExpression,
+            {
+              localMemory:
+                this.getActiveLocalMemory(process),
+              sharedMemory:
+                this.state.program.sharedMemory,
+            },
+          )
+
+          runtime.computedValue = value
+          this.recordMicroOperation(
+            process,
+            'COMPUTE',
+            `result = ${JSON.stringify(value)}`,
+          )
+          runtime.phase = 'WRITE'
+          return
+        }
+
+        const value =
+          this.state.program.sharedMemory[
+            read.variableName
+          ]
+
+        if (value === undefined) {
+          throw new Error(
+            `Shared variable "${read.variableName}" is not defined`,
+          )
+        }
+
+        this.recordMicroOperation(
+          process,
+          'SHARED_READ',
+          `${read.variableName} = ${JSON.stringify(value)}`,
+        )
+
+        runtime.pendingExpression =
+          this.replaceExpressionWithValue(
+            runtime.pendingExpression,
+            read.expression,
+            value,
+          )
+
+        if (
+          !this.findNextSharedMemoryRead(
+            process,
+            runtime.pendingExpression,
+          )
+        ) {
+          runtime.phase = 'COMPUTE'
+        }
+
+        return
+      }
+
+      case 'COMPUTE': {
+        runtime.computedValue =
+          evaluateExpression(
+            runtime.pendingExpression,
+            {
+              localMemory:
+                this.getActiveLocalMemory(process),
+              sharedMemory:
+                this.state.program.sharedMemory,
+            },
+          )
+          this.recordMicroOperation(
+            process,
+            'COMPUTE',
+            `result = ${JSON.stringify(
+              runtime.computedValue,
+            )}`,
+          )
+
+        runtime.phase = 'WRITE'
+        return
+      }
+
+      case 'WRITE': {
+        if (runtime.computedValue === undefined) {
+          throw new Error(
+            'Shared assignment has no computed value',
+          )
+        }
+
+        const target =
+          runtime.instruction.target
+
+        if (target.type !== 'VARIABLE') {
+          throw new Error(
+            'Micro-operation assignment runtime currently supports variable targets only',
+          )
+        }
+
+        writeVariable(
+          target.name,
+          runtime.computedValue,
+          this.getActiveLocalMemory(process),
+          this.state.program.sharedMemory,
+        )
+
+        this.recordMicroOperation(
+          process,
+          'SHARED_WRITE',
+          `${target.name} = ${JSON.stringify(
+            runtime.computedValue,
+          )}`,
+        )
+
+        process.microOperationRuntime = undefined
+
+        this.advanceProcess(process)
+        return
+      }
+    }
+  }
+
+  private isSharedAssignmentTarget(
+    process: Process,
+    target: AssignmentTarget,
+  ): boolean {
+    const localMemory =
+      this.getActiveLocalMemory(process)
+
+    const variableName =
+      target.type === 'VARIABLE'
+        ? target.name
+        : target.arrayName
+
+    if (variableName in localMemory) {
+      return false
+    }
+
+    return variableName
+      in this.state.program.sharedMemory
+  }
+
   private applyAssignment(
     process: Process,
     target: AssignmentTarget,
@@ -1869,6 +2227,25 @@ step(): boolean {
     )
 
     this.advanceProcess(process)
+  }
+
+  private recordMicroOperation(
+    process: Process,
+    type:
+      | 'INSTRUCTION'
+      | 'SHARED_READ'
+      | 'COMPUTE'
+      | 'SHARED_WRITE',
+    description: string,
+  ): void {
+    this.state.microOperationHistory ??= []
+
+    this.state.microOperationHistory.push({
+      step: this.state.stepCount + 1,
+      processId: process.id,
+      type,
+      description,
+    })
   }
 
 }
