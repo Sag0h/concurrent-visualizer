@@ -1143,4 +1143,95 @@ describe('SimulationEngine', () => {
     ])
   })
 
+  it('supports nested atomic sections without leaving atomic depth active', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        atomic {
+          x = x + 1;
+
+          atomic {
+            x = x + 1;
+          }
+
+          x = x + 1;
+        }
+      }
+
+      process P2 {
+        atomic {
+          x = x + 100;
+        }
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    expect(engine.isFinished()).toBe(true)
+    expect(
+      engine.getState().program.sharedMemory.x,
+    ).toBe(103)
+
+    for (
+      const process
+      of engine.getState().program.processes
+    ) {
+      expect(process.atomicDepth).toBe(0)
+    }
+  })
+
+  it('handles empty atomic sections without leaving the process locked', () => {
+    const source = `
+      shared int x = 0;
+
+      process P1 {
+        atomic {
+        }
+
+        x = x + 1;
+      }
+
+      process P2 {
+        x = x + 10;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    expect(engine.isFinished()).toBe(true)
+
+    for (
+      const process
+      of engine.getState().program.processes
+    ) {
+      expect(process.atomicDepth).toBe(0)
+    }
+  })
 })

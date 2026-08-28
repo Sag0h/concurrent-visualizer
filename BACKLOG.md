@@ -272,16 +272,21 @@ definida la unidad mínima de ejecución que puede intercalarse con otro proceso
 - [x] Distinguir formalmente conflicto de acceso de data race.
 
 ### Atomicidad explícita
-
-- [ ] Definir sintaxis/representación de secciones atómicas.
-
-- [ ] Implementar secciones atómicas.
-
-- [ ] Impedir interleavings dentro de una sección atómica.
-
-- [ ] Visualizar cuándo un proceso está ejecutando una región atómica.
-
-- [ ] Agregar tests que comparen ejecución protegida y no protegida.
+- [x] Definir sintaxis/representación de secciones atómicas.
+  
+- [x] Implementar secciones atómicas.
+  
+- [x] Impedir interleavings dentro de una sección atómica.
+  
+- [x] Visualizar cuándo un acceso está sincronizado por atomicidad.
+  
+- [x] Agregar tests que comparen ejecución protegida y no protegida.
+  
+- [x] Soportar regiones atómicas anidadas.
+  
+- [x] Mantener atomicidad correctamente ante return, break y continue.
+  
+- [x] Soportar regiones atómicas vacías.
 
 **Caso de prueba principal:** dos procesos ejecutan:
 
