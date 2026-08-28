@@ -190,3 +190,74 @@ la terminología y semántica del material oficial de la cursada actual.
 El material histórico de la UNLP se utilizará para anticipar temas y
 planificar extensibilidad, pero no para asumir sin verificación que la
 semántica de 2026 es idéntica a la de años anteriores.
+
+------------------------------------------------------------------------
+
+## ADR-013 --- Microoperaciones como unidad atómica de ejecución
+
+**Estado:** Aceptada
+
+**Contexto:** una instrucción del pseudocódigo puede contener múltiples
+acciones relevantes para la concurrencia. Por ejemplo:
+
+``` text
+x = x + 1;
+```
+
+puede implicar leer `x`, calcular el nuevo valor y escribir nuevamente
+sobre `x`.
+
+Si toda la instrucción se ejecuta como una única transición indivisible,
+el scheduler no puede producir interleavings entre esas acciones y ciertos
+problemas de concurrencia, como el lost update, no pueden emerger de la
+simulación.
+
+**Decisión:** distinguir entre instrucciones visibles del pseudocódigo y
+microoperaciones internas del runtime.
+
+Una instrucción del pseudocódigo podrá producir una o más microoperaciones.
+
+Una microoperación constituye la unidad mínima de ejecución atómica del
+simulador.
+
+Por defecto, `SimulationEngine.step()` ejecutará una microoperación del
+proceso seleccionado y, al finalizarla, el scheduler podrá seleccionar otro
+proceso para el siguiente step.
+
+Los accesos relevantes a memoria compartida deberán poder representarse
+explícitamente. Una operación como:
+
+``` text
+x = x + 1;
+```
+
+podrá conceptualmente descomponerse como:
+
+``` text
+READ x
+COMPUTE + 1
+WRITE x
+```
+
+Una lectura captura el valor observado en ese instante. El cálculo posterior
+debe utilizar ese valor capturado aunque otro proceso modifique la variable
+compartida antes de la escritura.
+
+Las operaciones exclusivamente locales no necesitan inicialmente el mismo
+nivel de descomposición, ya que no producen interferencia entre procesos.
+Esta granularidad podrá ampliarse posteriormente con fines educativos.
+
+Las futuras secciones atómicas podrán contener múltiples microoperaciones,
+pero impedirán que otro proceso sea seleccionado entre ellas.
+
+El historial de instrucciones fuente y el historial de microoperaciones se
+mantendrán conceptualmente separados para conservar tanto una vista cercana
+al pseudocódigo como una vista detallada de la ejecución concurrente.
+
+**Consecuencia:** el estado de cada proceso deberá poder conservar una
+instrucción parcialmente ejecutada y los valores temporales necesarios para
+reanudarla en steps posteriores.
+
+**Motivo:** permitir que race conditions e interleavings problemáticos
+emerjan de la ejecución real del programa sin introducir comportamientos
+especiales codificados específicamente para cada ejemplo.

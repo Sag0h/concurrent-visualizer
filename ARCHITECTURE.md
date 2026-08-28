@@ -99,15 +99,47 @@ Estados iniciales previstos:
 -   `BLOCKED`
 -   `FINISHED`
 
-### Instruction
+### Instruction y microoperaciones
 
-Representación ejecutable de una instrucción.
+`Instruction` representa una instrucción visible del pseudocódigo.
 
-El sistema deberá poder distinguir entre:
+Una instrucción no constituye necesariamente una única acción atómica del
+simulador. Cuando sea necesario representar interferencia, podrá
+descomponerse en microoperaciones internas del runtime.
 
--   instrucción visible del pseudocódigo;
--   operaciones internas necesarias para modelar atomicidad e
-    interferencia.
+Ejemplo conceptual:
+
+``` text
+Instrucción fuente:
+
+x = x + 1;
+
+Microoperaciones:
+
+READ x
+COMPUTE + 1
+WRITE x
+```
+
+Una microoperación constituye la unidad mínima de ejecución atómica del
+motor.
+
+El scheduler podrá seleccionar otro proceso entre dos microoperaciones,
+permitiendo que distintos procesos intercalen la ejecución de instrucciones
+que todavía no terminaron.
+
+Por este motivo, un proceso podrá mantener estado temporal asociado a una
+instrucción parcialmente ejecutada.
+
+En particular, una lectura de memoria compartida deberá capturar el valor
+observado en ese instante. Las microoperaciones posteriores utilizarán ese
+valor capturado aunque otro proceso modifique la memoria compartida antes de
+que la instrucción termine.
+
+Inicialmente la descomposición detallada se concentrará en operaciones que
+interactúan con memoria compartida. Las operaciones puramente locales podrán
+continuar ejecutándose con mayor granularidad salvo que sea necesario
+descomponerlas por motivos semánticos o educativos.
 
 ### ExecutionState
 
@@ -135,6 +167,13 @@ Schedulers previstos:
 ### SimulationEngine
 
 Responsable de aplicar una transición válida al estado actual.
+
+En el modelo concurrente detallado, una transición producida por `step()`
+corresponderá normalmente a una microoperación atómica del proceso
+seleccionado.
+
+Completar una instrucción fuente podrá requerir múltiples llamadas a
+`step()`.
 
 API conceptual:
 
