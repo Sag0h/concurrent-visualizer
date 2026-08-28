@@ -517,7 +517,7 @@ describe('SimulationEngine', () => {
       },
       
       microOperationHistory: [],
-
+      memoryAccessConflicts: [],
       processes: [
         {
           id: 'P1',
@@ -933,18 +933,102 @@ describe('SimulationEngine', () => {
         processId: 'P1',
         type: 'SHARED_READ',
         description: 'x = 0',
+        location: {
+          type: 'VARIABLE',
+          name: 'x',
+        },
       },
       {
         step: 2,
         processId: 'P1',
         type: 'COMPUTE',
         description: 'result = 1',
+        location: undefined,
       },
       {
         step: 3,
         processId: 'P1',
         type: 'SHARED_WRITE',
         description: 'x = 1',
+        location: {
+          type: 'VARIABLE',
+          name: 'x',
+        },
+      },
+    ])
+  })
+
+  it('records shared memory locations structurally in micro-operation history', () => {
+    const source = `
+      shared int counter = 0;
+      shared int[] values = [10, 20];
+
+      process P1 {
+        counter = counter + 1;
+        values[1] = values[1] + 5;
+      }
+    `
+
+    const program = parseProgram(source)
+
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    const memoryEvents =
+      engine
+        .getState()
+        .microOperationHistory
+        ?.filter(
+          (event) =>
+            event.type === 'SHARED_READ'
+            || event.type === 'SHARED_WRITE',
+        )
+
+    expect(
+      memoryEvents?.map((event) => ({
+        type: event.type,
+        location: event.location,
+      })),
+    ).toEqual([
+      {
+        type: 'SHARED_READ',
+        location: {
+          type: 'VARIABLE',
+          name: 'counter',
+        },
+      },
+      {
+        type: 'SHARED_WRITE',
+        location: {
+          type: 'VARIABLE',
+          name: 'counter',
+        },
+      },
+      {
+        type: 'SHARED_READ',
+        location: {
+          type: 'ARRAY_ELEMENT',
+          arrayName: 'values',
+          index: 1,
+        },
+      },
+      {
+        type: 'SHARED_WRITE',
+        location: {
+          type: 'ARRAY_ELEMENT',
+          arrayName: 'values',
+          index: 1,
+        },
       },
     ])
   })

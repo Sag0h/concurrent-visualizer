@@ -867,37 +867,181 @@ function App() {
                       No micro-operations executed yet.
                     </p>
                   ) : (
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Step</th>
-                          <th>Process</th>
-                          <th>Operation</th>
-                          <th>Detail</th>
-                        </tr>
-                      </thead>
+                    <>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Step</th>
+                            <th>Process</th>
+                            <th>Operation</th>
+                            <th>Detail</th>
+                          </tr>
+                        </thead>
 
-                      <tbody>
-                        {snapshot.microOperationHistory.map(
-                          (entry, index) => (
-                            <tr
-                              key={`${entry.step}-${entry.processId}-${entry.type}-${index}`}
-                            >
-                              <td>{entry.step}</td>
-                              <td>{entry.processId}</td>
-                              <td>
-                                <span
-                                  className={`micro-operation micro-operation-${entry.type.toLowerCase()}`}
+                        <tbody>
+                          {snapshot.microOperationHistory.map(
+                            (entry, index) => {
+                              const hasConflict =
+                                snapshot.memoryAccessConflicts.some(
+                                  (conflict) =>
+                                    (
+                                      conflict.first.step
+                                        === entry.step
+                                      && conflict.first.processId
+                                        === entry.processId
+                                      && conflict.first.type
+                                        === entry.type
+                                    )
+                                    || (
+                                      conflict.second.step
+                                        === entry.step
+                                      && conflict.second.processId
+                                        === entry.processId
+                                      && conflict.second.type
+                                        === entry.type
+                                    ),
+                                )
+
+                              return (
+                                <tr
+                                  key={`${entry.step}-${entry.processId}-${entry.type}-${index}`}
+                                  className={
+                                    hasConflict
+                                      ? 'memory-conflict-row'
+                                      : undefined
+                                  }
                                 >
-                                  {entry.type}
-                                </span>
-                              </td>
-                              <td>{entry.description}</td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
+                                  <td>{entry.step}</td>
+                                  <td>{entry.processId}</td>
+                                  <td>
+                                    <span
+                                      className={`micro-operation micro-operation-${entry.type.toLowerCase()}`}
+                                    >
+                                      {entry.type}
+                                    </span>
+                                  </td>
+
+                                  <td>
+                                    {entry.description}
+
+                                    {hasConflict && (
+                                      <span className="memory-conflict-indicator">
+                                        Conflict
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            },
+                          )}
+                        </tbody>
+                      </table>
+
+                      <div className="memory-conflicts">
+                        <div className="memory-conflicts-header">
+                          <h3>Memory Conflicts</h3>
+
+                          <span className="memory-conflict-count">
+                            {
+                              snapshot
+                                .memoryAccessConflicts
+                                .length
+                            }
+                          </span>
+                        </div>
+
+                        {snapshot.memoryAccessConflicts.length
+                          === 0 ? (
+                            <p className="empty">
+                              No conflicting shared-memory accesses detected.
+                            </p>
+                          ) : (
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Location</th>
+                                  <th>First access</th>
+                                  <th>Second access</th>
+                                </tr>
+                              </thead>
+
+                              <tbody>
+                                {snapshot.memoryAccessConflicts.map(
+                                  (conflict, index) => {
+                                    const location =
+                                      conflict.first.location
+
+                                    const locationDescription =
+                                      location?.type
+                                        === 'VARIABLE'
+                                        ? location.name
+                                        : location?.type
+                                            === 'ARRAY_ELEMENT'
+                                          ? `${location.arrayName}[${location.index}]`
+                                          : 'Unknown'
+
+                                    return (
+                                      <tr
+                                        key={`${conflict.first.step}-${conflict.second.step}-${index}`}
+                                      >
+                                        <td>
+                                          <code>
+                                            {locationDescription}
+                                          </code>
+                                        </td>
+
+                                        <td>
+                                          <strong>
+                                            {
+                                              conflict
+                                                .first
+                                                .processId
+                                            }
+                                          </strong>
+                                          {' · '}
+                                          {
+                                            conflict
+                                              .first
+                                              .type
+                                          }
+                                          {' · Step '}
+                                          {
+                                            conflict
+                                              .first
+                                              .step
+                                          }
+                                        </td>
+
+                                        <td>
+                                          <strong>
+                                            {
+                                              conflict
+                                                .second
+                                                .processId
+                                            }
+                                          </strong>
+                                          {' · '}
+                                          {
+                                            conflict
+                                              .second
+                                              .type
+                                          }
+                                          {' · Step '}
+                                          {
+                                            conflict
+                                              .second
+                                              .step
+                                          }
+                                        </td>
+                                      </tr>
+                                    )
+                                  },
+                                )}
+                              </tbody>
+                            </table>
+                          )}
+                      </div>
+                    </>
                   )}
                 </div>
               </section>

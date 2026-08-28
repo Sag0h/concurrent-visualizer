@@ -1,4 +1,5 @@
 import type { ProcessId } from '../process/ProcessId'
+import type { MemoryLocation } from '../memory/MemoryLocation'
 import type { MicroOperationType } from './MicroOperation'
 
 export interface MicroOperationEvent {
@@ -6,4 +7,5 @@ export interface MicroOperationEvent {
   readonly processId: ProcessId
   readonly type: MicroOperationType
   readonly description: string
+  readonly location?: MemoryLocation
 }

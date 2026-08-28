@@ -18,6 +18,8 @@ import type { FunctionDefinition } from '../language/FunctionDefinition'
 import type { PendingEvaluation } from '../process/PendingEvaluation'
 import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
+import { findMemoryAccessConflicts } from './findMemoryAccessConflicts'
+
 export class SimulationEngine {
   private state: ExecutionState
   private readonly scheduler: Scheduler
@@ -478,10 +480,6 @@ step(): boolean {
       sharedMemory: structuredClone(
         this.state.program.sharedMemory,
       ),
-      microOperationHistory: structuredClone(
-        this.state.microOperationHistory ?? [],
-      ),
-
       processes: this.state.program.processes.map(
         (process) => ({
           id: process.id,
@@ -500,6 +498,14 @@ step(): boolean {
           ),
         }),
       ),
+      microOperationHistory: structuredClone(
+        this.state.microOperationHistory ?? [],
+      ),
+      memoryAccessConflicts:
+        findMemoryAccessConflicts(
+          this.state.microOperationHistory ?? [],
+        ),
+
     }
   }
 
@@ -1809,6 +1815,7 @@ step(): boolean {
           process,
           'SHARED_READ',
           `${locationDescription} = ${JSON.stringify(value)}`,
+          read.location,
         )
 
         runtime.pendingExpression =
@@ -1890,6 +1897,7 @@ step(): boolean {
           `${locationDescription} = ${JSON.stringify(
             runtime.computedValue,
           )}`,
+          location,
         )
 
         process.microOperationRuntime = undefined
@@ -2381,6 +2389,7 @@ step(): boolean {
       | 'COMPUTE'
       | 'SHARED_WRITE',
     description: string,
+    location?: MemoryLocation,
   ): void {
     this.state.microOperationHistory ??= []
 
@@ -2389,6 +2398,10 @@ step(): boolean {
       processId: process.id,
       type,
       description,
+      location:
+        location
+          ? structuredClone(location)
+          : undefined,
     })
   }
 

@@ -332,3 +332,51 @@ h2 {
 .micro-operation-instruction {
   background: #eee;
 }
+
+.memory-conflict-row {
+  background: rgba(255, 90, 90, 0.08);
+}
+
+.memory-conflict-indicator {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid currentColor;
+  border-radius: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.memory-conflicts {
+  margin-top: 1.5rem;
+}
+
+.memory-conflicts-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.memory-conflicts-header h3 {
+  margin: 0;
+}
+
+.memory-conflict-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.4rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.memory-conflicts code {
+  font-family: monospace;
+  font-weight: 600;
+}
