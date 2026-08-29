@@ -436,6 +436,22 @@ h2 {
   color: #8a5a00;
 }
 
+.memory-exclusion-count {
+  font-weight: 600;
+  color: #a1261d;
+}
+
+.memory-exclusion-indicator {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  color: #fff;
+  background: #a1261d;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .memory-unknown-indicator {
   display: inline-block;
   margin-left: 0.5rem;
@@ -594,4 +610,195 @@ h2 {
 
 .await-status-enabled {
   background: #d1e7dd;
+}
+
+.deadlock-panel {
+  border: 2px solid #b42318;
+  border-radius: 10px;
+  padding: 20px;
+  background: #fff7f6;
+}
+
+.deadlock-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.deadlock-header h2 {
+  margin: 8px 0 0;
+  color: #8f1d14;
+}
+
+.deadlock-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: #b42318;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.deadlock-facts,
+.deadlock-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.deadlock-facts {
+  margin: 16px 0;
+}
+
+.deadlock-facts span,
+.deadlock-tags span {
+  padding: 5px 9px;
+  border: 1px solid #e5aaa4;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.deadlock-entities {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.deadlock-entities h3,
+.deadlock-graph h3,
+.deadlock-cycles h3 {
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.deadlock-graph {
+  overflow-x: auto;
+  margin-top: 18px;
+}
+
+.deadlock-limitation {
+  padding: 10px 12px;
+  border-left: 4px solid #c97a21;
+  background: #fff4df;
+}
+
+.deadlock-replay-note {
+  margin-bottom: 0;
+  color: #6b4b47;
+  font-size: 12px;
+}
+
+.runtime-diagnostics {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #d6a84c;
+  border-radius: 10px;
+  background: #fffaf0;
+}
+
+.runtime-diagnostics-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.runtime-diagnostics-header h2 {
+  margin: 8px 0 0;
+  color: #704b00;
+}
+
+.runtime-diagnostics-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: #8a5a00;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.runtime-diagnostics-intro {
+  color: #5f5138;
+}
+
+.runtime-diagnostic-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.runtime-diagnostic-card {
+  padding: 16px;
+  border: 1px solid #dfcda8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.runtime-diagnostic-warning {
+  border-left: 5px solid #c97a21;
+}
+
+.runtime-diagnostic-info {
+  border-left: 5px solid #3976b8;
+}
+
+.runtime-diagnostic-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.runtime-diagnostic-title h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.runtime-diagnostic-title span,
+.runtime-diagnostic-facts span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f3ead7;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.runtime-diagnostic-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.runtime-diagnostic-card h4 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+}
+
+.runtime-diagnostic-card ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.runtime-diagnostic-card li {
+  margin-bottom: 5px;
+  color: #4f4f4f;
+  font-size: 13px;
+}
+
+.runtime-diagnostic-scope {
+  margin-bottom: 0;
+  padding-top: 10px;
+  border-top: 1px solid #eee2ca;
+  color: #6b5a39;
+  font-size: 12px;
 }

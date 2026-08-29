@@ -1,3 +1,9 @@
+export interface MemoryAccessProtection {
+  readonly atomicRegion: boolean
+  readonly mutexSemaphoreNames: string[]
+  readonly ambiguousSemaphoreNames: string[]
+}
+
 export type MemoryConflictReason =
   | {
       readonly type: 'UNPROTECTED'
@@ -16,4 +22,14 @@ export type MemoryConflictReason =
   | {
       readonly type: 'AMBIGUOUS_SEMAPHORE_PROTOCOL'
       readonly semaphoreNames: string[]
+    }
+  | {
+      readonly type: 'INCONSISTENT_PROTECTION'
+      readonly first: MemoryAccessProtection
+      readonly second: MemoryAccessProtection
+    }
+  | {
+      readonly type: 'OBSERVED_MUTEX_OVERLAP'
+      readonly first: MemoryAccessProtection
+      readonly second: MemoryAccessProtection
     }

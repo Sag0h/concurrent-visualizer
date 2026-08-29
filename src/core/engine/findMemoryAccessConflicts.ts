@@ -3,6 +3,7 @@ import type { MemoryAccessConflict } from './MemoryAccessConflict'
 import type { ExecutionEvent } from './ExecutionEvent'
 import type { ProcessId } from '../process/ProcessId'
 import { sameMemoryLocation } from '../memory/MemoryLocationUtils'
+import type { MemoryAccessProtection } from './MemoryConflictReason'
 
 export interface MemoryAccessAnalysisContext {
   readonly executionHistory:
@@ -16,6 +17,11 @@ interface SemaphoreAnalysis {
     ReadonlyMap<MicroOperationEvent, ReadonlySet<string>>
   readonly validMutexes: ReadonlySet<string>
   readonly directSignals: readonly DirectSemaphoreSignal[]
+  readonly activeSectionsByProcess:
+    ReadonlyMap<
+      MicroOperationEvent,
+      ReadonlyMap<ProcessId, ReadonlySet<string>>
+    >
 }
 
 interface DirectSemaphoreSignal {
@@ -120,6 +126,11 @@ function analyzeSemaphoreSections(
   const activeSections = new Map<
     MicroOperationEvent,
     ReadonlySet<string>
+  >()
+
+  const activeSectionsByProcess = new Map<
+    MicroOperationEvent,
+    ReadonlyMap<ProcessId, ReadonlySet<string>>
   >()
 
   const signalingCandidates = new Map<
@@ -236,6 +247,22 @@ function analyzeSemaphoreSections(
         ),
       )
 
+      activeSectionsByProcess.set(
+        item.event,
+        new Map(
+          [...activeByProcess.entries()].map(
+            ([processId, sections]) => [
+              processId,
+              new Set(
+                [...sections.entries()]
+                  .filter(([, count]) => count > 0)
+                  .map(([name]) => name),
+              ),
+            ],
+          ),
+        ),
+      )
+
       continue
     }
 
@@ -289,6 +316,7 @@ function analyzeSemaphoreSections(
     ]
       .filter((candidate) => candidate.isValid)
       .flatMap((candidate) => candidate.signals),
+    activeSectionsByProcess,
   }
 }
 
@@ -323,6 +351,112 @@ function findSharedSemaphoreSections(
   return [...firstSections]
     .filter((name) => secondSections.has(name))
     .sort()
+}
+
+function describeAccessProtection(
+  event: MicroOperationEvent,
+  analysis?: SemaphoreAnalysis,
+): MemoryAccessProtection {
+  const sections = analysis?.activeSections.get(event)
+    ?? new Set<string>()
+  const mutexSemaphoreNames = [...sections]
+    .filter(
+      (name) => analysis?.validMutexes.has(name),
+    )
+    .sort()
+  const ambiguousSemaphoreNames = [...sections]
+    .filter(
+      (name) => !analysis?.validMutexes.has(name),
+    )
+    .sort()
+
+  return {
+    atomicRegion: event.atomicDepth > 0,
+    mutexSemaphoreNames,
+    ambiguousSemaphoreNames,
+  }
+}
+
+function hasAnyProtection(
+  protection: MemoryAccessProtection,
+): boolean {
+  return (
+    protection.atomicRegion
+    || protection.mutexSemaphoreNames.length > 0
+    || protection.ambiguousSemaphoreNames.length > 0
+  )
+}
+
+function validMutexesAtEvent(
+  event: MicroOperationEvent,
+  processId: ProcessId,
+  analysis?: SemaphoreAnalysis,
+): string[] {
+  const sections =
+    analysis?.activeSectionsByProcess
+      .get(event)
+      ?.get(processId)
+    ?? new Set<string>()
+
+  return [...sections]
+    .filter(
+      (name) => analysis?.validMutexes.has(name),
+    )
+    .sort()
+}
+
+function hasObservedMutexOverlap(
+  first: MicroOperationEvent,
+  second: MicroOperationEvent,
+  analysis?: SemaphoreAnalysis,
+): boolean {
+  if (!analysis) {
+    return false
+  }
+
+  const firstOwnAtFirst = validMutexesAtEvent(
+    first,
+    first.processId,
+    analysis,
+  )
+  const secondAtFirst = validMutexesAtEvent(
+    first,
+    second.processId,
+    analysis,
+  )
+  const firstAtSecond = validMutexesAtEvent(
+    second,
+    first.processId,
+    analysis,
+  )
+  const secondOwnAtSecond = validMutexesAtEvent(
+    second,
+    second.processId,
+    analysis,
+  )
+
+  return (
+    accessesWhileOtherHoldsDifferentMutex(
+      firstOwnAtFirst,
+      secondAtFirst,
+    )
+    || accessesWhileOtherHoldsDifferentMutex(
+      secondOwnAtSecond,
+      firstAtSecond,
+    )
+  )
+}
+
+function accessesWhileOtherHoldsDifferentMutex(
+  accessingProcessMutexes: string[],
+  otherProcessMutexes: string[],
+): boolean {
+  return (
+    otherProcessMutexes.length > 0
+    && !otherProcessMutexes.some(
+      (name) => accessingProcessMutexes.includes(name),
+    )
+  )
 }
 
 export function findMemoryAccessConflicts(
@@ -407,6 +541,26 @@ export function findMemoryAccessConflicts(
             )
           : undefined
 
+      const firstProtection =
+        describeAccessProtection(
+          first,
+          semaphoreAnalysis,
+        )
+      const secondProtection =
+        describeAccessProtection(
+          second,
+          semaphoreAnalysis,
+        )
+      const observedMutexOverlap =
+        hasObservedMutexOverlap(
+          first,
+          second,
+          semaphoreAnalysis,
+        )
+      const hasInconsistentProtection =
+        hasAnyProtection(firstProtection)
+        || hasAnyProtection(secondProtection)
+
       const classification = bothInsideAtomic
         ? 'SYNCHRONIZED'
         : mutexSemaphore
@@ -416,6 +570,14 @@ export function findMemoryAccessConflicts(
             : sharedSemaphoreSections.length > 0
               ? 'UNKNOWN'
               : 'POTENTIAL_RACE'
+
+      const diagnostic = classification === 'SYNCHRONIZED'
+        ? 'SYNCHRONIZED_ACCESS' as const
+        : classification === 'UNKNOWN'
+          ? 'AMBIGUOUS_SYNCHRONIZATION' as const
+          : observedMutexOverlap
+            ? 'MUTUAL_EXCLUSION_VIOLATION' as const
+            : 'POTENTIAL_DATA_RACE' as const
 
       const reason = bothInsideAtomic
         ? { type: 'ATOMIC_REGION' as const }
@@ -438,12 +600,27 @@ export function findMemoryAccessConflicts(
                   semaphoreNames:
                     sharedSemaphoreSections,
                 }
-              : { type: 'UNPROTECTED' as const }
+              : observedMutexOverlap
+                ? {
+                    type:
+                      'OBSERVED_MUTEX_OVERLAP' as const,
+                    first: firstProtection,
+                    second: secondProtection,
+                  }
+                : hasInconsistentProtection
+                  ? {
+                      type:
+                        'INCONSISTENT_PROTECTION' as const,
+                      first: firstProtection,
+                      second: secondProtection,
+                    }
+                  : { type: 'UNPROTECTED' as const }
 
       conflicts.push({
         first,
         second,
         classification,
+        diagnostic,
         reason,
       })
     }

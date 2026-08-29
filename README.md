@@ -16,9 +16,10 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M8 --- **Detector de errores y diagnósticos**.
+**Milestone actual:** M9 --- **Exploración de ejecuciones**.
 
-**Último milestone completado:** M7 --- **Semáforos**.
+**Último milestone completado:** M8 --- **Detector de errores y
+diagnósticos**.
 
 M7 está completado en sus siete fases:
 
@@ -36,8 +37,10 @@ compartida, microoperaciones intercalables, análisis básico de
 interferencias, regiones `atomic`, acciones atómicas condicionales
 mediante `await` y semáforos escalares.
 
-La próxima fase profundiza los diagnósticos de errores a partir de la
-base de interferencias, bloqueos y deadlocks ya disponible.
+M8 incorporó diagnóstico de deadlock, protección inconsistente,
+violaciones observadas de exclusión mutua, busy waiting conservador,
+riesgo de starvation y un estado separado para ejecuciones que alcanzan
+el límite de pasos sin estar en deadlock.
 
 ------------------------------------------------------------------------
 
@@ -142,6 +145,32 @@ La implementación no impone FIFO, fairness ni ownership. La reactivación
 de un proceso no reserva el recurso: la adquisición efectiva ocurre
 cuando `P` vuelve a ejecutarse.
 
+### Diagnosticar un deadlock
+
+Cuando ningún proceso puede avanzar, el simulador diferencia un
+deadlock de un bloqueo temporal. Para semáforos reconstruye dependencias
+observadas y muestra el wait-for graph, los procesos, los recursos y los
+ciclos involucrados.
+
+El diagnóstico conserva el paso de detección y puede reproducir la
+misma ejecución reiniciando el scheduler. Si el estado es terminal pero
+la información no permite demostrar un ciclo —por ejemplo un `await`
+falso sin otro proceso ejecutable— se informa un grafo parcial en lugar
+de inventar una dependencia.
+
+### Explicar problemas de liveness
+
+El panel de diagnósticos identifica bucles vacíos que consultan
+repetidamente memoria compartida sin bloquearse. También advierte cuando
+un proceso sigue `READY` pero el scheduler lo posterga mientras otros
+continúan ejecutando.
+
+Estas conclusiones se limitan a la traza observada. Starvation se
+presenta como riesgo, no como certeza. Si la ejecución llega al límite
+de seguridad, el estado `STEP_LIMIT_REACHED` la distingue de un
+deadlock y aclara que un historial finito no permite decidir si la no
+terminación era intencional.
+
 ------------------------------------------------------------------------
 
 ## Flujo de ejecución
@@ -226,6 +255,11 @@ La lógica del simulador vive en el motor y es independiente de React.
 -   Estado `BLOCKED`.
 -   Condición esperada por `await`.
 -   Distinción entre programa bloqueado y finalizado.
+-   Distinción `RUNNING`, `TEMPORARILY_BLOCKED`, `FINISHED` y
+    `DEADLOCK`.
+-   Wait-for graph y detección de ciclos para semáforos.
+-   Procesos y recursos involucrados en deadlock.
+-   Reproducción determinista hasta el paso del deadlock.
 -   Memoria local.
 -   Memoria compartida.
 -   Call stack.
@@ -235,6 +269,9 @@ La lógica del simulador vive en el motor y es independiente de React.
 -   Detección de accesos conflictivos.
 -   Clasificación `POTENTIAL_RACE`.
 -   Clasificación `SYNCHRONIZED`.
+-   Protección unilateral e incompatible diferenciada.
+-   Violaciones observadas de exclusión mutua con mutex distintos.
+-   Motivos estructurados por acceso y por ubicación.
 -   Resumen de conflictos por ubicación de memoria.
 -   Valores actuales de semáforos.
 -   Procesos bloqueados esperando cada semáforo, sin representar FIFO.
@@ -339,6 +376,16 @@ antes del `V` y el segundo después del `P`.
 Esta clasificación no crea un tipo binario ni agrega ownership al
 runtime. Tampoco demuestra el comportamiento para todos los
 interleavings: explica únicamente la traza ejecutada.
+
+Cuando dos accesos usan protecciones diferentes, el analizador distingue
+una advertencia de protección inconsistente de una violación observada.
+La violación exige que la traza muestre a un proceso accediendo mientras
+el otro todavía conserva un mutex incompatible.
+
+`POTENTIAL_RACE` no significa “data race demostrada”. Un análisis formal
+basado en happens-before requeriría relaciones causales específicas para
+cada primitiva; el orden numérico de los pasos no sirve porque es el
+interleaving total elegido por el scheduler.
 
 El primer caso académico de M7.7 adapta el ejercicio práctico de los
 chicos y la bolsa de caramelos. El incremento compartido se protege con
@@ -609,7 +656,7 @@ Pasaje de mensajes
 Visualización y análisis avanzado
 ```
 
-### Último milestone completado --- M7: Semáforos
+### Último milestone completado --- M8: Detector de errores y diagnósticos
 
 Completado:
 
@@ -621,12 +668,13 @@ M7.4  Runtime P / V
 M7.5  Historial y visualización
 M7.6  Integración con el análisis de interferencia
 M7.7  Casos académicos reproducibles
+M8    Detector de errores y diagnósticos
 ```
 
 Próximo:
 
 ``` text
-M8  Detector de errores y diagnósticos
+M9  Exploración de ejecuciones
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

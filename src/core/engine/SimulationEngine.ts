@@ -20,7 +20,13 @@ import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
 import { findMemoryAccessConflicts } from './findMemoryAccessConflicts'
 import { summarizeMemoryAccessConflicts } from './summarizeMemoryAccessConflicts'
-import type { SemaphoreExecutionEvent } from './ExecutionEvent'
+import type {
+  LoopConditionExecutionEvent,
+  SemaphoreExecutionEvent,
+} from './ExecutionEvent'
+import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
+import type { ExecutionDiagnostic } from '../deadlock/DeadlockDiagnostic'
+import { analyzeRuntimeDiagnostics } from '../diagnostics/analyzeRuntimeDiagnostics'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -47,6 +53,25 @@ export class SimulationEngine {
     return this.state.program.processes.every(
       (process) => process.state === 'FINISHED',
     )
+  }
+
+  getExecutionDiagnostic(): ExecutionDiagnostic {
+    const diagnostic = analyzeDeadlock(this.state)
+
+    if (
+      this.hasReachedStepLimit()
+      && diagnostic.status !== 'FINISHED'
+      && diagnostic.status !== 'DEADLOCK'
+    ) {
+      return { status: 'STEP_LIMIT_REACHED' }
+    }
+
+    return diagnostic
+  }
+
+  isDeadlocked(): boolean {
+    return this.getExecutionDiagnostic().status
+      === 'DEADLOCK'
   }
 
   reset(): void {
@@ -101,6 +126,9 @@ step(): boolean {
 
     let semaphoreEvent:
       SemaphoreExecutionEvent | undefined
+
+    let loopConditionEvent:
+      LoopConditionExecutionEvent | undefined
 
     switch (instruction.type) {
       case 'NO_OP':
@@ -290,6 +318,20 @@ step(): boolean {
           },
         )
 
+        if (typeof condition === 'boolean') {
+          loopConditionEvent = {
+            loopType: 'WHILE',
+            conditionResult: condition,
+            sharedVariableNames:
+              this.findSharedVariableReferences(
+                process,
+                instruction.condition,
+              ),
+            bodyIsEmpty:
+              instruction.body.length === 0,
+          }
+        }
+
         this.applyWhileCondition(
           process,
           instruction,
@@ -327,6 +369,19 @@ step(): boolean {
                 this.state.program.sharedMemory,
             },
           )
+
+          if (typeof condition === 'boolean') {
+            loopConditionEvent = {
+              loopType: 'REPEAT_UNTIL',
+              conditionResult: condition,
+              sharedVariableNames:
+                this.findSharedVariableReferences(
+                  process,
+                  instruction.condition,
+                ),
+              bodyIsEmpty: true,
+            }
+          }
 
           this.applyRepeatUntilCondition(
             process,
@@ -627,6 +682,7 @@ step(): boolean {
       instructionType: instruction.type,
       awaitStatus,
       semaphoreEvent,
+      loopConditionEvent,
       description: executionDescription,
     })
 
@@ -652,6 +708,8 @@ step(): boolean {
 }
 
   getSnapshot(): SimulationSnapshot {
+    const executionDiagnostic =
+      this.getExecutionDiagnostic()
     const initialSemaphoreValues =
       Object.fromEntries(
         Object.values(
@@ -673,6 +731,15 @@ step(): boolean {
       )
     return {
       stepCount: this.state.stepCount,
+      executionStatus: executionDiagnostic.status,
+      deadlock: executionDiagnostic.deadlock,
+      runtimeDiagnostics:
+        analyzeRuntimeDiagnostics(this.state, {
+          stepLimitReached:
+            executionDiagnostic.status
+              === 'STEP_LIMIT_REACHED',
+          maxSteps: this.maxSteps,
+        }),
 
       sharedMemory: structuredClone(
         this.state.program.sharedMemory,
@@ -743,6 +810,55 @@ step(): boolean {
     return process.instructions[
       process.programCounter
     ]
+  }
+
+  private findSharedVariableReferences(
+    process: Process,
+    expression: Expression,
+  ): string[] {
+    const references = new Set<string>()
+    const localMemory =
+      this.getActiveLocalMemory(process)
+    const sharedMemory =
+      this.state.program.sharedMemory
+
+    const visit = (candidate: Expression): void => {
+      switch (candidate.type) {
+        case 'LITERAL':
+          return
+
+        case 'VARIABLE':
+          if (
+            !(candidate.name in localMemory)
+            && candidate.name in sharedMemory
+          ) {
+            references.add(candidate.name)
+          }
+          return
+
+        case 'UNARY':
+          visit(candidate.operand)
+          return
+
+        case 'BINARY':
+          visit(candidate.left)
+          visit(candidate.right)
+          return
+
+        case 'ARRAY_ACCESS':
+          visit(candidate.array)
+          visit(candidate.index)
+          return
+
+        case 'FUNCTION_CALL':
+          candidate.arguments.forEach(visit)
+          return
+      }
+    }
+
+    visit(expression)
+
+    return [...references].sort()
   }
 
   private advanceProcess(

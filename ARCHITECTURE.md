@@ -788,21 +788,117 @@ necesarios, monitores, pasaje de mensajes y tiempo simulado.
 
 ## 20. Análisis de errores
 
-La base actual detecta conflictos observados sobre memoria compartida.
+La base detecta conflictos observados sobre memoria compartida y M8
+agrega diagnóstico de deadlock sobre el estado alcanzado.
+
+El progreso global se clasifica como:
+
+``` text
+RUNNING
+TEMPORARILY_BLOCKED
+FINISHED
+DEADLOCK
+STEP_LIMIT_REACHED
+```
+
+Existe deadlock cuando quedan procesos sin finalizar, no existe ningún
+proceso `READY`/`RUNNING` y ninguna espera bloqueada está actualmente
+habilitada. La reevaluación incluye condiciones de `await` y permisos de
+semáforos, por lo que un bloqueo visible pero habilitable sigue siendo
+temporal.
+
+`src/core/deadlock/` permanece separado del runtime. Consume procesos,
+razones de bloqueo, recursos e historial, pero no modifica scheduling ni
+valores del programa.
+
+Para semáforos reconstruye adquisiciones pendientes desde los eventos
+`P` / `V`, genera dependencias `WAITS_FOR` y `HOLDS`, deriva un wait-for
+graph entre procesos y detecta componentes fuertemente conexas. Un
+autociclo también es válido cuando un proceso retiene una unidad y
+espera otra del mismo recurso agotado.
+
+La inferencia describe permisos observados; no agrega ownership al
+semáforo. Cuando faltan poseedores inferibles o interviene `await`, el
+estado puede diagnosticarse como bloqueo terminal con grafo parcial sin
+afirmar una espera circular.
+
+Los recursos usan una clase extensible:
+
+``` text
+SEMAPHORE | MONITOR | CHANNEL
+```
+
+Semáforos están integrados. Monitores y canales incorporarán sus propias
+dependencias al introducirse esas primitivas, reutilizando el mismo
+algoritmo de ciclos y la misma representación visual.
 
 El objetivo posterior incluye:
 
--   análisis más preciso de sincronización/data races;
--   deadlock;
--   violaciones de exclusión mutua;
--   busy waiting;
--   starvation cuando sea razonablemente detectable;
 -   bloqueos por comunicación;
 -   estados inválidos.
 
-Con semáforos ya existen recursos y procesos bloqueados suficientes para
-comenzar a diseñar análisis de dependencias, pero el detector formal de
-deadlock permanece en M8.
+La detección corresponde a la ejecución actual. Buscar un interleaving
+alternativo que produzca deadlock permanece en M9.
+
+### Diagnóstico de memoria compartida
+
+El análisis conserva tres clasificaciones:
+
+``` text
+POTENTIAL_RACE | SYNCHRONIZED | UNKNOWN
+```
+
+Cada par incorpora además un diagnóstico educativo estructurado. La
+protección de cada acceso describe `atomic`, mutex observados y
+protocolos de semáforo ambiguos. Así se distinguen accesos sin
+protección, protección unilateral, mecanismos incompatibles y un mutex
+común válido.
+
+El analizador toma snapshots de las secciones de semáforos activas para
+todos los procesos en cada microoperación. Si un proceso accede a una
+ubicación mientras otro conserva un mutex diferente, se registra
+`MUTUAL_EXCLUSION_VIOLATION`. Sin ese solapamiento, la protección
+inconsistente permanece como `POTENTIAL_DATA_RACE`.
+
+### Límite de happens-before
+
+La traza del simulador posee un orden total por número de paso, pero ese
+orden es una elección del scheduler y no una relación causal entre
+procesos. Usarlo como happens-before haría que todos los accesos
+parecieran ordenados y eliminaría incorrectamente las races.
+
+Un detector formal futuro necesita, como mínimo:
+
+-   orden de programa por proceso;
+-   aristas causales de cada primitiva de sincronización;
+-   correspondencia de permisos en semáforos generales;
+-   semántica para `await`, monitores y comunicación;
+-   una representación como relojes vectoriales u otra relación parcial.
+
+Hasta entonces, `POTENTIAL_RACE` significa conflicto observado sin
+protección común reconocida. No es una prueba formal y permanece
+separado de la exploración de estados de M9.
+
+### Diagnósticos conservadores de liveness
+
+`src/core/diagnostics/` analiza el estado y el historial sin modificar
+la ejecución. Sus resultados estructurados incluyen código, severidad,
+procesos, evidencia de la traza y una nota explícita de alcance.
+
+El detector de busy waiting reconoce únicamente un patrón de alta
+confianza: cuatro o más evaluaciones consecutivas que mantienen activo
+un `while` o `repeat/until` vacío cuya condición lee memoria compartida.
+No intenta clasificar bucles con cuerpo ni condiciones suspendibles.
+
+El riesgo de starvation se informa cuando un proceso permanece `READY`
+sin eventos propios durante al menos doce pasos, mientras otros
+procesos sí continúan ejecutando. Es evidencia de postergación en la
+traza finita, no una prueba de que el proceso nunca será elegido.
+
+Al alcanzar el límite de seguridad con procesos ejecutables se usa
+`STEP_LIMIT_REACHED`, separado de `DEADLOCK`. El simulador puede afirmar
+que la ejecución no terminó dentro del límite, pero no decidir si el
+bucle infinito es intencional o erróneo.
 
 ## 21. Exploración de interleavings
 

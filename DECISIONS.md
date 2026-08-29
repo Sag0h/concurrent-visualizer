@@ -869,3 +869,114 @@ todos los interleavings.
 **Motivo:** reconocer el caso académico común de exclusión mutua sin
 crear un tipo binario, imponer ownership al runtime ni confundir
 sincronización con ausencia total de interleaving.
+
+------------------------------------------------------------------------
+
+## ADR-026 --- Separar progreso global, deadlock y espera circular
+
+**Estado:** Aceptada
+
+**Contexto:** un proceso `BLOCKED` no demuestra deadlock. Otro proceso
+puede ejecutar la operación que lo habilita y, después de un `V`, el
+waiter puede seguir marcado como bloqueado hasta la próxima reevaluación.
+Además, un programa puede quedar sin progreso aunque la información
+disponible no permita construir un ciclo de recursos.
+
+**Decisión:** el análisis global distingue `RUNNING`,
+`TEMPORARILY_BLOCKED`, `FINISHED` y `DEADLOCK`.
+
+Se considera deadlock el estado alcanzado cuando:
+
+-   queda al menos un proceso sin finalizar;
+-   no existe un proceso listo o ejecutándose;
+-   ninguna razón de bloqueo está habilitada en el estado actual.
+
+La espera circular es evidencia estructural adicional, no la definición
+única de deadlock. Para semáforos, el analizador infiere permisos
+pendientes desde el historial, construye dependencias proceso-recurso y
+un wait-for graph derivado. Las componentes fuertemente conexas revelan
+ciclos; si la información es insuficiente, se informa bloqueo terminal
+con grafo parcial.
+
+Los poseedores inferidos son metadata de análisis y no ownership del
+runtime. El modelo de recursos admite semáforos, monitores y canales,
+aunque solamente los semáforos tienen adaptador en M8.
+
+**Consecuencia:** la UI puede explicar procesos, recursos y ciclos,
+diferenciar espera temporal y deadlock y reproducir la traza hasta el
+paso detectado. No se afirma que una ejecución sin deadlock pruebe que
+todos los interleavings son seguros.
+
+**Motivo:** ofrecer un diagnóstico educativo útil sin contaminar la
+semántica de las primitivas ni adelantar la exploración de estados de
+M9.
+
+------------------------------------------------------------------------
+
+## ADR-027 --- Mantener `POTENTIAL_RACE` separado de happens-before formal
+
+**Estado:** Aceptada
+
+**Contexto:** el engine produce una traza totalmente ordenada por pasos,
+pero ese orden solamente representa el interleaving seleccionado. Si se
+interpretara cada paso anterior como happens-before, todos los accesos
+quedarían ordenados y ninguna race sería visible.
+
+Un happens-before formal requeriría orden de programa y aristas causales
+para `atomic`, transferencias de semáforos, `await`, monitores y canales.
+Los semáforos generales agregan además permisos contados y señalización
+sin ownership obligatorio.
+
+**Decisión:** M8 mantiene un análisis de protocolos sobre la traza
+observada y no lo presenta como detector formal de data races.
+
+Cada acceso registra su protección observada. Los pares se distinguen
+como sincronizados, ambiguos, potencialmente problemáticos o violaciones
+de exclusión mutua observadas. Esta última categoría exige que la traza
+muestre un acceso mientras otro proceso conserva un mutex incompatible.
+
+La UI usa explícitamente “potential race observation” y declara que el
+resultado no prueba una data race ni cubre todos los interleavings.
+
+**Consecuencia:** el diagnóstico es más preciso y educativo sin atribuir
+garantías que el modelo actual no demuestra. Un analizador futuro podrá
+incorporar relojes vectoriales o una relación parcial equivalente como
+fase separada, reutilizando eventos estructurados de sincronización.
+
+**Motivo:** preservar la diferencia entre conflicto observado,
+protección por protocolo, causalidad formal y exploración de estados.
+
+------------------------------------------------------------------------
+
+## ADR-028 --- Diagnosticar liveness desde evidencia finita sin prometer decidibilidad
+
+**Estado:** Aceptada
+
+**Contexto:** busy waiting, starvation y no terminación son propiedades
+de liveness. Una traza finita puede mostrar síntomas fuertes, pero en
+general no demuestra qué ocurrirá en todos los pasos futuros ni en
+otros interleavings. El límite del engine tampoco debe confundirse con
+un estado sin transiciones habilitadas.
+
+**Decisión:** los diagnósticos de liveness permanecen en
+`src/core/diagnostics/`, separados del runtime y del detector de
+deadlock.
+
+Busy waiting sólo se informa después de cuatro evaluaciones consecutivas
+que mantienen activo un bucle vacío y leen memoria compartida. El riesgo
+de starvation exige un proceso actualmente `READY`, al menos doce pasos
+sin selección y actividad continuada de otros procesos.
+
+Al alcanzar el límite con trabajo ejecutable, el estado global es
+`STEP_LIMIT_REACHED`. `DEADLOCK` conserva prioridad si realmente no
+existe progreso posible. Cada hallazgo incluye evidencia y una nota de
+alcance; starvation se denomina riesgo y la no terminación no se
+clasifica automáticamente como error.
+
+**Consecuencia:** la UI puede enseñar diferencias entre espera activa,
+postergación, no terminación y deadlock sin presentar heurísticas como
+pruebas. Los umbrales y patrones podrán evolucionar sin alterar la
+semántica de los procesos ni del scheduler.
+
+**Motivo:** preferir pocos diagnósticos justificables y reproducibles a
+una clasificación amplia con falsos positivos o garantías inexistentes.

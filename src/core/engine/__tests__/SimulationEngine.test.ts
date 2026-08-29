@@ -513,6 +513,9 @@ describe('SimulationEngine', () => {
 
     expect(engine.getSnapshot()).toEqual({
       stepCount: 1,
+      executionStatus: 'FINISHED',
+      deadlock: undefined,
+      runtimeDiagnostics: [],
       sharedMemory: {
         counter: 10,
       },
@@ -530,6 +533,7 @@ describe('SimulationEngine', () => {
             x: 5,
           },
           callStack: [],
+          blockingReason: undefined,
         },
       ],
     })

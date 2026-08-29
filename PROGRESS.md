@@ -5,9 +5,10 @@
 
 ## Estado actual
 
-**Fase:** M8 --- Detector de errores y diagnósticos.
+**Fase:** M9 --- Exploración de ejecuciones.
 
-**Último milestone completado:** M7 --- Semáforos.
+**Último milestone completado:** M8 --- Detector de errores y
+diagnósticos.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -20,8 +21,13 @@ el runtime base de `P` / `V`, su historial/visualización y la integración
 con el análisis de interferencia, además de nueve casos académicos
 reproducibles.
 
-**Próximo objetivo:** iniciar M8 consolidando los diagnósticos de errores
-con la base de interferencias, bloqueos y deadlocks ya disponible.
+**Estado M8:** completado. Incluye deadlock y wait-for graph,
+diagnósticos de memoria/exclusión mutua y análisis conservador de busy
+waiting, riesgo de starvation y no terminación al alcanzar el límite de
+pasos.
+
+**Próximo objetivo:** comenzar M9 representando y clonando estados de
+ejecución para explorar interleavings alternativos.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -1446,3 +1452,145 @@ npm run build
 
 **Estado:** M7 COMPLETADO; M7.1 a M7.7 y nueve casos académicos
 reproducibles verificados.
+
+------------------------------------------------------------------------
+
+## 2026-08-29 --- M8: diagnóstico de deadlock
+
+### Definición de progreso
+
+El snapshot distingue cuatro estados globales:
+
+-   `RUNNING`: no hay procesos bloqueados y queda trabajo ejecutable;
+-   `TEMPORARILY_BLOCKED`: existe al menos un proceso bloqueado, pero
+    otro proceso puede avanzar o una espera ya está habilitada;
+-   `FINISHED`: todos los procesos finalizaron;
+-   `DEADLOCK`: quedan procesos sin finalizar, ninguno está listo y
+    ninguna espera bloqueada puede habilitarse con el estado actual.
+
+Esta definición evita confundir un waiter con deadlock y también evita
+un falso positivo inmediatamente después de un `V`: aunque el waiter
+todavía figure `BLOCKED` hasta la próxima reevaluación, el permiso
+disponible demuestra que puede progresar.
+
+### Dependencias y wait-for graph
+
+El analizador reconstruye permisos adquiridos a partir del historial
+estructurado de `P` / `V`. Para un proceso bloqueado en `P(s)` crea:
+
+``` text
+proceso --WAITS_FOR--> semáforo --HOLDS--> proceso inferido
+```
+
+De esas dependencias deriva aristas proceso-a-proceso y busca
+componentes fuertemente conexas. Una componente con más de un proceso,
+o un proceso que depende de sí mismo, constituye espera circular.
+
+Los poseedores son metadata inferida para la traza observada; no se
+agrega ownership a la semántica de los semáforos. Si un `await` no puede
+progresar o un semáforo no tiene poseedor inferible, se informa bloqueo
+terminal con grafo parcial sin inventar un ciclo.
+
+El modelo de recursos admite `SEMAPHORE`, `MONITOR` y `CHANNEL`. En esta
+etapa solamente semáforos producen dependencias concretas; monitores y
+comunicación podrán agregar adaptadores sin reemplazar el algoritmo de
+ciclos.
+
+### Visualización y reproducción
+
+Cuando se alcanza un deadlock, la UI muestra:
+
+-   paso de detección y tipo de diagnóstico;
+-   procesos y recursos involucrados;
+-   tabla del wait-for graph;
+-   ciclos encontrados o la limitación del grafo parcial;
+-   botón `Replay deadlock`.
+
+La reproducción reinicia el mismo estado y scheduler y ejecuta hasta el
+paso registrado. Round Robin, First Ready y Random con seed conservan
+así la misma traza.
+
+### Alcance
+
+El detector diagnostica el estado alcanzado por la ejecución actual. No
+busca todavía interleavings alternativos; esa exploración pertenece a
+M9.
+
+### M8 --- Race conditions y exclusión mutua
+
+El análisis de memoria mantiene las clasificaciones públicas
+`POTENTIAL_RACE`, `SYNCHRONIZED` y `UNKNOWN`, pero agrega un diagnóstico
+estructurado independiente:
+
+-   `POTENTIAL_DATA_RACE`;
+-   `MUTUAL_EXCLUSION_VIOLATION`;
+-   `AMBIGUOUS_SYNCHRONIZATION`;
+-   `SYNCHRONIZED_ACCESS`.
+
+Para cada acceso se describe si estaba dentro de `atomic`, dentro de un
+protocolo mutex observado o dentro de un protocolo de semáforo ambiguo.
+Esto permite diferenciar:
+
+-   dos accesos completamente desprotegidos;
+-   protección unilateral;
+-   mecanismos incompatibles;
+-   dos mutex distintos protegiendo la misma ubicación;
+-   un mutex común válido;
+-   señalización directa válida `V -> P`;
+-   contadores y protocolos ambiguos.
+
+Se informa `MUTUAL_EXCLUSION_VIOLATION` únicamente cuando la traza
+muestra que un proceso accedió a la ubicación mientras otro todavía
+mantenía un mutex incompatible. Una protección inconsistente sin
+solapamiento demostrado continúa como `POTENTIAL_DATA_RACE`.
+
+Los resúmenes por ubicación cuentan por separado observaciones
+potenciales, violaciones de mutex, accesos sincronizados y casos
+ambiguos. La UI explica el motivo estructurado y aclara que el análisis
+corresponde a la traza observada.
+
+Se evaluó incorporar happens-before formal. El número global de paso no
+puede utilizarse como relación causal: convertiría el interleaving total
+del simulador en un orden entre todos los procesos y ocultaría races.
+Un detector formal futuro requerirá orden de programa, relaciones
+específicas por primitiva y posiblemente relojes vectoriales. Debe
+integrar semáforos generales, `await`, monitores y comunicación, y
+permanecer separado de la exploración de interleavings de M9.
+
+Por ese motivo, M8 conserva deliberadamente el nombre
+`POTENTIAL_RACE`: es evidencia educativa de accesos conflictivos sin una
+protección común reconocida, no prueba formal de una data race.
+
+### M8 --- Otros diagnósticos y cierre
+
+Se agregó un analizador de liveness separado del runtime. Cada
+diagnóstico contiene un código estable, severidad, procesos afectados,
+evidencia concreta de la traza y una nota que explica qué no puede
+concluirse.
+
+El busy waiting se detecta sólo ante un patrón conservador: al menos
+cuatro evaluaciones consecutivas mantienen activo un bucle vacío cuya
+condición consulta memoria compartida. Los bucles con cuerpo o
+condiciones suspendibles quedan sin clasificar para evitar falsos
+positivos.
+
+El riesgo de starvation se informa cuando un proceso está `READY` pero
+no fue seleccionado durante doce pasos o más, mientras otros procesos
+sí acumulan ejecución. El diagnóstico habla de postergación observada,
+no afirma starvation inevitable.
+
+El límite máximo de pasos ahora produce el estado global
+`STEP_LIMIT_REACHED` cuando todavía hay trabajo ejecutable. De esta
+forma una ejecución potencialmente infinita queda separada de
+`DEADLOCK`; el panel explica que una traza finita no distingue por sí
+sola un servidor intencionalmente infinito de un error de terminación.
+
+La UI muestra las observaciones en tarjetas educativas con evidencia y
+alcance. El engine conserva el límite predeterminado de 10.000 pasos y
+deshabilita `Step`/`Run` al alcanzarlo.
+
+Se agregaron pruebas para busy waiting positivo, rechazo de un bucle que
+no consulta memoria compartida, postergación por `First Ready` y la
+separación formal entre límite y deadlock.
+
+**Estado:** M8 COMPLETADO.

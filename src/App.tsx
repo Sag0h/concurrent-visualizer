@@ -221,6 +221,32 @@ function App() {
     }
   }
 
+  function handleReplayDeadlock() {
+    if (!engine || !snapshot?.deadlock) {
+      return
+    }
+
+    const targetStep =
+      snapshot.deadlock.replayTargetStep
+
+    engine.reset()
+
+    while (
+      engine.getState().stepCount < targetStep
+      && !engine.isFinished()
+      && !engine.hasReachedStepLimit()
+    ) {
+      const progressed = engine.step()
+
+      if (!progressed) {
+        break
+      }
+    }
+
+    setSnapshot(engine.getSnapshot())
+    setError(null)
+  }
+
   function generateRandomSeed(): number {
     return Math.floor(
       Math.random() * 2_147_483_647,
@@ -514,6 +540,13 @@ function App() {
         conflict.classification === 'SYNCHRONIZED',
     ) ?? []
 
+  const mutualExclusionViolations =
+    potentialRaces.filter(
+      (conflict) =>
+        conflict.diagnostic
+          === 'MUTUAL_EXCLUSION_VIOLATION',
+    )
+
   const unknownConflicts =
     snapshot?.memoryAccessConflicts.filter(
       (conflict) =>
@@ -526,21 +559,7 @@ function App() {
   ]
 
   const programStatus =
-    engine?.isFinished()
-      ? 'FINISHED'
-      : snapshot
-        && snapshot.processes.length > 0
-        && snapshot.processes.every(
-          (process) =>
-            process.state === 'BLOCKED'
-            || process.state === 'FINISHED',
-        )
-        && snapshot.processes.some(
-          (process) =>
-            process.state === 'BLOCKED',
-        )
-          ? 'BLOCKED'
-          : 'RUNNING'
+    snapshot?.executionStatus ?? 'RUNNING'
 
   return (
     <main className="app">
@@ -657,6 +676,10 @@ function App() {
               disabled={
                 !engine
                 || engine.isFinished()
+                || snapshot?.executionStatus
+                  === 'DEADLOCK'
+                || snapshot?.executionStatus
+                  === 'STEP_LIMIT_REACHED'
               }
             >
               Step
@@ -667,6 +690,10 @@ function App() {
               disabled={
                 !engine
                 || engine.isFinished()
+                || snapshot?.executionStatus
+                  === 'DEADLOCK'
+                || snapshot?.executionStatus
+                  === 'STEP_LIMIT_REACHED'
               }
             >
               Run
@@ -903,6 +930,254 @@ function App() {
                 </section>
               )}
 
+              {snapshot.deadlock && (
+                <section
+                  className="deadlock-panel"
+                  aria-labelledby="deadlock-heading"
+                >
+                  <div className="deadlock-header">
+                    <div>
+                      <span className="deadlock-badge">
+                        DEADLOCK
+                      </span>
+
+                      <h2 id="deadlock-heading">
+                        Deadlock detected
+                      </h2>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleReplayDeadlock}
+                    >
+                      Replay deadlock
+                    </button>
+                  </div>
+
+                  <p>{snapshot.deadlock.summary}</p>
+
+                  <div className="deadlock-facts">
+                    <span>
+                      Detected at step{' '}
+                      <strong>
+                        {snapshot.deadlock.detectedAtStep}
+                      </strong>
+                    </span>
+
+                    <span>
+                      Type:{' '}
+                      <strong>
+                        {snapshot.deadlock.kind === 'CIRCULAR_WAIT'
+                          ? 'Circular wait'
+                          : 'Terminal blocking'}
+                      </strong>
+                    </span>
+
+                    <span>
+                      Graph:{' '}
+                      <strong>
+                        {snapshot.deadlock.graphIsComplete
+                          ? 'Complete'
+                          : 'Partial'}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <div className="deadlock-entities">
+                    <div>
+                      <h3>Processes involved</h3>
+
+                      <div className="deadlock-tags">
+                        {snapshot.deadlock.involvedProcessIds.map(
+                          (processId) => (
+                            <span key={processId}>
+                              {processId}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3>Resources involved</h3>
+
+                      {snapshot.deadlock.involvedResources.length === 0 ? (
+                        <p className="empty">
+                          No concrete resource dependency
+                          could be inferred.
+                        </p>
+                      ) : (
+                        <div className="deadlock-tags">
+                          {snapshot.deadlock.involvedResources.map(
+                            (resource) => (
+                              <span key={resource.id}>
+                                {resource.kind.toLowerCase()}
+                                {': '}
+                                {resource.name}
+                              </span>
+                            ),
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {snapshot.deadlock.waitForEdges.length > 0 && (
+                    <div className="deadlock-graph">
+                      <h3>Wait-for graph</h3>
+
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Waiting process</th>
+                            <th>Resource</th>
+                            <th>Inferred holder</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {snapshot.deadlock.waitForEdges.map(
+                            (edge) => {
+                              const resource =
+                                snapshot.deadlock?.involvedResources.find(
+                                  (candidate) =>
+                                    candidate.id === edge.resourceId,
+                                )
+
+                              return (
+                                <tr
+                                  key={`${edge.waitingProcessId}-${edge.resourceId}-${edge.holdingProcessId}`}
+                                >
+                                  <td>
+                                    {edge.waitingProcessId}
+                                  </td>
+                                  <td>
+                                    <code>
+                                      {resource?.name
+                                        ?? edge.resourceId}
+                                    </code>
+                                  </td>
+                                  <td>
+                                    {edge.holdingProcessId}
+                                  </td>
+                                </tr>
+                              )
+                            },
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {snapshot.deadlock.cycles.length > 0 ? (
+                    <div className="deadlock-cycles">
+                      <h3>Detected cycles</h3>
+
+                      {snapshot.deadlock.cycles.map(
+                        (cycle, index) => (
+                          <p key={cycle.processIds.join('-')}>
+                            <strong>
+                              Cycle {index + 1}:
+                            </strong>{' '}
+                            {cycle.processIds.join(' ↔ ')}
+                          </p>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <p className="deadlock-limitation">
+                      Every unfinished process is blocked, but
+                      the available information is insufficient
+                      to prove a circular resource dependency.
+                    </p>
+                  )}
+
+                  <p className="deadlock-replay-note">
+                    Replay resets the same scheduler and executes
+                    the recorded number of steps again.
+                  </p>
+                </section>
+              )}
+
+              {snapshot.runtimeDiagnostics.length > 0 && (
+                <section
+                  className="runtime-diagnostics"
+                  aria-labelledby="runtime-diagnostics-heading"
+                >
+                  <div className="runtime-diagnostics-header">
+                    <div>
+                      <span className="runtime-diagnostics-badge">
+                        TRACE DIAGNOSTICS
+                      </span>
+
+                      <h2 id="runtime-diagnostics-heading">
+                        Execution diagnostics
+                      </h2>
+                    </div>
+
+                    <span>
+                      {snapshot.runtimeDiagnostics.length}{' '}
+                      observation(s)
+                    </span>
+                  </div>
+
+                  <p className="runtime-diagnostics-intro">
+                    These findings explain the execution observed so far.
+                    They do not predict every possible interleaving.
+                  </p>
+
+                  <div className="runtime-diagnostic-grid">
+                    {snapshot.runtimeDiagnostics.map(
+                      (diagnostic) => (
+                        <article
+                          className={
+                            `runtime-diagnostic-card runtime-diagnostic-${diagnostic.severity.toLowerCase()}`
+                          }
+                          key={`${diagnostic.code}-${diagnostic.processIds.join('-')}`}
+                        >
+                          <div className="runtime-diagnostic-title">
+                            <span>{diagnostic.severity}</span>
+                            <h3>{diagnostic.title}</h3>
+                          </div>
+
+                          <p>{diagnostic.summary}</p>
+
+                          <div className="runtime-diagnostic-facts">
+                            <span>
+                              Step{' '}
+                              <strong>{diagnostic.detectedAtStep}</strong>
+                            </span>
+
+                            {diagnostic.processIds.map(
+                              (processId) => (
+                                <span key={processId}>
+                                  {processId}
+                                </span>
+                              ),
+                            )}
+                          </div>
+
+                          <h4>Evidence in this trace</h4>
+
+                          <ul>
+                            {diagnostic.evidence.map(
+                              (item) => (
+                                <li key={item}>{item}</li>
+                              ),
+                            )}
+                          </ul>
+
+                          <p className="runtime-diagnostic-scope">
+                            <strong>Scope:</strong>{' '}
+                            {diagnostic.scopeNote}
+                          </p>
+                        </article>
+                      ),
+                    )}
+                  </div>
+                </section>
+              )}
+
               <section>
                 <div className="history-header">
                   <h2>Execution History</h2>
@@ -1051,6 +1326,11 @@ function App() {
                               const hasPotentialRace =
                                 potentialRaces.some(belongsToConflict)
 
+                              const hasMutualExclusionViolation =
+                                mutualExclusionViolations.some(
+                                  belongsToConflict,
+                                )
+
                               const hasSynchronizedAccess =
                                 synchronizedConflicts.some(belongsToConflict)
 
@@ -1083,7 +1363,14 @@ function App() {
                                   <td>
                                     {entry.description}
 
-                                    {hasPotentialRace && (
+                                    {hasMutualExclusionViolation && (
+                                      <span className="memory-exclusion-indicator">
+                                        Mutex violation
+                                      </span>
+                                    )}
+
+                                    {hasPotentialRace
+                                      && !hasMutualExclusionViolation && (
                                       <span className="memory-conflict-indicator">
                                         Potential race
                                       </span>
@@ -1115,8 +1402,18 @@ function App() {
                           <div>
                             <span className="memory-conflict-count">
                               {potentialRaces.length}{' '}
-                              potential race
+                              potential race observation
                               {potentialRaces.length === 1 ? '' : 's'}
+                            </span>
+
+                            {' · '}
+
+                            <span className="memory-exclusion-count">
+                              {mutualExclusionViolations.length}{' '}
+                              mutex violation
+                              {mutualExclusionViolations.length === 1
+                                ? ''
+                                : 's'}
                             </span>
 
                             {' · '}
@@ -1135,8 +1432,9 @@ function App() {
                           </div>
                         </div>
                         <p className="analysis-scope-note">
-                          Classification applies to this observed execution.
-                          It is not a proof for every possible interleaving.
+                          This is a protocol analysis of the observed trace,
+                          not a formal data-race proof or a guarantee about
+                          every possible interleaving.
                         </p>
 
                         {conflictsNeedingAttention.length > 0
@@ -1165,12 +1463,22 @@ function App() {
                                     </span>
 
                                     <span>
-                                      {summary.conflictCount}{' '}
-                                      conflict
-                                      {summary.conflictCount === 1
+                                      {summary.potentialRaceCount}{' '}
+                                      potential observation
+                                      {summary.potentialRaceCount === 1
                                         ? ''
                                         : 's'}
                                     </span>
+
+                                    {summary.mutualExclusionViolationCount > 0 && (
+                                      <span className="memory-exclusion-count">
+                                        {summary.mutualExclusionViolationCount}{' '}
+                                        mutex violation
+                                        {summary.mutualExclusionViolationCount === 1
+                                          ? ''
+                                          : 's'}
+                                      </span>
+                                    )}
                                   </div>
                                 )
                               },
@@ -1266,12 +1574,18 @@ function App() {
                                             className={
                                               conflict.classification === 'UNKNOWN'
                                                 ? 'memory-unknown-indicator'
+                                                : conflict.diagnostic
+                                                    === 'MUTUAL_EXCLUSION_VIOLATION'
+                                                  ? 'memory-exclusion-indicator'
                                                 : 'memory-conflict-indicator'
                                             }
                                           >
                                             {conflict.classification === 'UNKNOWN'
                                               ? 'Unknown'
-                                              : 'Potential race'}
+                                              : conflict.diagnostic
+                                                  === 'MUTUAL_EXCLUSION_VIOLATION'
+                                                ? 'Mutex violation'
+                                                : 'Potential race'}
                                           </span>
 
                                           <div className="memory-analysis-reason">
@@ -1442,9 +1756,47 @@ function describeConflictReason(
     case 'AMBIGUOUS_SEMAPHORE_PROTOCOL':
       return `Semaphore use is not a verified mutex protocol: ${conflict.reason.semaphoreNames.join(', ')}.`
 
+    case 'INCONSISTENT_PROTECTION':
+      return `The accesses use inconsistent protection (${describeProtection(conflict.reason.first)} vs ${describeProtection(conflict.reason.second)}). This remains a potential race, not a formal proof.`
+
+    case 'OBSERVED_MUTEX_OVERLAP':
+      return `The trace shows one process accessing the location while the other still holds an incompatible mutex (${describeProtection(conflict.reason.first)} vs ${describeProtection(conflict.reason.second)}).`
+
     case 'UNPROTECTED':
-      return 'The accesses do not share a recognized protection mechanism.'
+      return 'The accesses do not share a recognized protection mechanism. This is a potential race observation, not proof of a data race.'
   }
+}
+
+function describeProtection(
+  protection: Extract<
+    MemoryAccessConflict['reason'],
+    {
+      type:
+        | 'INCONSISTENT_PROTECTION'
+        | 'OBSERVED_MUTEX_OVERLAP'
+    }
+  >['first'],
+): string {
+  const mechanisms: string[] = []
+
+  if (protection.atomicRegion) {
+    mechanisms.push('atomic')
+  }
+
+  mechanisms.push(
+    ...protection.mutexSemaphoreNames.map(
+      (name) => `${name} (mutex)`,
+    ),
+  )
+  mechanisms.push(
+    ...protection.ambiguousSemaphoreNames.map(
+      (name) => `ambiguous semaphore ${name}`,
+    ),
+  )
+
+  return mechanisms.length > 0
+    ? mechanisms.join(' + ')
+    : 'no recognized protection'
 }
 
 function schedulerLabel(

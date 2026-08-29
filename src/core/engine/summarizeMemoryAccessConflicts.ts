@@ -41,6 +41,10 @@ export function summarizeMemoryAccessConflicts(
           structuredClone(location),
         processes: [],
         conflictCount: 0,
+        potentialRaceCount: 0,
+        mutualExclusionViolationCount: 0,
+        synchronizedCount: 0,
+        unknownCount: 0,
         readCount: 0,
         writeCount: 0,
       }
@@ -49,6 +53,25 @@ export function summarizeMemoryAccessConflicts(
     }
 
     summary.conflictCount += 1
+
+    switch (conflict.diagnostic) {
+      case 'POTENTIAL_DATA_RACE':
+        summary.potentialRaceCount += 1
+        break
+
+      case 'MUTUAL_EXCLUSION_VIOLATION':
+        summary.potentialRaceCount += 1
+        summary.mutualExclusionViolationCount += 1
+        break
+
+      case 'SYNCHRONIZED_ACCESS':
+        summary.synchronizedCount += 1
+        break
+
+      case 'AMBIGUOUS_SYNCHRONIZATION':
+        summary.unknownCount += 1
+        break
+    }
 
     const events = [
       conflict.first,

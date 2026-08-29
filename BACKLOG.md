@@ -662,33 +662,39 @@ debe evolucionar esa base, no duplicarla.
 
 ### Deadlock
 
--   [ ] Definir formalmente qué estados considera deadlock el simulador.
--   [ ] Diferenciar finalización, bloqueo temporal y deadlock.
--   [ ] Diseñar dependencias entre procesos y recursos.
--   [ ] Construir wait-for graph cuando exista información suficiente.
--   [ ] Detectar ciclos de espera cuando corresponda.
--   [ ] Mostrar procesos y recursos involucrados.
--   [ ] Reproducir la ejecución que produjo el deadlock.
--   [ ] Contemplar semáforos, monitores y comunicación.
+-   [x] Definir formalmente qué estados considera deadlock el simulador.
+-   [x] Diferenciar finalización, bloqueo temporal y deadlock.
+-   [x] Diseñar dependencias entre procesos y recursos.
+-   [x] Construir wait-for graph cuando exista información suficiente.
+-   [x] Detectar ciclos de espera cuando corresponda.
+-   [x] Mostrar procesos y recursos involucrados.
+-   [x] Reproducir la ejecución que produjo el deadlock.
+-   [x] Contemplar semáforos, monitores y comunicación mediante un
+    modelo extensible de recursos; los adaptadores de monitores y
+    canales se implementarán junto con esas primitivas.
 
 ### Race conditions y exclusión mutua
 
--   [ ] Evolucionar el análisis básico de M5 hacia un modelo de
+-   [x] Evolucionar el análisis básico de M5 hacia un modelo de
     sincronización más preciso.
--   [ ] Integrar mecanismos distintos de `atomic`.
--   [ ] Diagnosticar violaciones de exclusión mutua cuando exista
+-   [x] Integrar mecanismos distintos de `atomic`.
+-   [x] Diagnosticar violaciones de exclusión mutua cuando exista
     información suficiente.
--   [ ] Investigar un análisis formal de data races/happens-before
+-   [x] Investigar un análisis formal de data races/happens-before
     apropiado para el alcance educativo.
--   [ ] Evitar presentar `POTENTIAL_RACE` como prueba formal de una data
+-   [x] Evitar presentar `POTENTIAL_RACE` como prueba formal de una data
     race.
 
 ### Otros diagnósticos
 
--   [ ] Detectar busy waiting cuando sea razonablemente identificable.
--   [ ] Investigar detección útil de starvation/inanición.
--   [ ] Diferenciar no terminación legítima de deadlock.
--   [ ] Generar diagnósticos educativos explicando el problema.
+-   [x] Detectar busy waiting cuando sea razonablemente identificable.
+-   [x] Investigar detección útil de starvation/inanición.
+-   [x] Diferenciar no terminación legítima de deadlock.
+-   [x] Generar diagnósticos educativos explicando el problema.
+
+**Estado:** M8 COMPLETADO. Deadlock, conflictos de memoria/exclusión
+mutua y diagnósticos conservadores de liveness implementados y
+verificados sobre la traza observada.
 
 ------------------------------------------------------------------------
 

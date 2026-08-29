@@ -16,6 +16,13 @@ export interface SemaphoreExecutionEvent {
   readonly valueAfter: number
 }
 
+export interface LoopConditionExecutionEvent {
+  readonly loopType: 'WHILE' | 'REPEAT_UNTIL'
+  readonly conditionResult: boolean
+  readonly sharedVariableNames: string[]
+  readonly bodyIsEmpty: boolean
+}
+
 export interface ExecutionEvent {
   readonly step: number
   readonly processId: ProcessId
@@ -23,4 +30,5 @@ export interface ExecutionEvent {
   readonly description?: string
   readonly awaitStatus?: AwaitEventStatus
   readonly semaphoreEvent?: SemaphoreExecutionEvent
+  readonly loopConditionEvent?: LoopConditionExecutionEvent
 }

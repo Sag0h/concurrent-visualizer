@@ -39,6 +39,9 @@ describe('findMemoryAccessConflicts', () => {
     expect(conflicts).toHaveLength(1)
     expect(conflicts[0].first.step).toBe(1)
     expect(conflicts[0].second.step).toBe(2)
+    expect(conflicts[0].diagnostic).toBe(
+      'POTENTIAL_DATA_RACE',
+    )
   })
 
   it('does not treat two reads as a conflict', () => {
@@ -195,6 +198,14 @@ describe('findMemoryAccessConflicts', () => {
       snapshot.memoryConflictSummaries[0]
         .conflictCount,
     ).toBeGreaterThan(0)
+    expect(
+      snapshot.memoryConflictSummaries[0]
+        .potentialRaceCount,
+    ).toBeGreaterThan(0)
+    expect(
+      snapshot.memoryConflictSummaries[0]
+        .mutualExclusionViolationCount,
+    ).toBe(0)
   })
 
   it('classifies accesses inside atomic sections as synchronized', () => {
@@ -231,6 +242,9 @@ describe('findMemoryAccessConflicts', () => {
     expect(
       conflicts[0].classification,
     ).toBe('SYNCHRONIZED')
+    expect(conflicts[0].diagnostic).toBe(
+      'SYNCHRONIZED_ACCESS',
+    )
   })
 
   it('keeps conflict as potential race when only one access is atomic', () => {
@@ -265,6 +279,18 @@ describe('findMemoryAccessConflicts', () => {
     expect(
       conflicts[0].classification,
     ).toBe('POTENTIAL_RACE')
+    expect(conflicts[0]).toMatchObject({
+      diagnostic: 'POTENTIAL_DATA_RACE',
+      reason: {
+        type: 'INCONSISTENT_PROTECTION',
+        first: {
+          atomicRegion: true,
+        },
+        second: {
+          atomicRegion: false,
+        },
+      },
+    })
   })
 
   it('recognizes a general semaphore used as a mutex in the observed execution', () => {
@@ -351,6 +377,77 @@ describe('findMemoryAccessConflicts', () => {
             === 'POTENTIAL_RACE',
       ),
     ).toBe(true)
+    expect(
+      conflicts.some(
+        (conflict) =>
+          conflict.diagnostic
+            === 'MUTUAL_EXCLUSION_VIOLATION'
+          && conflict.reason.type
+            === 'OBSERVED_MUTEX_OVERLAP',
+      ),
+    ).toBe(true)
+  })
+
+  it('diagnoses overlapping critical sections protected by different mutexes', () => {
+    const source = `
+      sem mutexA = 1;
+      sem mutexB = 1;
+      shared int x = 0;
+
+      process P1 {
+        P(mutexA);
+        x = x + 1;
+        V(mutexA);
+      }
+
+      process P2 {
+        P(mutexB);
+        x = x + 1;
+        V(mutexB);
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    const conflicts =
+      engine.getSnapshot().memoryAccessConflicts
+
+    expect(conflicts.length).toBeGreaterThan(0)
+    expect(
+      conflicts.some(
+        (conflict) =>
+          conflict.diagnostic
+            === 'MUTUAL_EXCLUSION_VIOLATION',
+      ),
+    ).toBe(true)
+    expect(
+      conflicts.find(
+        (conflict) =>
+          conflict.diagnostic
+            === 'MUTUAL_EXCLUSION_VIOLATION',
+      )?.reason,
+    ).toMatchObject({
+      type: 'OBSERVED_MUTEX_OVERLAP',
+      first: {
+        mutexSemaphoreNames: ['mutexA'],
+      },
+      second: {
+        mutexSemaphoreNames: ['mutexB'],
+      },
+    })
+    expect(
+      engine.getSnapshot().memoryConflictSummaries[0]
+        .mutualExclusionViolationCount,
+    ).toBeGreaterThan(0)
   })
 
   it('does not mistake a counting semaphore for a mutex', () => {
@@ -390,6 +487,13 @@ describe('findMemoryAccessConflicts', () => {
       conflicts.every(
         (conflict) =>
           conflict.classification === 'UNKNOWN',
+      ),
+    ).toBe(true)
+    expect(
+      conflicts.every(
+        (conflict) =>
+          conflict.diagnostic
+            === 'AMBIGUOUS_SYNCHRONIZATION',
       ),
     ).toBe(true)
     expect(conflicts[0].reason).toEqual({
@@ -512,9 +616,10 @@ describe('findMemoryAccessConflicts', () => {
     ).toEqual([
       expect.objectContaining({
         classification: 'POTENTIAL_RACE',
-        reason: {
-          type: 'UNPROTECTED',
-        },
+        diagnostic: 'POTENTIAL_DATA_RACE',
+        reason: expect.objectContaining({
+          type: 'INCONSISTENT_PROTECTION',
+        }),
       }),
     ])
   })

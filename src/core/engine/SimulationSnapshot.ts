@@ -5,8 +5,16 @@ import type { MicroOperationEvent } from './MicroOperationEvent'
 import type { MemoryAccessConflict } from './MemoryAccessConflict'
 import type { MemoryConflictSummary } from './MemoryConflictSummary'
 import type { BlockingReason } from '../process/BlockingReason'
+import type {
+  DeadlockDiagnostic,
+  ProgramExecutionStatus,
+} from '../deadlock/DeadlockDiagnostic'
+import type { RuntimeDiagnostic } from '../diagnostics/RuntimeDiagnostic'
 export interface SimulationSnapshot {
   readonly stepCount: number
+  readonly executionStatus: ProgramExecutionStatus
+  readonly deadlock?: DeadlockDiagnostic
+  readonly runtimeDiagnostics: RuntimeDiagnostic[]
   readonly sharedMemory: Memory
   readonly semaphores: SemaphoreSnapshot[]
   readonly processes: ProcessSnapshot[]
