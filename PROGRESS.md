@@ -23,6 +23,13 @@ reproducibles.
 **Próximo objetivo:** iniciar M8 consolidando los diagnósticos de errores
 con la base de interferencias, bloqueos y deadlocks ya disponible.
 
+**Requerimiento futuro registrado:** incorporar en M11 un catálogo
+educativo cargable desde la interfaz. Comenzará con los nueve casos de
+semáforos de M7 y reutilizará una única fuente de pseudocódigo entre los
+tests y el selector visual. Cargar un ejemplo podrá elegir su scheduler
+recomendado, pero no ejecutará `Build` ni reemplazará trabajo del usuario
+sin advertencia.
+
 ------------------------------------------------------------------------
 
 ## 2026-08-26 --- Inicio del proyecto
