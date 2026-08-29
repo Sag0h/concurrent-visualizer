@@ -3,7 +3,7 @@ import type { Scheduler } from './Scheduler'
 import { SeededRandom } from './SeededRandom'
 
 export class RandomScheduler implements Scheduler {
-  private readonly random: SeededRandom
+  private random: SeededRandom
 
   constructor(seed: number) {
     this.random = new SeededRandom(seed)
@@ -27,5 +27,13 @@ export class RandomScheduler implements Scheduler {
 
   reset(): void {
     this.random.reset()
+  }
+
+  clone(): Scheduler {
+    const clone = new RandomScheduler(0)
+
+    clone.random = this.random.clone()
+
+    return clone
   }
 }

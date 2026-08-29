@@ -83,4 +83,23 @@ describe('RoundRobinScheduler', () => {
 
     expect(scheduler.selectNext(processes)?.id).toBe('P1')
   })
+
+  it('clones its current selection cursor', () => {
+    const processes = [
+      createProcess('P1'),
+      createProcess('P2'),
+      createProcess('P3'),
+    ]
+    const scheduler = new RoundRobinScheduler()
+
+    scheduler.selectNext(processes)
+    scheduler.selectNext(processes)
+
+    const clone = scheduler.clone()
+
+    expect(scheduler.selectNext(processes)?.id).toBe('P3')
+    expect(clone.selectNext(processes)?.id).toBe('P3')
+    expect(scheduler.selectNext(processes)?.id).toBe('P1')
+    expect(clone.selectNext(processes)?.id).toBe('P1')
+  })
 })

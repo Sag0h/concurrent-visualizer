@@ -16,4 +16,14 @@ export class SeededRandom {
   reset(): void {
    this.state = this.initialSeed
   }
+
+  clone(): SeededRandom {
+    const clone = new SeededRandom(
+      this.initialSeed,
+    )
+
+    clone.state = this.state
+
+    return clone
+  }
 }

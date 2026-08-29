@@ -26,4 +26,13 @@ export class RoundRobinScheduler implements Scheduler {
   reset(): void {
     this.lastSelectedIndex = -1
   }
+
+  clone(): Scheduler {
+    const clone = new RoundRobinScheduler()
+
+    clone.lastSelectedIndex =
+      this.lastSelectedIndex
+
+    return clone
+  }
 }

@@ -115,4 +115,32 @@ describe('RandomScheduler', () => {
 
     expect(secondSequence).toEqual(firstSequence)
   })
+
+  it('clones its current pseudo-random state', () => {
+    const processes = [
+      createProcess('P1'),
+      createProcess('P2'),
+      createProcess('P3'),
+    ]
+    const scheduler = new RandomScheduler(42)
+
+    Array.from(
+      { length: 7 },
+      () => scheduler.selectNext(processes),
+    )
+
+    const clone = scheduler.clone()
+    const originalContinuation = Array.from(
+      { length: 20 },
+      () => scheduler.selectNext(processes)?.id,
+    )
+    const clonedContinuation = Array.from(
+      { length: 20 },
+      () => clone.selectNext(processes)?.id,
+    )
+
+    expect(clonedContinuation).toEqual(
+      originalContinuation,
+    )
+  })
 })

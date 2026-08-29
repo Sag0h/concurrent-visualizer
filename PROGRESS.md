@@ -26,9 +26,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** comenzar M9.1 separando selección y transición:
-enumerar procesos habilitados, ejecutar una elección explícita y clonar
-estados intermedios independientes.
+**Próximo objetivo:** cerrar la separación del estado de análisis antes
+de decidir qué propiedad adicional de M9.4 puede explorarse sin mezclar
+metadata dependiente del historial con el estado semántico.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -1653,5 +1653,117 @@ Se agregaron pruebas para:
 -   rechazo de transiciones no habilitadas;
 -   ausencia de transiciones al alcanzar el límite de steps.
 
-La separación del estado semántico y la clonación de estados
-intermedios continúan pendientes dentro de M9.1.
+La separación del estado semántico continúa pendiente dentro de M9.1.
+
+### M9.1 --- Forks independientes
+
+Se agregó `cloneExecutionState()` como única operación de clonación
+estructural y `SimulationEngine.fork()` para crear una rama desde el
+estado intermedio actual. El estado clonado es también el nuevo punto de
+`reset()` de la rama.
+
+Los tres schedulers implementan `clone()`. First Ready no conserva
+estado; Round Robin copia su último índice seleccionado y Random copia el
+estado actual de `SeededRandom`. Esta copia preserva `step()` dentro de
+un fork, pero la futura clave canónica no incluirá política de
+scheduling.
+
+Se verificó independencia durante:
+
+-   una asignación compartida suspendida entre microoperaciones;
+-   una llamada a función pendiente dentro de una expresión;
+-   un frame activo de `while`;
+-   reset de una rama hacia su punto de bifurcación;
+-   continuación equivalente de Round Robin y Random.
+
+La clonación de estados intermedios queda completada. Continúa pendiente
+extraer la metadata de análisis dependiente de la traza para propiedades
+de memoria.
+
+### M9.2 --- Estado semántico y detección de repeticiones
+
+Se creó `src/core/exploration/` con dos proyecciones independientes:
+
+-   `SemanticExecutionState` clona `Program` y conserva todo el estado
+    que gobierna transiciones futuras;
+-   `ExecutionTrace` clona step, historial de instrucciones e historial
+    de microoperaciones.
+
+`createSemanticStateKey()` serializa el estado semántico de manera
+estable, ordenando claves de objetos sin alterar el orden de arrays. La
+clave excluye el contador y los historiales, pero conserva memoria,
+semáforos y todo el runtime interno de los procesos.
+
+`VisitedStateRegistry` registra claves y devuelve `NEW` o `REPEATED`. Un
+`while (true) {}` demuestra que dos steps con historiales distintos
+pueden representar el mismo estado semántico.
+
+Las pruebas también verifican:
+
+-   proyecciones desconectadas del estado mutable original;
+-   independencia frente al orden de propiedades de objetos;
+-   diferencias ante cambios de memoria, semáforos y control;
+-   registro de sucesores realmente nuevos.
+
+Esta clave es la base inicial para búsqueda de deadlock. Todavía no se
+usa para análisis de races/exclusión mutua porque la protección inferida
+desde la traza requiere un estado de análisis explícito.
+
+### M9.2/M9.3 --- BFS acotada y primer contraejemplo
+
+Se agregó `exploreForDeadlock()`. La búsqueda recorre estados en anchura,
+bifurca el engine para cada transición habilitada y registra estados por
+su clave semántica. El engine entregado por la UI o por un test no se
+modifica durante la exploración.
+
+Los límites de profundidad y cantidad de estados son independientes. El
+límite de seguridad interno del engine también se informa como causa de
+truncamiento. El resultado distingue:
+
+-   `FOUND`: se halló un deadlock;
+-   `EXHAUSTED`: no quedan estados semánticos nuevos por visitar;
+-   `TRUNCATED`: al menos una rama no pudo continuar por un límite.
+
+Las estadísticas conservan estados visitados, transiciones ensayadas y
+máxima profundidad alcanzada. Los ciclos semánticos se cierran sin hacer
+crecer indefinidamente la cola.
+
+El primer contraejemplo guarda `DEADLOCK`, profundidad, límites, secuencia
+exacta de procesos, claves inicial/terminal, estado terminal y diagnóstico
+estructurado. `replayDeadlockCounterexample()` fuerza esa secuencia desde
+un fork y valida que comience en el mismo estado y termine en el deadlock
+registrado.
+
+El caso clásico de dos procesos que toman dos semáforos en orden opuesto
+verifica las dos posibilidades: existe una traza secuencial que termina y
+un interleaving de cuatro elecciones que produce espera circular. BFS
+encuentra el contraejemplo mínimo.
+
+Las propiedades de memoria continúan pospuestas hasta representar su
+metadata de análisis fuera del historial.
+
+### M9.3 --- Panel de exploración y reproducción guiada
+
+La simulación muestra ahora un panel `Bounded BFS` desde el que pueden
+configurarse profundidad y cantidad máxima de estados. La búsqueda parte
+del estado visible sin modificarlo y presenta:
+
+-   `FOUND`, `EXHAUSTED` o `TRUNCATED` con una explicación de alcance;
+-   los límites efectivamente usados y las causas de truncamiento;
+-   estados visitados, transiciones ensayadas y profundidad alcanzada;
+-   el tipo, profundidad y secuencia exacta del contraejemplo.
+
+Al iniciar la reproducción, la UI vuelve al fork conservado del estado
+origen. Cada clic resalta y ejecuta el siguiente proceso guardado. También
+se puede reproducir toda la secuencia, salir al origen o reiniciarla. Los
+controles normales `Step` y `Run` se deshabilitan durante la guía para no
+desviarse accidentalmente del camino demostrado.
+
+Se verificó en navegador el flujo completo con dos semáforos tomados en
+orden opuesto: BFS encontró 16 estados, 16 transiciones y un deadlock
+mínimo de profundidad 4; tras cuatro elecciones guiadas ambos procesos
+quedaron bloqueados y apareció el diagnóstico de espera circular. También
+se comprobaron un resultado truncado por profundidad, un espacio seguro
+agotado y la ausencia de errores de consola.
+
+**Estado:** M9.3 COMPLETADO.

@@ -1007,6 +1007,12 @@ estados. Una clave canónica excluirá step e historiales, pero deberá
 incluir toda metadata que afecte la semántica o diagnósticos futuros.
 Los resultados serán `FOUND`, `EXHAUSTED` o `TRUNCATED`.
 
+La primera clave implementada serializa canónicamente `Program` y se
+limita a búsqueda de deadlock. El historial se proyecta como
+`ExecutionTrace` independiente. Esta clave no se reutilizará para
+diagnósticos de memoria hasta extraer la metadata de protección que hoy
+se reconstruye desde eventos anteriores.
+
 Deadlock será la primera propiedad buscable. El contraejemplo guardará
 la secuencia exacta de procesos elegidos y se reproducirá forzando esa
 secuencia, no intentando deducir una seed.
@@ -1021,6 +1027,11 @@ interleavings no visitados.
 scheduler antes de implementar el algoritmo de búsqueda. La UI podrá
 seguir usando los schedulers existentes y reproducir contraejemplos de
 manera estable aunque cambie la implementación del scheduler.
+
+Un `fork()` operativo puede clonar el estado privado del scheduler para
+conservar `step()`, pero esa copia no integra el estado semántico ni su
+clave canónica. El explorador continúa dependiendo de elecciones
+explícitas.
 
 **Motivo:** obtener contraejemplos cortos y educativos sin presentar una
 búsqueda finita como model checking exhaustivo ni acoplar la semántica a

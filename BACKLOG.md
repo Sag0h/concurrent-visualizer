@@ -713,8 +713,9 @@ elige explícitamente cuál ejecutar en cada rama.
 -   [x] El deadlock observado puede reproducirse hasta su step de
     detección.
 
-Esta base no permite todavía bifurcar una ejecución: `step()` consulta
-internamente al scheduler y no expone las alternativas habilitadas.
+M9.1 extendió esta base con bifurcaciones independientes, enumeración de
+alternativas habilitadas y ejecución explícita sin consultar al
+scheduler.
 
 ### M9.1 --- Modelo de transiciones y estados clonables
 
@@ -726,34 +727,34 @@ internamente al scheduler y no expone las alternativas habilitadas.
     una decisión al scheduler.
 -   [x] Respetar exclusión durante `atomic` y cuerpos habilitados de
     `await`.
--   [ ] Clonar un estado intermedio completo sin compartir estructuras
+-   [x] Clonar un estado intermedio completo sin compartir estructuras
     mutables.
--   [ ] Verificar clonación durante funciones, loops, evaluaciones
+-   [x] Verificar clonación durante funciones, loops, evaluaciones
     suspendidas y microoperaciones.
 
 ### M9.2 --- Explorador acotado
 
--   [ ] Definir una clave canónica de estado que no incluya step ni
+-   [x] Definir una clave canónica de estado que no incluya step ni
     historiales crecientes.
 -   [ ] Incluir en la clave la metadata que afecte semántica o futuros
     diagnósticos.
--   [ ] Detectar estados repetidos mediante la clave canónica.
--   [ ] Explorar primero en anchura para priorizar contraejemplos cortos.
--   [ ] Limitar por separado profundidad y cantidad de estados.
--   [ ] Informar `FOUND`, `EXHAUSTED` o `TRUNCATED`.
--   [ ] Reportar cantidad de estados y transiciones exploradas.
+-   [x] Detectar estados repetidos mediante la clave canónica.
+-   [x] Explorar primero en anchura para priorizar contraejemplos cortos.
+-   [x] Limitar por separado profundidad y cantidad de estados.
+-   [x] Informar `FOUND`, `EXHAUSTED` o `TRUNCATED`.
+-   [x] Reportar cantidad de estados y transiciones exploradas.
 
 ### M9.3 --- Deadlock y contraejemplos reproducibles
 
--   [ ] Usar deadlock como primera propiedad buscable.
--   [ ] Encontrar un programa donde una traza termine y otra produzca
+-   [x] Usar deadlock como primera propiedad buscable.
+-   [x] Encontrar un programa donde una traza termine y otra produzca
     deadlock.
--   [ ] Guardar la secuencia exacta de elecciones de proceso.
--   [ ] Representar un contraejemplo con propiedad, profundidad, límites
+-   [x] Guardar la secuencia exacta de elecciones de proceso.
+-   [x] Representar un contraejemplo con propiedad, profundidad, límites
     y estado terminal.
--   [ ] Reproducir el contraejemplo forzando la secuencia guardada, sin
+-   [x] Reproducir el contraejemplo forzando la secuencia guardada, sin
     depender de una seed.
--   [ ] Mostrar en la UI el resultado, los límites y la reproducción paso
+-   [x] Mostrar en la UI el resultado, los límites y la reproducción paso
     a paso.
 
 ### M9.4 --- Propiedades adicionales

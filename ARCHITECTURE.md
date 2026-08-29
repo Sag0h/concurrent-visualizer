@@ -409,6 +409,7 @@ API principal:
 engine.step()
 engine.getEnabledTransitions()
 engine.stepTransition(transition)
+engine.fork()
 engine.reset()
 engine.getState()
 engine.getSnapshot()
@@ -432,6 +433,17 @@ Un proceso bloqueado en `await` o `P` puede aparecer como transición
 lógicamente habilitada sin que la enumeración cambie su estado. Si
 existe una región `atomic` activa y habilitada, sólo se expone su
 transición.
+
+`fork()` crea un nuevo engine desde el estado intermedio actual mediante
+`cloneExecutionState()`. Memoria, recursos, pilas, evaluaciones
+suspendidas, microoperaciones e historiales no comparten estructuras
+mutables con la rama original. El estado copiado se convierte en el
+punto de `reset()` de la nueva rama.
+
+El fork también clona el cursor o generador del scheduler para conservar
+el comportamiento de `step()` fuera del explorador. Ese estado de
+política es operativo y no formará parte de la futura clave semántica:
+la exploración usará transiciones explícitas.
 
 Antes de seleccionar el siguiente proceso, el engine puede reevaluar
 procesos bloqueados por mecanismos cuya condición haya cambiado.
@@ -935,7 +947,7 @@ bucle infinito es intencional o erróneo.
 Una ejecución correcta no demuestra que un programa concurrente sea
 correcto.
 
-M9 implementará exploración acotada, no verificación exhaustiva. La
+M9 implementa exploración acotada, no verificación exhaustiva. La
 ejecución interactiva seguirá usando schedulers; el explorador enumerará
 las elecciones habilitadas y ejecutará una transición explícita por
 rama.
@@ -957,6 +969,24 @@ descartarse si modifica la clasificación de accesos futuros. Antes de
 buscar propiedades de memoria deberá extraerse el contexto de análisis
 relevante o incluirlo explícitamente en la equivalencia.
 
+La primera implementación vive en `src/core/exploration/`:
+
+-   `SemanticExecutionState` proyecta y clona `Program`, que contiene
+    memoria, semáforos y todo el control mutable de los procesos;
+-   `ExecutionTrace` proyecta por separado step, eventos de instrucción
+    y microoperaciones;
+-   `createSemanticStateKey()` serializa `Program` ordenando las claves
+    de objetos y preservando el orden significativo de arrays;
+-   `VisitedStateRegistry` clasifica cada visita como `NEW` o
+    `REPEATED`.
+
+La clave excluye únicamente datos de traza; incluye instrucciones,
+funciones, memorias, recursos, program counters, frames, llamadas,
+evaluaciones pendientes, microoperaciones activas, atomicidad y razones
+de bloqueo. Por ahora se utilizará para exploración de deadlock. La
+metadata necesaria para diagnósticos de memoria sigue pendiente y no se
+deduplicará con esta clave hasta modelarla explícitamente.
+
 ### Modelo de transición
 
 La primera API de M9 separa selección y ejecución:
@@ -973,22 +1003,35 @@ depender de una seed.
 
 ### Estrategia y límites
 
-La primera versión usará búsqueda en anchura para favorecer
-contraejemplos cortos, con límites independientes de profundidad y
-cantidad de estados. El resultado distinguirá:
+`exploreForDeadlock()` usa búsqueda en anchura para favorecer
+contraejemplos cortos. Cada arista bifurca el engine y fuerza una
+transición; el engine suministrado permanece intacto. La búsqueda tiene
+límites independientes de profundidad y cantidad de estados y distingue:
 
 ``` text
 FOUND | EXHAUSTED | TRUNCATED
 ```
 
-`EXHAUSTED` sólo se refiere al espacio finito cubierto por la
-configuración. `TRUNCATED` nunca se presentará como prueba de ausencia de
-errores.
+`EXHAUSTED` indica que no quedan estados semánticos nuevos alcanzables
+dentro del modelo y los límites aplicables. `TRUNCATED` registra si se
+agotó profundidad, cantidad de estados o el límite de seguridad del
+engine, y nunca se presenta como prueba de ausencia de errores. El
+resultado informa estados visitados, transiciones ensayadas y máxima
+profundidad alcanzada.
 
-La primera propiedad será deadlock, porque su estado terminal ya posee
-una definición formal en M8. Un contraejemplo guardará la secuencia
-exacta de elecciones de proceso y podrá reproducirse forzando esas
-elecciones.
+La primera propiedad es deadlock, porque su estado terminal ya posee una
+definición formal en M8. `DeadlockCounterexample` conserva propiedad,
+profundidad, límites, secuencia exacta de procesos, claves de los estados
+inicial y terminal, estado terminal y diagnóstico. La reproducción
+parte de un fork, fuerza la secuencia y valida ambos extremos; no depende
+de una seed ni modifica el engine original.
+
+La UI conserva el engine origen junto al resultado. El panel permite
+configurar ambos límites, muestra estado, causas de truncamiento y
+estadísticas, y representa la secuencia de procesos del contraejemplo.
+La reproducción guiada avanza una elección explícita por vez sobre un
+fork del origen; la ejecución normal queda deshabilitada durante ese
+modo para evitar desviarse accidentalmente de la secuencia guardada.
 
 Violaciones observadas de exclusión mutua se integrarán después de
 resolver el estado de análisis. `POTENTIAL_RACE` no se convertirá en una

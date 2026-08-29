@@ -9,6 +9,13 @@ import { createScheduler } from './core/scheduler/createScheduler'
 import type { SchedulerType } from './core/scheduler/SchedulerType'
 import { formatExpression } from './core/expressions/formatExpression'
 import type { MemoryAccessConflict } from './core/engine/MemoryAccessConflict'
+import { exploreForDeadlock } from './core/exploration/exploreForDeadlock'
+import { replayDeadlockCounterexample } from './core/exploration/replayDeadlockCounterexample'
+import type {
+  DeadlockExplorationResult,
+  ExplorationLimits,
+} from './core/exploration/DeadlockExplorationResult'
+import { DeadlockExplorerPanel } from './components/DeadlockExplorerPanel'
 
 const initialCode = `shared int counter = 0;
 shared string message = "Concurrent Visualizer";
@@ -24,6 +31,11 @@ process P2 {
     value = value + 5;
     counter = counter + 1;
 }`
+
+interface ExplorationSession {
+  readonly originEngine: SimulationEngine
+  readonly result: DeadlockExplorationResult
+}
 
 function App() {
   const [code, setCode] = useState(initialCode)
@@ -52,6 +64,18 @@ function App() {
   const [isDirty, setIsDirty] = 
     useState(true)
 
+  const [explorationLimits, setExplorationLimits] =
+    useState<ExplorationLimits>({
+      maxDepth: 30,
+      maxStates: 1000,
+    })
+
+  const [explorationSession, setExplorationSession] =
+    useState<ExplorationSession | null>(null)
+
+  const [replayChoiceIndex, setReplayChoiceIndex] =
+    useState<number | null>(null)
+
   function handleBuild() {
     try {
         const program = parseProgram(code)
@@ -75,10 +99,14 @@ function App() {
         setSnapshot(newEngine.getSnapshot())
         setError(null)
         setIsDirty(false)
+        setExplorationSession(null)
+        setReplayChoiceIndex(null)
 
     } catch (buildError) {
       setEngine(null)
       setSnapshot(null)
+      setExplorationSession(null)
+      setReplayChoiceIndex(null)
 
       if (buildError instanceof Error) {
         setError(buildError.message)
@@ -92,6 +120,8 @@ function App() {
     setEngine(null)
     setSnapshot(null)
     setIsDirty(true)
+    setExplorationSession(null)
+    setReplayChoiceIndex(null)
   }
 
   function handleAddProcess() {
@@ -147,6 +177,21 @@ function App() {
 
   function handleReset() {
     if (!engine) {
+      return
+    }
+
+    if (
+      replayChoiceIndex !== null
+      && explorationSession
+    ) {
+      const replayEngine =
+        explorationSession.originEngine.fork()
+
+      setEngine(replayEngine)
+      setSnapshot(replayEngine.getSnapshot())
+      setReplayChoiceIndex(0)
+      setError(null)
+
       return
     }
 
@@ -219,6 +264,134 @@ function App() {
         engine.getSnapshot(),
       )
     }
+  }
+
+  function handleExploreDeadlock() {
+    if (!engine) {
+      return
+    }
+
+    try {
+      const originEngine = engine.fork()
+      const result = exploreForDeadlock(
+        originEngine,
+        explorationLimits,
+      )
+
+      setExplorationSession({
+        originEngine,
+        result,
+      })
+      setReplayChoiceIndex(null)
+      setError(null)
+    } catch (explorationError) {
+      setError(errorMessage(
+        explorationError,
+        'Unknown exploration error',
+      ))
+    }
+  }
+
+  function handleStartCounterexampleReplay() {
+    const counterexample =
+      explorationSession?.result.counterexample
+
+    if (!explorationSession || !counterexample) {
+      return
+    }
+
+    const replayEngine =
+      explorationSession.originEngine.fork()
+
+    setEngine(replayEngine)
+    setSnapshot(replayEngine.getSnapshot())
+    setReplayChoiceIndex(0)
+    setError(null)
+  }
+
+  function handleReplayNextChoice() {
+    const counterexample =
+      explorationSession?.result.counterexample
+
+    if (
+      !engine
+      || !counterexample
+      || replayChoiceIndex === null
+      || replayChoiceIndex
+        >= counterexample.processChoices.length
+    ) {
+      return
+    }
+
+    try {
+      const processId =
+        counterexample.processChoices[replayChoiceIndex]
+      const transition = engine
+        .getEnabledTransitions()
+        .find(
+          (candidate) =>
+            candidate.processId === processId,
+        )
+
+      if (!transition) {
+        throw new Error(
+          `Recorded process "${processId}" is not enabled`,
+        )
+      }
+
+      engine.stepTransition(transition)
+      setReplayChoiceIndex(replayChoiceIndex + 1)
+      setSnapshot(engine.getSnapshot())
+      setError(null)
+    } catch (replayError) {
+      setError(errorMessage(
+        replayError,
+        'Unknown replay error',
+      ))
+    }
+  }
+
+  function handleReplayAllChoices() {
+    const counterexample =
+      explorationSession?.result.counterexample
+
+    if (!explorationSession || !counterexample) {
+      return
+    }
+
+    try {
+      const replayEngine =
+        replayDeadlockCounterexample(
+          explorationSession.originEngine,
+          counterexample,
+        )
+
+      setEngine(replayEngine)
+      setSnapshot(replayEngine.getSnapshot())
+      setReplayChoiceIndex(
+        counterexample.processChoices.length,
+      )
+      setError(null)
+    } catch (replayError) {
+      setError(errorMessage(
+        replayError,
+        'Unknown replay error',
+      ))
+    }
+  }
+
+  function handleExitCounterexampleReplay() {
+    if (!explorationSession) {
+      return
+    }
+
+    const originEngine =
+      explorationSession.originEngine.fork()
+
+    setEngine(originEngine)
+    setSnapshot(originEngine.getSnapshot())
+    setReplayChoiceIndex(null)
+    setError(null)
   }
 
   function handleReplayDeadlock() {
@@ -675,6 +848,7 @@ function App() {
               onClick={handleStep}
               disabled={
                 !engine
+                || replayChoiceIndex !== null
                 || engine.isFinished()
                 || snapshot?.executionStatus
                   === 'DEADLOCK'
@@ -689,6 +863,7 @@ function App() {
               onClick={handleRun}
               disabled={
                 !engine
+                || replayChoiceIndex !== null
                 || engine.isFinished()
                 || snapshot?.executionStatus
                   === 'DEADLOCK'
@@ -709,7 +884,7 @@ function App() {
 
           {error && (
             <div className="error-box">
-              <strong>Build error</strong>
+              <strong>Error</strong>
               <pre>{error}</pre>
             </div>
           )}
@@ -757,6 +932,24 @@ function App() {
                   </strong>
                 </span>
               </section>
+
+              <DeadlockExplorerPanel
+                limits={explorationLimits}
+                result={
+                  explorationSession?.result ?? null
+                }
+                replayChoiceIndex={replayChoiceIndex}
+                onLimitsChange={setExplorationLimits}
+                onExplore={handleExploreDeadlock}
+                onStartReplay={
+                  handleStartCounterexampleReplay
+                }
+                onReplayNext={handleReplayNextChoice}
+                onReplayAll={handleReplayAllChoices}
+                onExitReplay={
+                  handleExitCounterexampleReplay
+                }
+              />
 
               <section>
                 <h2>Processes</h2>
@@ -948,9 +1141,15 @@ function App() {
 
                     <button
                       type="button"
-                      onClick={handleReplayDeadlock}
+                      onClick={
+                        replayChoiceIndex !== null
+                          ? handleReplayAllChoices
+                          : handleReplayDeadlock
+                      }
                     >
-                      Replay deadlock
+                      {replayChoiceIndex !== null
+                        ? 'Replay counterexample'
+                        : 'Replay deadlock'}
                     </button>
                   </div>
 
@@ -1812,6 +2011,15 @@ function schedulerLabel(
     case 'RANDOM':
       return 'Random'
   }
+}
+
+function errorMessage(
+  value: unknown,
+  fallback: string,
+): string {
+  return value instanceof Error
+    ? value.message
+    : fallback
 }
 
 export default App

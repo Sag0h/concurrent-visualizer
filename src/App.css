@@ -116,6 +116,235 @@ button:disabled {
   background: #fafafa;
 }
 
+.exploration-panel {
+  margin-bottom: 28px;
+  padding: 20px;
+  border: 1px solid #b9b2dc;
+  border-radius: 10px;
+  background: #faf9ff;
+}
+
+.exploration-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.exploration-header h2 {
+  margin: 7px 0 0;
+}
+
+.exploration-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: #5746a5;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.exploration-intro {
+  margin-bottom: 16px;
+  color: #58536d;
+  font-size: 14px;
+}
+
+.exploration-limit-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(150px, 210px));
+  gap: 12px;
+}
+
+.exploration-limit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #58536d;
+}
+
+.exploration-limit-grid input {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #b9b2dc;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.exploration-result {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.exploration-result-found {
+  color: #8f1d14;
+}
+
+.exploration-result-exhausted {
+  color: #246b3c;
+}
+
+.exploration-result-truncated {
+  color: #835400;
+}
+
+.exploration-result > p,
+.exploration-result-heading span,
+.exploration-statistics,
+.exploration-reasons {
+  color: #4f4f4f;
+}
+
+.exploration-result-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.exploration-result-heading > strong {
+  font-size: 17px;
+}
+
+.exploration-result-heading span {
+  font-size: 12px;
+}
+
+.exploration-statistics {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.exploration-statistics span {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f4f3f8;
+  font-size: 12px;
+}
+
+.exploration-statistics strong {
+  font-size: 15px;
+}
+
+.exploration-reasons {
+  margin-top: 14px;
+  font-size: 12px;
+}
+
+.exploration-reasons > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.exploration-reasons span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff1d6;
+  color: #754c00;
+  font-weight: 600;
+}
+
+.counterexample-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #e5aaa4;
+  border-radius: 8px;
+  color: #333;
+  background: #fff9f8;
+}
+
+.counterexample-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.counterexample-heading h3,
+.counterexample-heading p {
+  margin: 0;
+}
+
+.counterexample-heading p {
+  margin-top: 5px;
+  color: #6b4b47;
+  font-size: 13px;
+}
+
+.counterexample-kind {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #8f1d14;
+  background: #f8d7da;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.counterexample-sequence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.counterexample-choice {
+  min-width: 30px;
+  padding: 6px 9px;
+  border: 1px solid #d8c9c7;
+  border-radius: 6px;
+  background: #fff;
+  text-align: center;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.counterexample-choice-complete {
+  border-color: #7fb48e;
+  color: #1f6035;
+  background: #e6f4ea;
+}
+
+.counterexample-choice-next {
+  border: 2px solid #c97a21;
+  padding: 5px 8px;
+  color: #754c00;
+  background: #fff4df;
+}
+
+.counterexample-progress {
+  margin: 12px 0;
+  padding: 9px 11px;
+  border-left: 4px solid #5746a5;
+  color: #40366d;
+  background: #f1effc;
+  font-size: 13px;
+}
+
+.counterexample-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .process-grid {
   display: grid;
   grid-template-columns: repeat(
@@ -801,4 +1030,19 @@ h2 {
   border-top: 1px solid #eee2ca;
   color: #6b5a39;
   font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .exploration-header,
+  .counterexample-heading {
+    flex-direction: column;
+  }
+
+  .exploration-header button {
+    width: 100%;
+  }
+
+  .exploration-limit-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }

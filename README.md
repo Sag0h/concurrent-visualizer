@@ -42,9 +42,24 @@ violaciones observadas de exclusión mutua, busy waiting conservador,
 riesgo de starvation y un estado separado para ejecuciones que alcanzan
 el límite de pasos sin estar en deadlock.
 
-M9.1 ya comenzó separando la elección del scheduler de la transición del
+M9 separa la elección del scheduler de la transición del
 motor. El engine puede enumerar procesos habilitados y ejecutar una
 elección explícita sin modificar el comportamiento de `Step` y `Run`.
+También puede bifurcar un estado intermedio en ramas completamente
+independientes.
+
+La primera infraestructura de exploración ya separa el estado semántico
+de la traza y reconoce estados repetidos mediante una clave canónica.
+Esta equivalencia se limita inicialmente a la búsqueda de deadlock; los
+diagnósticos de memoria dependientes de historial requieren metadata
+adicional antes de poder deduplicarse.
+
+El núcleo ya puede recorrer interleavings mediante BFS acotada, encontrar
+el deadlock más corto dentro de los límites y devolver un contraejemplo
+reproducible. Distingue una propiedad encontrada, un espacio agotado y
+una búsqueda truncada. La interfaz permite ajustar ambos límites, iniciar
+la búsqueda desde el estado visible y reproducir el contraejemplo una
+elección de proceso por vez o de forma completa.
 
 ------------------------------------------------------------------------
 
@@ -494,7 +509,8 @@ src/
 │   ├── memory/
 │   ├── semaphores/
 │   ├── deadlock/
-│   └── diagnostics/
+│   ├── diagnostics/
+│   └── exploration/
 └── App.tsx
 ```
 
@@ -533,9 +549,9 @@ React visualiza el estado. La semántica vive en `core`.
 Los escenarios aleatorios pueden utilizar una seed para volver a
 ejecutar exactamente un comportamiento interesante o problemático.
 
-M9 ampliará esta garantía: los contraejemplos encontrados por el
-explorador guardarán la secuencia exacta de procesos elegidos y no
-dependerán de reconstruirla mediante una seed.
+Los contraejemplos encontrados por el explorador guardan la secuencia
+exacta de procesos elegidos y no dependen de reconstruirla mediante una
+seed. La reproducción valida el estado inicial y el deadlock terminal.
 
 ### Fidelidad académica
 
@@ -701,10 +717,9 @@ Entre los objetivos futuros se encuentran:
 -   monitores y variables condición;
 -   pasaje de mensajes;
 -   canales síncronos y asíncronos;
--   deadlock detection;
 -   análisis más preciso de race conditions;
--   exploración de múltiples interleavings;
--   reproducción de contraejemplos;
+-   visualización de la exploración de múltiples interleavings;
+-   reproducción visual paso a paso de contraejemplos;
 -   problemas clásicos expresados directamente en el lenguaje;
 -   visualizaciones educativas de procesos, recursos y comunicación.
 

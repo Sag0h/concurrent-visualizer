@@ -28,6 +28,7 @@ import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
 import type { ExecutionDiagnostic } from '../deadlock/DeadlockDiagnostic'
 import { analyzeRuntimeDiagnostics } from '../diagnostics/analyzeRuntimeDiagnostics'
 import type { EnabledTransition } from './EnabledTransition'
+import { cloneExecutionState } from './cloneExecutionState'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -42,7 +43,7 @@ export class SimulationEngine {
   ) {
     this.state = state
     this.scheduler = scheduler
-    this.initialState = structuredClone(state)
+    this.initialState = cloneExecutionState(state)
     this.maxSteps = maxSteps
   }
 
@@ -76,8 +77,18 @@ export class SimulationEngine {
   }
 
   reset(): void {
-    this.state = structuredClone(this.initialState)
+    this.state = cloneExecutionState(
+      this.initialState,
+    )
     this.scheduler.reset()
+  }
+
+  fork(): SimulationEngine {
+    return new SimulationEngine(
+      cloneExecutionState(this.state),
+      this.scheduler.clone(),
+      this.maxSteps,
+    )
   }
 
   hasReachedStepLimit(): boolean {

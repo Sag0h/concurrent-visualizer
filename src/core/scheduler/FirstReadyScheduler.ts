@@ -10,4 +10,8 @@ export class FirstReadyScheduler implements Scheduler {
   reset(): void {
     
   }
+
+  clone(): Scheduler {
+    return new FirstReadyScheduler()
+  }
 }
