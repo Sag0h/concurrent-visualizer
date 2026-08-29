@@ -26,9 +26,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** cerrar la separación del estado de análisis antes
-de decidir qué propiedad adicional de M9.4 puede explorarse sin mezclar
-metadata dependiente del historial con el estado semántico.
+**Próximo objetivo:** evaluar si las assertions explícitas sobre estados
+finales deben entrar en M9.4 o quedar como extensión futura del lenguaje;
+el resto de las propiedades previstas para M9 ya está implementado.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -1767,3 +1767,97 @@ se comprobaron un resultado truncado por profundidad, un espacio seguro
 agotado y la ausencia de errores de consola.
 
 **Estado:** M9.3 COMPLETADO.
+
+### M9.4 --- Interfaz extensible de propiedades
+
+Se extrajo `exploreExecution()` como BFS genérico. El algoritmo ya no
+conoce deadlock: recibe una `ExplorationProperty<Kind, Diagnostic>` y se
+encarga de ramas, límites, estados visitados, estadísticas y construcción
+del contraejemplo.
+
+Una propiedad define:
+
+-   su identificador estable;
+-   una evaluación pura del estado que devuelve diagnóstico o
+    `undefined`;
+-   opcionalmente, una clave extendida cuando necesita metadata de
+    análisis que la equivalencia semántica general no contiene.
+
+`VisitedStateRegistry` acepta ahora esa función de identidad. Sin una
+extensión conserva `createSemanticStateKey()` como comportamiento por
+defecto. Esto mantiene eficiente la búsqueda de deadlock y prepara una
+frontera explícita para propiedades dependientes de metadata adicional.
+
+`deadlockExplorationProperty` adapta el diagnóstico existente y
+`exploreForDeadlock()` queda como wrapper estable, por lo que la UI y la
+reproducción no cambiaron.
+
+Las pruebas agregadas usan una propiedad sintética diferente de deadlock,
+verifican que BFS encuentre su camino mínimo y demuestran que una
+propiedad puede distinguir estados semánticamente iguales mediante su
+metadata. Las regresiones completas de deadlock continúan pasando.
+
+La interfaz todavía no integra una propiedad de memoria. La sección
+siguiente resuelve primero su requisito de metadata; `POTENTIAL_RACE`
+continúa sin tratarse como violación formal.
+
+### M9.1/M9.2 --- Estado explícito de análisis
+
+`ExecutionState` incorpora `analysisState` como representación separada
+de `Program` y de las trazas. Su sección de memoria conserva únicamente:
+
+-   valores iniciales de los semáforos;
+-   operaciones `P` / `V` exitosas;
+-   microoperaciones `SHARED_READ` y `SHARED_WRITE`.
+
+El engine actualiza esta evidencia al mismo tiempo que registra el evento.
+Los snapshots calculan conflictos desde `analysisState`, por lo que ya no
+necesitan releer los historiales crudos. Los estados anteriores que no
+posean el campo se reconstruyen una sola vez para conservar compatibilidad.
+
+`ExplorationAnalysisState` ofrece una proyección desconectada y
+`createAnalyzedStateKey()` combina metadata y estado semántico. Deadlock
+continúa usando la clave pequeña de `Program`; una propiedad de memoria
+podrá optar por la clave analizada mediante `ExplorationProperty`.
+
+Las pruebas verifican filtrado de evidencia, reconstrucción de estados
+legados, independencia entre forks, proyecciones desconectadas y claves
+distintas ante contextos de análisis diferentes. También demuestran que
+los conflictos son idénticos aunque una copia pierda sus trazas crudas.
+
+Con esto quedan cerrados los tickets de separación de representaciones y
+metadata en la identidad. La próxima propiedad puede reutilizar el BFS
+sin deduplicar contextos de protección incompatibles.
+
+### M9.4 --- Violaciones observadas de exclusión mutua
+
+Se incorporó `mutualExclusionViolationProperty` sobre el BFS genérico.
+La propiedad usa `createAnalyzedStateKey()` y busca únicamente el
+diagnóstico estructurado `MUTUAL_EXCLUSION_VIOLATION` con razón
+`OBSERVED_MUTEX_OVERLAP`. Un conflicto que sólo sea `POTENTIAL_RACE` no
+se transforma en una violación formal.
+
+`exploreForMutualExclusionViolation()` ofrece la API tipada y
+`replayCounterexample()` concentra la reproducción exacta para cualquier
+propiedad. Los wrappers de deadlock y exclusión mutua validan que el
+estado terminal vuelva a producir su diagnóstico al forzar las mismas
+elecciones de proceso.
+
+El panel de exploración ahora permite elegir entre `Deadlock` y
+`Observed mutex violation`. Para el segundo caso muestra la ubicación,
+los procesos involucrados y los mutex incompatibles, además del camino
+mínimo y las estadísticas comunes. Durante la reproducción guiada quedan
+bloqueados los controles que podrían cambiar la búsqueda.
+
+Las pruebas cubren cuatro fronteras importantes:
+
+-   dos procesos que protegen `value` con mutex distintos encuentran el
+    contraejemplo mínimo de profundidad 6;
+-   ese camino se reproduce exactamente;
+-   ambos procesos usando el mismo mutex agotan el espacio sin violación;
+-   accesos sin protección continúan como `POTENTIAL_RACE` y no satisfacen
+    esta propiedad.
+
+La verificación visual reprodujo el camino `P1 P1 P1 P1 P2 P2`. Al sexto
+paso, el historial de microoperaciones y el análisis de memoria mostraron
+una violación sobre `value`, con `mutexA` frente a `mutexB`.

@@ -48,18 +48,32 @@ elección explícita sin modificar el comportamiento de `Step` y `Run`.
 También puede bifurcar un estado intermedio en ramas completamente
 independientes.
 
-La primera infraestructura de exploración ya separa el estado semántico
-de la traza y reconoce estados repetidos mediante una clave canónica.
-Esta equivalencia se limita inicialmente a la búsqueda de deadlock; los
-diagnósticos de memoria dependientes de historial requieren metadata
-adicional antes de poder deduplicarse.
+La infraestructura de exploración separa estado semántico, metadata de
+análisis y traza. Reconoce estados repetidos con una clave canónica y
+puede ampliar esa identidad para propiedades cuyo diagnóstico depende de
+la evidencia de sincronización acumulada.
 
 El núcleo ya puede recorrer interleavings mediante BFS acotada, encontrar
-el deadlock más corto dentro de los límites y devolver un contraejemplo
-reproducible. Distingue una propiedad encontrada, un espacio agotado y
-una búsqueda truncada. La interfaz permite ajustar ambos límites, iniciar
-la búsqueda desde el estado visible y reproducir el contraejemplo una
-elección de proceso por vez o de forma completa.
+el contraejemplo más corto dentro de los límites para deadlock o una
+violación observada de exclusión mutua. Distingue una propiedad
+encontrada, un espacio agotado y una búsqueda truncada. La interfaz
+permite elegir la propiedad, ajustar ambos límites, iniciar la búsqueda
+desde el estado visible y reproducir el contraejemplo una elección de
+proceso por vez o de forma completa.
+
+El BFS ya no está acoplado a deadlock: una interfaz de propiedad permite
+reutilizar recorrido, límites, deduplicación y contraejemplos. Cada nueva
+propiedad puede ampliar la identidad del estado con su metadata de
+análisis. Deadlock usa solamente el estado semántico; exclusión mutua usa
+además la evidencia de accesos y semáforos.
+
+La evidencia necesaria para analizar memoria ya vive en un estado
+separado de la traza completa. El motor conserva solamente operaciones de
+semáforo exitosas y accesos compartidos relevantes, los clona en cada
+rama y ofrece una clave analizada para propiedades que dependan de ese
+contexto. La búsqueda de exclusión mutua sólo acepta solapamientos
+observados con mutex incompatibles; una advertencia `POTENTIAL_RACE` por
+sí sola no se presenta como infracción demostrada.
 
 ------------------------------------------------------------------------
 

@@ -719,7 +719,7 @@ scheduler.
 
 ### M9.1 --- Modelo de transiciones y estados clonables
 
--   [ ] Separar estado semántico, metadata de análisis y traza.
+-   [x] Separar estado semántico, metadata de análisis y traza.
 -   [x] Definir `EnabledTransition` con la elección ejecutable de un
     proceso.
 -   [x] Enumerar las transiciones habilitadas sin modificar el estado.
@@ -736,7 +736,7 @@ scheduler.
 
 -   [x] Definir una clave canónica de estado que no incluya step ni
     historiales crecientes.
--   [ ] Incluir en la clave la metadata que afecte semántica o futuros
+-   [x] Incluir en la clave la metadata que afecte semántica o futuros
     diagnósticos.
 -   [x] Detectar estados repetidos mediante la clave canónica.
 -   [x] Explorar primero en anchura para priorizar contraejemplos cortos.
@@ -759,14 +759,14 @@ scheduler.
 
 ### M9.4 --- Propiedades adicionales
 
--   [ ] Definir una interfaz extensible para propiedades de exploración.
--   [ ] Integrar violaciones observadas de exclusión mutua cuando el
+-   [x] Definir una interfaz extensible para propiedades de exploración.
+-   [x] Integrar violaciones observadas de exclusión mutua cuando el
     estado de análisis pueda clonarse y compararse correctamente.
 -   [ ] Evaluar assertions explícitas sobre estados finales como
     extensión futura del lenguaje.
--   [ ] Mantener `POTENTIAL_RACE` como observación educativa y no como
+-   [x] Mantener `POTENTIAL_RACE` como observación educativa y no como
     violación formal.
--   [ ] No presentar una búsqueda acotada como prueba de ausencia de
+-   [x] No presentar una búsqueda acotada como prueba de ausencia de
     errores cuando el resultado sea `TRUNCATED`.
 
 ### Fuera del alcance inicial

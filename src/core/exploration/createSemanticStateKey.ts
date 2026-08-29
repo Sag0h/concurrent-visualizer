@@ -3,10 +3,12 @@ import type { ExecutionState } from '../engine/ExecutionState'
 export function createSemanticStateKey(
   state: ExecutionState,
 ): string {
-  return stableSerialize(state.program)
+  return createCanonicalValueKey(state.program)
 }
 
-function stableSerialize(value: unknown): string {
+export function createCanonicalValueKey(
+  value: unknown,
+): string {
   return JSON.stringify(normalize(value))
 }
 

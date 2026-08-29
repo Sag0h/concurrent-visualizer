@@ -1033,6 +1033,31 @@ conservar `step()`, pero esa copia no integra el estado semántico ni su
 clave canónica. El explorador continúa dependiendo de elecciones
 explícitas.
 
+El algoritmo BFS será independiente de la propiedad concreta.
+`ExplorationProperty` identifica la violación, evalúa un estado y puede
+extender la función de equivalencia con metadata de análisis propia. La
+clave semántica de `Program` continúa siendo el valor por defecto;
+deadlock se ofrece como una propiedad y un wrapper específicos. Una
+propiedad no podrá reutilizar la clave por defecto si su resultado futuro
+depende de información que esa clave omite.
+
+La metadata de memoria se almacenará explícitamente en
+`ExecutionAnalysisState`, separada de la traza explicativa. Sólo retendrá
+valores iniciales de semáforos, operaciones exitosas de sincronización y
+accesos compartidos. El engine la actualizará junto con los eventos y los
+forks la clonarán estructuralmente. Una clave analizada combinará esta
+metadata con `Program`; deadlock conservará la clave semántica más pequeña.
+
+La segunda propiedad buscable será la violación observada de exclusión
+mutua ya definida por M8. Usará la clave analizada y sólo aceptará el
+diagnóstico estructurado `MUTUAL_EXCLUSION_VIOLATION` con razón
+`OBSERVED_MUTEX_OVERLAP`. Un conflicto clasificado únicamente como
+`POTENTIAL_RACE` seguirá siendo evidencia educativa y no un fallo formal.
+
+La reproducción se generalizará en una operación común que fuerce la
+secuencia guardada y vuelva a evaluar la propiedad terminal; los wrappers
+tipados conservarán APIs explícitas para cada diagnóstico.
+
 **Motivo:** obtener contraejemplos cortos y educativos sin presentar una
 búsqueda finita como model checking exhaustivo ni acoplar la semántica a
 una política particular de scheduling.

@@ -21,6 +21,7 @@ import type { MemoryLocation } from '../memory/MemoryLocation'
 import { findMemoryAccessConflicts } from './findMemoryAccessConflicts'
 import { summarizeMemoryAccessConflicts } from './summarizeMemoryAccessConflicts'
 import type {
+  ExecutionEvent,
   LoopConditionExecutionEvent,
   SemaphoreExecutionEvent,
 } from './ExecutionEvent'
@@ -29,6 +30,11 @@ import type { ExecutionDiagnostic } from '../deadlock/DeadlockDiagnostic'
 import { analyzeRuntimeDiagnostics } from '../diagnostics/analyzeRuntimeDiagnostics'
 import type { EnabledTransition } from './EnabledTransition'
 import { cloneExecutionState } from './cloneExecutionState'
+import {
+  reconstructExecutionAnalysisState,
+  recordExecutionAnalysisEvent,
+  recordMicroOperationAnalysisEvent,
+} from './ExecutionAnalysisState'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -42,6 +48,8 @@ export class SimulationEngine {
     maxSteps: number = 10_000,
   ) {
     this.state = state
+    this.state.analysisState ??=
+      reconstructExecutionAnalysisState(this.state)
     this.scheduler = scheduler
     this.initialState = cloneExecutionState(state)
     this.maxSteps = maxSteps
@@ -756,7 +764,7 @@ export class SimulationEngine {
 
     }
 
-    this.state.history.push({
+    const executionEvent: ExecutionEvent = {
       step: this.state.stepCount + 1,
       processId: process.id,
       instructionType: instruction.type,
@@ -764,7 +772,13 @@ export class SimulationEngine {
       semaphoreEvent,
       loopConditionEvent,
       description: executionDescription,
-    })
+    }
+
+    this.state.history.push(executionEvent)
+    recordExecutionAnalysisEvent(
+      this.getAnalysisState(),
+      executionEvent,
+    )
 
     this.state.stepCount++
 
@@ -790,23 +804,17 @@ export class SimulationEngine {
   getSnapshot(): SimulationSnapshot {
     const executionDiagnostic =
       this.getExecutionDiagnostic()
-    const initialSemaphoreValues =
-      Object.fromEntries(
-        Object.values(
-          this.initialState.program.semaphores
-          ?? {},
-        ).map((semaphore) => [
-          semaphore.name,
-          semaphore.value,
-        ]),
-      )
+    const memoryAnalysis =
+      this.getAnalysisState().memory
 
     const memoryAccessConflicts =
       findMemoryAccessConflicts(
-        this.state.microOperationHistory ?? [],
+        memoryAnalysis.memoryAccessEvents,
         {
-          executionHistory: this.state.history,
-          initialSemaphoreValues,
+          executionHistory:
+            memoryAnalysis.semaphoreEvents,
+          initialSemaphoreValues:
+            memoryAnalysis.initialSemaphoreValues,
         },
       )
     return {
@@ -2967,7 +2975,7 @@ export class SimulationEngine {
   ): void {
     this.state.microOperationHistory ??= []
 
-    this.state.microOperationHistory.push({
+    const event = {
       step: this.state.stepCount + 1,
       processId: process.id,
       type,
@@ -2977,7 +2985,22 @@ export class SimulationEngine {
           ? structuredClone(location)
           : undefined,
       atomicDepth: process.atomicDepth,
-    })
+    }
+
+    this.state.microOperationHistory.push(event)
+    recordMicroOperationAnalysisEvent(
+      this.getAnalysisState(),
+      event,
+    )
+  }
+
+  private getAnalysisState(): NonNullable<
+    ExecutionState['analysisState']
+  > {
+    this.state.analysisState ??=
+      reconstructExecutionAnalysisState(this.state)
+
+    return this.state.analysisState
   }
 
   private resolveMicroOperationTargetLocation(

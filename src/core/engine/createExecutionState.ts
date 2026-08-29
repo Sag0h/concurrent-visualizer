@@ -1,5 +1,6 @@
 import type { Program } from './Program'
 import type { ExecutionState } from './ExecutionState'
+import { createInitialExecutionAnalysisState } from './ExecutionAnalysisState'
 
 export function createExecutionState(
   program: Program,
@@ -8,5 +9,7 @@ export function createExecutionState(
     program,
     stepCount: 0,
     history: [],
+    analysisState:
+      createInitialExecutionAnalysisState(program),
   }
 }

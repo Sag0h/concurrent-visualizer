@@ -8,6 +8,8 @@ import { createSemanticStateKey } from '../createSemanticStateKey'
 import { projectExecutionTrace } from '../ExecutionTrace'
 import { projectSemanticExecutionState } from '../SemanticExecutionState'
 import { VisitedStateRegistry } from '../VisitedStateRegistry'
+import { createAnalyzedStateKey } from '../createAnalyzedStateKey'
+import { projectExplorationAnalysisState } from '../ExplorationAnalysisState'
 
 function createEngine(source: string): SimulationEngine {
   return new SimulationEngine(
@@ -72,6 +74,66 @@ describe('semantic exploration state', () => {
       engine.getState().program.sharedMemory.value,
     ).toBe(1)
     expect(engine.getState().history).toEqual([])
+  })
+
+  it('returns a detached analysis projection', () => {
+    const engine = createEngine(`
+      sem mutex = 1;
+
+      process P1 {
+        P(mutex);
+      }
+    `)
+
+    engine.step()
+
+    const analysis = projectExplorationAnalysisState(
+      engine.getState(),
+    )
+
+    analysis.memory.semaphoreEvents.length = 0
+    analysis.memory.initialSemaphoreValues.mutex = 99
+
+    expect(
+      engine.getState().analysisState
+        ?.memory.semaphoreEvents,
+    ).toHaveLength(1)
+    expect(
+      engine.getState().analysisState
+        ?.memory.initialSemaphoreValues.mutex,
+    ).toBe(1)
+  })
+
+  it('includes analysis metadata only in the analyzed-state key', () => {
+    const engine = createEngine(`
+      sem mutex = 1;
+
+      process P1 { }
+    `)
+    const first = cloneExecutionState(
+      engine.getState(),
+    )
+    const second = cloneExecutionState(first)
+
+    second.analysisState?.memory.semaphoreEvents.push({
+      step: 1,
+      processId: 'P1',
+      instructionType: 'SEMAPHORE_P',
+      semaphoreEvent: {
+        operation: 'P',
+        semaphoreName: 'mutex',
+        status: 'SUCCEEDED',
+        valueBefore: 1,
+        valueAfter: 0,
+      },
+    })
+
+    expect(createSemanticStateKey(second)).toBe(
+      createSemanticStateKey(first),
+    )
+    expect(createAnalyzedStateKey(second)).not.toBe(
+      createAnalyzedStateKey(first),
+    )
   })
 
   it('normalizes object key order', () => {

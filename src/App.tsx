@@ -15,7 +15,13 @@ import type {
   DeadlockExplorationResult,
   ExplorationLimits,
 } from './core/exploration/DeadlockExplorationResult'
-import { DeadlockExplorerPanel } from './components/DeadlockExplorerPanel'
+import { exploreForMutualExclusionViolation } from './core/exploration/exploreForMutualExclusionViolation'
+import { replayMutualExclusionViolationCounterexample } from './core/exploration/replayMutualExclusionViolationCounterexample'
+import type { MutualExclusionViolationExplorationResult } from './core/exploration/MutualExclusionViolationExplorationResult'
+import {
+  ExplorationPanel,
+  type ExplorationTarget,
+} from './components/ExplorationPanel'
 
 const initialCode = `shared int counter = 0;
 shared string message = "Concurrent Visualizer";
@@ -32,10 +38,19 @@ process P2 {
     counter = counter + 1;
 }`
 
-interface ExplorationSession {
-  readonly originEngine: SimulationEngine
-  readonly result: DeadlockExplorationResult
-}
+type ExplorationSession =
+  | {
+      readonly target: 'DEADLOCK'
+      readonly originEngine: SimulationEngine
+      readonly result: DeadlockExplorationResult
+    }
+  | {
+      readonly target:
+        'MUTUAL_EXCLUSION_VIOLATION'
+      readonly originEngine: SimulationEngine
+      readonly result:
+        MutualExclusionViolationExplorationResult
+    }
 
 function App() {
   const [code, setCode] = useState(initialCode)
@@ -69,6 +84,9 @@ function App() {
       maxDepth: 30,
       maxStates: 1000,
     })
+
+  const [explorationTarget, setExplorationTarget] =
+    useState<ExplorationTarget>('DEADLOCK')
 
   const [explorationSession, setExplorationSession] =
     useState<ExplorationSession | null>(null)
@@ -266,22 +284,34 @@ function App() {
     }
   }
 
-  function handleExploreDeadlock() {
+  function handleExplore() {
     if (!engine) {
       return
     }
 
     try {
       const originEngine = engine.fork()
-      const result = exploreForDeadlock(
-        originEngine,
-        explorationLimits,
-      )
-
-      setExplorationSession({
-        originEngine,
-        result,
-      })
+      if (explorationTarget === 'DEADLOCK') {
+        setExplorationSession({
+          target: 'DEADLOCK',
+          originEngine,
+          result: exploreForDeadlock(
+            originEngine,
+            explorationLimits,
+          ),
+        })
+      } else {
+        setExplorationSession({
+          target:
+            'MUTUAL_EXCLUSION_VIOLATION',
+          originEngine,
+          result:
+            exploreForMutualExclusionViolation(
+              originEngine,
+              explorationLimits,
+            ),
+        })
+      }
       setReplayChoiceIndex(null)
       setError(null)
     } catch (explorationError) {
@@ -352,25 +382,48 @@ function App() {
   }
 
   function handleReplayAllChoices() {
-    const counterexample =
-      explorationSession?.result.counterexample
-
-    if (!explorationSession || !counterexample) {
+    if (!explorationSession) {
       return
     }
 
     try {
-      const replayEngine =
-        replayDeadlockCounterexample(
+      let replayEngine: SimulationEngine
+      let choiceCount: number
+
+      if (explorationSession.target === 'DEADLOCK') {
+        const counterexample =
+          explorationSession.result.counterexample
+
+        if (!counterexample) {
+          return
+        }
+
+        replayEngine = replayDeadlockCounterexample(
           explorationSession.originEngine,
           counterexample,
         )
+        choiceCount =
+          counterexample.processChoices.length
+      } else {
+        const counterexample =
+          explorationSession.result.counterexample
+
+        if (!counterexample) {
+          return
+        }
+
+        replayEngine =
+          replayMutualExclusionViolationCounterexample(
+            explorationSession.originEngine,
+            counterexample,
+          )
+        choiceCount =
+          counterexample.processChoices.length
+      }
 
       setEngine(replayEngine)
       setSnapshot(replayEngine.getSnapshot())
-      setReplayChoiceIndex(
-        counterexample.processChoices.length,
-      )
+      setReplayChoiceIndex(choiceCount)
       setError(null)
     } catch (replayError) {
       setError(errorMessage(
@@ -392,6 +445,14 @@ function App() {
     setSnapshot(originEngine.getSnapshot())
     setReplayChoiceIndex(null)
     setError(null)
+  }
+
+  function handleExplorationTargetChange(
+    target: ExplorationTarget,
+  ) {
+    setExplorationTarget(target)
+    setExplorationSession(null)
+    setReplayChoiceIndex(null)
   }
 
   function handleReplayDeadlock() {
@@ -933,14 +994,18 @@ function App() {
                 </span>
               </section>
 
-              <DeadlockExplorerPanel
+              <ExplorationPanel
+                target={explorationTarget}
                 limits={explorationLimits}
                 result={
                   explorationSession?.result ?? null
                 }
                 replayChoiceIndex={replayChoiceIndex}
+                onTargetChange={
+                  handleExplorationTargetChange
+                }
                 onLimitsChange={setExplorationLimits}
-                onExplore={handleExploreDeadlock}
+                onExplore={handleExplore}
                 onStartReplay={
                   handleStartCounterexampleReplay
                 }

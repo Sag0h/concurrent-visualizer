@@ -179,6 +179,22 @@ button:disabled {
   font-size: 14px;
 }
 
+.exploration-property-control select {
+  width: 100%;
+  border-color: #b9b2dc;
+  font-size: 14px;
+  text-transform: none;
+}
+
+.exploration-scope-note {
+  margin: 14px 0 0;
+  padding: 9px 11px;
+  border-left: 4px solid #5746a5;
+  color: #40366d;
+  background: #f1effc;
+  font-size: 12px;
+}
+
 .exploration-result {
   margin-top: 18px;
   padding: 16px;
@@ -295,6 +311,22 @@ button:disabled {
   color: #8f1d14;
   background: #f8d7da;
   font-size: 11px;
+  font-weight: 700;
+}
+
+.counterexample-evidence {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #ecd2cf;
+  border-radius: 6px;
+  background: #fff;
+  color: #5d4542;
+  font-size: 12px;
+}
+
+.counterexample-evidence code {
   font-weight: 700;
 }
 

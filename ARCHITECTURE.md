@@ -969,10 +969,15 @@ descartarse si modifica la clasificación de accesos futuros. Antes de
 buscar propiedades de memoria deberá extraerse el contexto de análisis
 relevante o incluirlo explícitamente en la equivalencia.
 
-La primera implementación vive en `src/core/exploration/`:
+Las representaciones implementadas son:
 
 -   `SemanticExecutionState` proyecta y clona `Program`, que contiene
     memoria, semáforos y todo el control mutable de los procesos;
+-   `ExecutionAnalysisState` conserva por separado la evidencia mínima
+    utilizada por el diagnóstico de memoria: valores iniciales de
+    semáforo, transiciones exitosas `P` / `V` y accesos compartidos;
+-   `ExplorationAnalysisState` proyecta esa metadata sin compartir
+    estructuras mutables;
 -   `ExecutionTrace` proyecta por separado step, eventos de instrucción
     y microoperaciones;
 -   `createSemanticStateKey()` serializa `Program` ordenando las claves
@@ -980,12 +985,22 @@ La primera implementación vive en `src/core/exploration/`:
 -   `VisitedStateRegistry` clasifica cada visita como `NEW` o
     `REPEATED`.
 
-La clave excluye únicamente datos de traza; incluye instrucciones,
+La clave semántica excluye únicamente datos de traza y análisis; incluye instrucciones,
 funciones, memorias, recursos, program counters, frames, llamadas,
 evaluaciones pendientes, microoperaciones activas, atomicidad y razones
-de bloqueo. Por ahora se utilizará para exploración de deadlock. La
-metadata necesaria para diagnósticos de memoria sigue pendiente y no se
-deduplicará con esta clave hasta modelarla explícitamente.
+de bloqueo. Deadlock utiliza esta equivalencia.
+
+`createAnalyzedStateKey()` combina el mismo estado semántico con
+`ExecutionAnalysisState`. Una propiedad cuyo resultado dependa de
+evidencia anterior debe elegir esta clave mediante `createStateKey`; así
+dos estados con el mismo runtime pero distinto contexto de protección no
+se deduplican incorrectamente.
+
+El engine actualiza la metadata al registrar cada transición exitosa de
+semáforo y cada lectura/escritura compartida. `getSnapshot()` calcula los
+conflictos desde esta representación, no desde `history` y
+`microOperationHistory`. Estados legados sin el campo pueden reconstruirlo
+una vez desde sus trazas para conservar compatibilidad.
 
 ### Modelo de transición
 
@@ -1003,8 +1018,23 @@ depender de una seed.
 
 ### Estrategia y límites
 
-`exploreForDeadlock()` usa búsqueda en anchura para favorecer
-contraejemplos cortos. Cada arista bifurca el engine y fuerza una
+`exploreExecution()` concentra la búsqueda en anchura. Recibe una
+`ExplorationProperty<Kind, Diagnostic>` que declara un identificador y
+una evaluación pura de estado. El BFS construye de forma genérica el
+contraejemplo, sus límites, camino, estados extremos y diagnóstico.
+
+Una propiedad puede suministrar `createStateKey()` cuando su evaluación
+dependa de metadata de análisis adicional. Si no lo hace, se utiliza la
+clave semántica de `Program`. Esto permite extender la equivalencia de
+estados por propiedad sin contaminar el modelo general con el historial
+completo.
+
+`exploreForDeadlock()` permanece como API específica y delega en el BFS
+genérico mediante `deadlockExplorationProperty`.
+`exploreForMutualExclusionViolation()` hace lo mismo con
+`mutualExclusionViolationProperty`, que opta por
+`createAnalyzedStateKey()` porque su resultado depende de la evidencia
+de protección acumulada. Cada arista bifurca el engine y fuerza una
 transición; el engine suministrado permanece intacto. La búsqueda tiene
 límites independientes de profundidad y cantidad de estados y distingue:
 
@@ -1019,25 +1049,33 @@ engine, y nunca se presenta como prueba de ausencia de errores. El
 resultado informa estados visitados, transiciones ensayadas y máxima
 profundidad alcanzada.
 
-La primera propiedad es deadlock, porque su estado terminal ya posee una
-definición formal en M8. `DeadlockCounterexample` conserva propiedad,
-profundidad, límites, secuencia exacta de procesos, claves de los estados
-inicial y terminal, estado terminal y diagnóstico. La reproducción
-parte de un fork, fuerza la secuencia y valida ambos extremos; no depende
-de una seed ni modifica el engine original.
+La primera propiedad fue deadlock, porque su estado terminal ya poseía
+una definición formal en M8. La segunda es una violación observada de
+exclusión mutua. Sólo acepta el diagnóstico estructurado
+`MUTUAL_EXCLUSION_VIOLATION` con razón `OBSERVED_MUTEX_OVERLAP`: no eleva
+un `POTENTIAL_RACE` ordinario a violación demostrada.
+
+Cada contraejemplo conserva propiedad, profundidad, límites, secuencia
+exacta de procesos, claves de los estados inicial y terminal, estado
+terminal y diagnóstico. `replayCounterexample()` concentra la
+reproducción común: parte de un fork, fuerza la secuencia, vuelve a
+evaluar la propiedad y valida ambos extremos. Los wrappers tipados de
+deadlock y exclusión mutua no dependen de una seed ni modifican el engine
+original.
 
 La UI conserva el engine origen junto al resultado. El panel permite
-configurar ambos límites, muestra estado, causas de truncamiento y
-estadísticas, y representa la secuencia de procesos del contraejemplo.
+elegir la propiedad, configurar ambos límites, muestra estado, causas de
+truncamiento y estadísticas, y representa la secuencia de procesos del
+contraejemplo. Para exclusión mutua agrega ubicación, procesos y mutex
+incompatibles como evidencia.
 La reproducción guiada avanza una elección explícita por vez sobre un
 fork del origen; la ejecución normal queda deshabilitada durante ese
 modo para evitar desviarse accidentalmente de la secuencia guardada.
 
-Violaciones observadas de exclusión mutua se integrarán después de
-resolver el estado de análisis. `POTENTIAL_RACE` no se convertirá en una
-violación formal. La prueba de starvation/terminación, happens-before,
-partial-order reduction y el grafo visual completo quedan fuera del
-alcance inicial.
+Las assertions explícitas sobre estados finales permanecen como posible
+extensión del lenguaje. La prueba de starvation/terminación,
+happens-before, partial-order reduction y el grafo visual completo quedan
+fuera del alcance inicial.
 
 ## 22. Problemas clásicos
 
