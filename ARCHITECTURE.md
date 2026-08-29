@@ -360,8 +360,13 @@ interleavings.
 
 `SimulationSnapshot` expone una representación segura para la UI.
 Actualmente incluye memoria, procesos, `blockingReason`, call stacks,
-historial de microoperaciones, análisis de conflictos y snapshots de
-semáforos.
+historial de microoperaciones, snapshots de semáforos, estado global,
+deadlock, diagnósticos de liveness y análisis/resúmenes de conflictos de
+memoria.
+
+El snapshot de UI no debe convertirse en el estado de búsqueda de M9.
+Omite deliberadamente detalles internos del runtime y contiene datos
+derivados para presentación.
 
 Cada `SemaphoreSnapshot` contiene nombre, valor actual y los ids de los
 procesos actualmente bloqueados en `P` sobre ese recurso. Esta última
@@ -388,6 +393,11 @@ del scheduler. Estar `READY` significa ser elegible para ejecutar; no
 implica haber reservado una condición o recurso.
 
 Esto es fundamental tanto para `await` como para semáforos.
+
+En la ejecución interactiva el scheduler seguirá siendo una política
+externa que elige entre transiciones habilitadas. M9 deberá permitir que
+el explorador fuerce una elección concreta sin incorporar el cursor de
+Round Robin o el generador aleatorio al estado semántico del programa.
 
 ## 12. SimulationEngine
 
@@ -788,8 +798,9 @@ necesarios, monitores, pasaje de mensajes y tiempo simulado.
 
 ## 20. Análisis de errores
 
-La base detecta conflictos observados sobre memoria compartida y M8
-agrega diagnóstico de deadlock sobre el estado alcanzado.
+M8 detecta conflictos observados sobre memoria compartida, deadlock,
+violaciones observadas de exclusión mutua y síntomas conservadores de
+liveness sobre el estado y la traza alcanzados.
 
 El progreso global se clasifica como:
 
@@ -905,12 +916,66 @@ bucle infinito es intencional o erróneo.
 Una ejecución correcta no demuestra que un programa concurrente sea
 correcto.
 
-El sistema deberá explorar eventualmente elecciones alternativas del
-scheduler, detectar estados repetidos y producir contraejemplos
-reproducibles.
+M9 implementará exploración acotada, no verificación exhaustiva. La
+ejecución interactiva seguirá usando schedulers; el explorador enumerará
+las elecciones habilitadas y ejecutará una transición explícita por
+rama.
 
-Las seeds y los historiales detallados existentes son fundamentos para
-esa funcionalidad.
+### Separación de representaciones
+
+La exploración necesita distinguir:
+
+-   estado semántico: memoria, recursos y control de cada proceso;
+-   estado de análisis: metadata que pueda afectar diagnósticos futuros;
+-   traza: elecciones y eventos utilizados para explicar/reproducir el
+    camino;
+-   snapshot: proyección segura y derivada para la interfaz.
+
+El historial completo y `stepCount` no pueden formar parte de la clave
+canónica: crecen en cada transición e impedirían reconocer un ciclo. Al
+mismo tiempo, la metadata reconstruida desde `P` / `V` no puede
+descartarse si modifica la clasificación de accesos futuros. Antes de
+buscar propiedades de memoria deberá extraerse el contexto de análisis
+relevante o incluirlo explícitamente en la equivalencia.
+
+### Modelo de transición
+
+La API objetivo separará selección y ejecución conceptualmente:
+
+``` ts
+engine.getEnabledTransitions()
+engine.stepTransition(transition)
+```
+
+Una transición identifica como mínimo el proceso seleccionado y respeta
+la continuidad de regiones `atomic`. El scheduler normal podrá elegir
+una de estas transiciones; el explorador podrá probarlas todas sin
+depender de una seed.
+
+### Estrategia y límites
+
+La primera versión usará búsqueda en anchura para favorecer
+contraejemplos cortos, con límites independientes de profundidad y
+cantidad de estados. El resultado distinguirá:
+
+``` text
+FOUND | EXHAUSTED | TRUNCATED
+```
+
+`EXHAUSTED` sólo se refiere al espacio finito cubierto por la
+configuración. `TRUNCATED` nunca se presentará como prueba de ausencia de
+errores.
+
+La primera propiedad será deadlock, porque su estado terminal ya posee
+una definición formal en M8. Un contraejemplo guardará la secuencia
+exacta de elecciones de proceso y podrá reproducirse forzando esas
+elecciones.
+
+Violaciones observadas de exclusión mutua se integrarán después de
+resolver el estado de análisis. `POTENTIAL_RACE` no se convertirá en una
+violación formal. La prueba de starvation/terminación, happens-before,
+partial-order reduction y el grafo visual completo quedan fuera del
+alcance inicial.
 
 ## 22. Problemas clásicos
 
@@ -941,12 +1006,10 @@ El material histórico puede orientar extensibilidad, pero las decisiones
 semánticas concretas deben contrastarse con el enfoque vigente de la
 cátedra.
 
-Actualmente `await` está completado y semáforos se encuentra en
-desarrollo.
+Actualmente `await`, semáforos y los diagnósticos de M8 están
+completados. M9 continúa sobre el mismo núcleo con exploración acotada de
+interleavings y contraejemplos reproducibles.
 
-El próximo trabajo de M7 es validar la implementación mediante casos
-académicos expresados como programas normales del lenguaje.
-
-Estos cambios deben reutilizar el núcleo existente de procesos,
-scheduling, bloqueo, historial, snapshots y análisis, sin crear un
-segundo motor de sincronización.
+Las primitivas futuras deben reutilizar procesos, scheduling, bloqueo,
+historial, snapshots, análisis y el modelo de transición de M9, sin
+crear motores paralelos de sincronización o exploración.

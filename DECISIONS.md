@@ -980,3 +980,48 @@ semántica de los procesos ni del scheduler.
 
 **Motivo:** preferir pocos diagnósticos justificables y reproducibles a
 una clasificación amplia con falsos positivos o garantías inexistentes.
+
+------------------------------------------------------------------------
+
+## ADR-029 --- Explorar transiciones explícitas con búsqueda acotada
+
+**Estado:** Aceptada
+
+**Contexto:** los schedulers actuales producen una única traza y
+`reset()` puede repetirla, pero `SimulationEngine.step()` selecciona el
+proceso internamente. No existe una operación para enumerar elecciones,
+forzar una transición o bifurcar el engine desde un estado intermedio.
+
+`ExecutionState` contiene además historiales crecientes, mientras el
+scheduler conserva cursores o estado pseudoaleatorio fuera de él. Usar
+todo ese conjunto como identidad impediría reconocer estados repetidos y
+mezclaría semántica, política de scheduling, análisis y reproducción.
+
+**Decisión:** M9 separará la enumeración de transiciones habilitadas de
+su ejecución. Los schedulers seguirán eligiendo una transición durante
+el uso normal; el explorador podrá ejecutar explícitamente cada elección
+sin incorporar el estado privado del scheduler al estado semántico.
+
+La exploración inicial será BFS acotada por profundidad y cantidad de
+estados. Una clave canónica excluirá step e historiales, pero deberá
+incluir toda metadata que afecte la semántica o diagnósticos futuros.
+Los resultados serán `FOUND`, `EXHAUSTED` o `TRUNCATED`.
+
+Deadlock será la primera propiedad buscable. El contraejemplo guardará
+la secuencia exacta de procesos elegidos y se reproducirá forzando esa
+secuencia, no intentando deducir una seed.
+
+Las violaciones observadas de exclusión mutua se incorporarán sólo
+después de representar correctamente su contexto de análisis.
+`POTENTIAL_RACE` no se tratará como violación formal y una búsqueda
+acotada no probará ausencia de starvation, no terminación ni errores en
+interleavings no visitados.
+
+**Consecuencia:** M9 requerirá refactorizar la frontera entre engine y
+scheduler antes de implementar el algoritmo de búsqueda. La UI podrá
+seguir usando los schedulers existentes y reproducir contraejemplos de
+manera estable aunque cambie la implementación del scheduler.
+
+**Motivo:** obtener contraejemplos cortos y educativos sin presentar una
+búsqueda finita como model checking exhaustivo ni acoplar la semántica a
+una política particular de scheduling.

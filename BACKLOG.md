@@ -700,15 +700,81 @@ verificados sobre la traza observada.
 
 ## M9 --- Exploración de ejecuciones
 
--   [ ] Representar completamente un estado de ejecución.
--   [ ] Clonar estados.
--   [ ] Explorar elecciones alternativas del scheduler.
--   [ ] Detectar estados repetidos.
--   [ ] Limitar profundidad y cantidad de estados.
--   [ ] Buscar deadlocks.
--   [ ] Buscar violaciones de propiedades.
--   [ ] Guardar contraejemplos.
--   [ ] Reproducir contraejemplos visualmente.
+M9 agrega exploración acotada de interleavings. No reemplaza los
+schedulers de ejecución normal: enumera las transiciones habilitadas y
+elige explícitamente cuál ejecutar en cada rama.
+
+### Base ya disponible
+
+-   [x] `ExecutionState` representa el runtime mutable del programa.
+-   [x] El estado inicial se clona estructuralmente para `reset()`.
+-   [x] Los schedulers actuales permiten reproducir una única traza.
+-   [x] M8 diagnostica deadlock y conflictos sobre la traza observada.
+-   [x] El deadlock observado puede reproducirse hasta su step de
+    detección.
+
+Esta base no permite todavía bifurcar una ejecución: `step()` consulta
+internamente al scheduler y no expone las alternativas habilitadas.
+
+### M9.1 --- Modelo de transiciones y estados clonables
+
+-   [ ] Separar estado semántico, metadata de análisis y traza.
+-   [ ] Definir `EnabledTransition` con la elección ejecutable de un
+    proceso.
+-   [ ] Enumerar las transiciones habilitadas sin modificar el estado.
+-   [ ] Ejecutar explícitamente una transición seleccionada, sin pedir
+    una decisión al scheduler.
+-   [ ] Respetar exclusión durante `atomic` y cuerpos habilitados de
+    `await`.
+-   [ ] Clonar un estado intermedio completo sin compartir estructuras
+    mutables.
+-   [ ] Verificar clonación durante funciones, loops, evaluaciones
+    suspendidas y microoperaciones.
+
+### M9.2 --- Explorador acotado
+
+-   [ ] Definir una clave canónica de estado que no incluya step ni
+    historiales crecientes.
+-   [ ] Incluir en la clave la metadata que afecte semántica o futuros
+    diagnósticos.
+-   [ ] Detectar estados repetidos mediante la clave canónica.
+-   [ ] Explorar primero en anchura para priorizar contraejemplos cortos.
+-   [ ] Limitar por separado profundidad y cantidad de estados.
+-   [ ] Informar `FOUND`, `EXHAUSTED` o `TRUNCATED`.
+-   [ ] Reportar cantidad de estados y transiciones exploradas.
+
+### M9.3 --- Deadlock y contraejemplos reproducibles
+
+-   [ ] Usar deadlock como primera propiedad buscable.
+-   [ ] Encontrar un programa donde una traza termine y otra produzca
+    deadlock.
+-   [ ] Guardar la secuencia exacta de elecciones de proceso.
+-   [ ] Representar un contraejemplo con propiedad, profundidad, límites
+    y estado terminal.
+-   [ ] Reproducir el contraejemplo forzando la secuencia guardada, sin
+    depender de una seed.
+-   [ ] Mostrar en la UI el resultado, los límites y la reproducción paso
+    a paso.
+
+### M9.4 --- Propiedades adicionales
+
+-   [ ] Definir una interfaz extensible para propiedades de exploración.
+-   [ ] Integrar violaciones observadas de exclusión mutua cuando el
+    estado de análisis pueda clonarse y compararse correctamente.
+-   [ ] Evaluar assertions explícitas sobre estados finales como
+    extensión futura del lenguaje.
+-   [ ] Mantener `POTENTIAL_RACE` como observación educativa y no como
+    violación formal.
+-   [ ] No presentar una búsqueda acotada como prueba de ausencia de
+    errores cuando el resultado sea `TRUNCATED`.
+
+### Fuera del alcance inicial
+
+-   Grafo visual completo del espacio de estados.
+-   Partial-order reduction.
+-   Happens-before formal.
+-   Prueba de starvation o terminación.
+-   Verificación exhaustiva sin límites.
 
 **Principio:** una ejecución correcta no implica que el programa sea
 correcto.
@@ -916,6 +982,6 @@ Un ticket se considera terminado cuando:
 4.  Se actualizó este backlog.
 5.  Se actualizó `PROGRESS.md`.
 6.  Si introdujo una decisión arquitectónica relevante, se documentó en
-    `docs/DECISIONS.md`.
+    `DECISIONS.md`.
 7.  Si modificó la arquitectura actual, se actualizó
-    `docs/ARCHITECTURE.md`.
+    `ARCHITECTURE.md`.

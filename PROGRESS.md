@@ -26,8 +26,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** comenzar M9 representando y clonando estados de
-ejecución para explorar interleavings alternativos.
+**Próximo objetivo:** comenzar M9.1 separando selección y transición:
+enumerar procesos habilitados, ejecutar una elección explícita y clonar
+estados intermedios independientes.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -106,8 +107,8 @@ Antes de continuar después de una pausa:
 
 1.  Leer `BACKLOG.md`.
 2.  Leer este archivo desde la entrada más reciente.
-3.  Revisar `docs/DECISIONS.md`.
-4.  Consultar `docs/ARCHITECTURE.md` para conocer la arquitectura
+3.  Revisar `DECISIONS.md`.
+4.  Consultar `ARCHITECTURE.md` para conocer la arquitectura
     vigente.
 5.  Ejecutar los tests existentes.
 6.  Continuar únicamente desde el próximo ticket pendiente.
@@ -168,7 +169,7 @@ Antes de continuar después de una pausa:
 
 -   Se definió la primera versión de la sintaxis del lenguaje del
     simulador.
--   Se documentó en `docs/SYNTAX.md`.
+-   Se documentó en `SYNTAX.md`.
 -   La sintaxis V0 soporta variables compartidas con `shared`, procesos
     mediante `process`, variables locales, tipos `int`, `bool` y
     `string`, arrays básicos, asignaciones, expresiones aritméticas,
@@ -446,8 +447,8 @@ estructuras de control anidadas.
 2.  Agregar tests automáticos específicos del runtime suspendible.
 3.  Ejecutar `npm test`, `npm run lint` y `npm run build`.
 4.  Cerrar M4 con un commit estable.
-5.  Actualizar `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` y
-    `docs/SYNTAX.md` si todavía describen la arquitectura previa.
+5.  Actualizar `ARCHITECTURE.md`, `DECISIONS.md` y `SYNTAX.md` si todavía
+    describen la arquitectura previa.
 6.  Recién después avanzar a primitivas específicamente concurrentes.
 
 ## 2026-08-27 --- M4 completado: runtime suspendible
@@ -1594,3 +1595,35 @@ no consulta memoria compartida, postergación por `First Ready` y la
 separación formal entre límite y deadlock.
 
 **Estado:** M8 COMPLETADO.
+
+------------------------------------------------------------------------
+
+## 2026-08-29 --- Auditoría y redefinición de M9
+
+Se auditó el backlog de exploración contra el motor implementado. El
+estado actual permite resetear y repetir una traza elegida por un
+scheduler, pero no enumerar elecciones habilitadas, forzar un proceso ni
+bifurcar una ejecución intermedia.
+
+La clonación estructural usada por `reset()` constituye una base, no una
+implementación completa de exploración: el scheduler conserva estado
+privado y el historial creciente no sirve como identidad canónica.
+
+M9 se reorganizó en cuatro fases:
+
+1.  modelo de transiciones y estados clonables;
+2.  exploración BFS acotada y detección de estados repetidos;
+3.  búsqueda de deadlock y contraejemplos reproducibles;
+4.  propiedades adicionales después de resolver el estado de análisis.
+
+La primera propiedad será deadlock. Los resultados distinguirán
+`FOUND`, `EXHAUSTED` y `TRUNCATED`; una búsqueda truncada nunca se
+presentará como prueba de corrección.
+
+Quedaron fuera del alcance inicial el grafo completo del espacio de
+estados, partial-order reduction, happens-before formal, verificación
+exhaustiva y pruebas de starvation o terminación.
+
+También se corrigió deriva documental posterior a M7/M8: referencias a
+semáforos todavía en desarrollo, la fase marcada como actual y enlaces
+que apuntaban a un directorio `docs/` inexistente.

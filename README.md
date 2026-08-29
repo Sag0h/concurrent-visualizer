@@ -486,10 +486,11 @@ src/
 │   ├── process/
 │   ├── instructions/
 │   ├── expressions/
+│   ├── language/
 │   ├── memory/
 │   ├── semaphores/
-│   └── analysis/
-├── components/
+│   ├── deadlock/
+│   └── diagnostics/
 └── App.tsx
 ```
 
@@ -499,7 +500,7 @@ incorporarán posteriormente sin crear simuladores independientes.
 
 Para más detalle:
 
-**[Arquitectura completa](docs/ARCHITECTURE.md)**
+**[Arquitectura completa](ARCHITECTURE.md)**
 
 ------------------------------------------------------------------------
 
@@ -527,6 +528,10 @@ React visualiza el estado. La semántica vive en `core`.
 
 Los escenarios aleatorios pueden utilizar una seed para volver a
 ejecutar exactamente un comportamiento interesante o problemático.
+
+M9 ampliará esta garantía: los contraejemplos encontrados por el
+explorador guardarán la secuencia exacta de procesos elegidos y no
+dependerán de reconstruirla mediante una seed.
 
 ### Fidelidad académica
 
@@ -606,22 +611,18 @@ código.
   **[BACKLOG.md](BACKLOG.md)**                  Fuente de verdad del roadmap,
                                                 milestones y tickets
 
-  **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**   Arquitectura vigente y
+  **[ARCHITECTURE.md](ARCHITECTURE.md)**        Arquitectura vigente y
                                                 funcionamiento interno del motor
 
-  **[DECISIONS.md](docs/DECISIONS.md)**         Decisiones arquitectónicas costosas
+  **[DECISIONS.md](DECISIONS.md)**              Decisiones arquitectónicas costosas
                                                 de olvidar
 
-  **[PROGRESS.md](docs/PROGRESS.md)**           Historial de implementación y
+  **[PROGRESS.md](PROGRESS.md)**                Historial de implementación y
                                                 estado actual
 
-  **[SYNTAX.md](docs/SYNTAX.md)**               Sintaxis actualmente soportada por
+  **[SYNTAX.md](SYNTAX.md)**                    Sintaxis actualmente soportada por
                                                 el lenguaje
   ---------------------------------------------------------------------------------
-
-> Los enlaces anteriores asumen que `BACKLOG.md` está en la raíz del
-> repositorio y el resto de los documentos se encuentra dentro de
-> `docs/`.
 
 ------------------------------------------------------------------------
 
@@ -643,11 +644,11 @@ Atomicidad
         ↓
 await
         ↓
-Semáforos P / V      ← actual
+Semáforos P / V
         ↓
 Análisis y errores
         ↓
-Exploración
+Exploración acotada  ← actual
         ↓
 Monitores
         ↓
