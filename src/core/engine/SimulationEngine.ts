@@ -20,6 +20,7 @@ import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
 import { findMemoryAccessConflicts } from './findMemoryAccessConflicts'
 import { summarizeMemoryAccessConflicts } from './summarizeMemoryAccessConflicts'
+import type { SemaphoreExecutionEvent } from './ExecutionEvent'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -62,6 +63,8 @@ step(): boolean {
     return false
   }
 
+  this.reevaluateBlockedProcesses()
+
   const atomicProcess =
     this.state.program.processes.find(
       (candidate) =>
@@ -89,6 +92,15 @@ step(): boolean {
       process.state = 'FINISHED'
       return true
     }
+
+    let executionDescription:
+      string | undefined
+
+    let awaitStatus:
+      'BLOCKED' | 'ENABLED' | undefined
+
+    let semaphoreEvent:
+      SemaphoreExecutionEvent | undefined
 
     switch (instruction.type) {
       case 'NO_OP':
@@ -474,24 +486,162 @@ step(): boolean {
 
         break
       }
+
+      case 'AWAIT': {
+        if (process.atomicDepth > 0) {
+          throw new Error(
+            'AWAIT inside an atomic region is not supported yet',
+          )
+        }
+
+        const enabled =
+          this.evaluateAwaitCondition(
+            process,
+            instruction.condition,
+          )
+
+        if (!enabled) {
+          process.state = 'BLOCKED'
+
+          process.blockingReason = {
+            type: 'AWAIT',
+            condition: structuredClone(
+              instruction.condition,
+            ),
+          }
+
+          awaitStatus = 'BLOCKED'
+          executionDescription =
+            'Await condition evaluated to false'
+
+          break
+        }
+
+        process.blockingReason = undefined
+
+        awaitStatus = 'ENABLED'
+        executionDescription =
+          'Await condition evaluated to true'
+
+        if (instruction.body.length === 0) {
+          this.advanceProcess(process)
+          break
+        }
+
+        process.atomicDepth += 1
+
+        process.executionStack.push({
+          instructions: instruction.body,
+          programCounter: 0,
+          completionMode: 'EXIT_ATOMIC',
+        })
+
+        break
+      }
+
+      case 'SEMAPHORE_P': {
+        const semaphore =
+          this.getSemaphore(
+            instruction.semaphoreName,
+          )
+
+        if (semaphore.value === 0) {
+          process.state = 'BLOCKED'
+
+          process.blockingReason = {
+            type: 'SEMAPHORE_P',
+            semaphoreName:
+              instruction.semaphoreName,
+          }
+
+          executionDescription =
+            `P(${instruction.semaphoreName}) blocked: semaphore value is 0`
+
+          semaphoreEvent = {
+            operation: 'P',
+            semaphoreName:
+              instruction.semaphoreName,
+            status: 'BLOCKED',
+            valueBefore: semaphore.value,
+            valueAfter: semaphore.value,
+          }
+
+          break
+        }
+
+        const previousValue = semaphore.value
+
+        semaphore.value -= 1
+
+        process.blockingReason = undefined
+
+        executionDescription =
+          `P(${instruction.semaphoreName}): ${previousValue} -> ${semaphore.value}`
+
+        semaphoreEvent = {
+          operation: 'P',
+          semaphoreName:
+            instruction.semaphoreName,
+          status: 'SUCCEEDED',
+          valueBefore: previousValue,
+          valueAfter: semaphore.value,
+        }
+
+        this.advanceProcess(process)
+
+        break
+      }
+
+      case 'SEMAPHORE_V': {
+        const semaphore =
+          this.getSemaphore(
+            instruction.semaphoreName,
+          )
+
+        const previousValue = semaphore.value
+
+        semaphore.value += 1
+
+        executionDescription =
+          `V(${instruction.semaphoreName}): ${previousValue} -> ${semaphore.value}`
+
+        semaphoreEvent = {
+          operation: 'V',
+          semaphoreName:
+            instruction.semaphoreName,
+          status: 'SUCCEEDED',
+          valueBefore: previousValue,
+          valueAfter: semaphore.value,
+        }
+
+        this.advanceProcess(process)
+
+        break
+      }
+
     }
 
     this.state.history.push({
       step: this.state.stepCount + 1,
       processId: process.id,
       instructionType: instruction.type,
+      awaitStatus,
+      semaphoreEvent,
+      description: executionDescription,
     })
 
     this.state.stepCount++
 
-    if (
-      process.executionStack.length === 0
-      && process.programCounter
-        >= process.instructions.length
-    ) {
-      process.state = 'FINISHED'
-    } else {
-      process.state = 'READY'
+    if (process.state !== 'BLOCKED') {
+      if (
+        process.executionStack.length === 0
+        && process.programCounter
+          >= process.instructions.length
+      ) {
+        process.state = 'FINISHED'
+      } else {
+        process.state = 'READY'
+      }
     }
 
     return true
@@ -502,9 +652,24 @@ step(): boolean {
 }
 
   getSnapshot(): SimulationSnapshot {
+    const initialSemaphoreValues =
+      Object.fromEntries(
+        Object.values(
+          this.initialState.program.semaphores
+          ?? {},
+        ).map((semaphore) => [
+          semaphore.name,
+          semaphore.value,
+        ]),
+      )
+
     const memoryAccessConflicts =
       findMemoryAccessConflicts(
         this.state.microOperationHistory ?? [],
+        {
+          executionHistory: this.state.history,
+          initialSemaphoreValues,
+        },
       )
     return {
       stepCount: this.state.stepCount,
@@ -512,6 +677,23 @@ step(): boolean {
       sharedMemory: structuredClone(
         this.state.program.sharedMemory,
       ),
+      semaphores: Object.values(
+        this.state.program.semaphores ?? {},
+      ).map((semaphore) => ({
+        name: semaphore.name,
+        value: semaphore.value,
+        waitingProcessIds:
+          this.state.program.processes
+            .filter(
+              (process) =>
+                process.state === 'BLOCKED'
+                && process.blockingReason?.type
+                  === 'SEMAPHORE_P'
+                && process.blockingReason.semaphoreName
+                  === semaphore.name,
+            )
+            .map((process) => process.id),
+      })),
       processes: this.state.program.processes.map(
         (process) => ({
           id: process.id,
@@ -528,20 +710,19 @@ step(): boolean {
               ),
             }),
           ),
+          blockingReason: process.blockingReason
+            ? structuredClone(process.blockingReason)
+            : undefined,
         }),
       ),
       microOperationHistory: structuredClone(
         this.state.microOperationHistory ?? [],
       ),
-      memoryAccessConflicts:
-        findMemoryAccessConflicts(
-          this.state.microOperationHistory ?? [],
-        ),
+      memoryAccessConflicts,
       memoryConflictSummaries:
         summarizeMemoryAccessConflicts(
           memoryAccessConflicts,
-        ),
-
+      ),
     }
   }
 
@@ -2744,5 +2925,96 @@ step(): boolean {
     }
 
     array[location.index] = value
+  }
+
+  private evaluateAwaitCondition(
+    process: Process,
+    condition: Expression,
+  ): boolean {
+    if (this.containsFunctionCall(condition)) {
+      throw new Error(
+        'Function calls inside AWAIT conditions are not supported yet',
+      )
+    }
+
+    const value = evaluateExpression(
+      condition,
+      {
+        localMemory:
+          this.getActiveLocalMemory(process),
+        sharedMemory:
+          this.state.program.sharedMemory,
+      },
+    )
+
+    if (typeof value !== 'boolean') {
+      throw new Error(
+        'AWAIT condition must evaluate to boolean',
+      )
+    }
+
+    return value
+  }
+
+  private reevaluateBlockedProcesses(): void {
+    for (
+      const process
+      of this.state.program.processes
+    ) {
+      if (
+        process.state !== 'BLOCKED'
+        || !process.blockingReason
+      ) {
+        continue
+      }
+
+      switch (process.blockingReason.type) {
+        case 'AWAIT': {
+          const enabled =
+            this.evaluateAwaitCondition(
+              process,
+              process.blockingReason.condition,
+            )
+
+          if (enabled) {
+            process.state = 'READY'
+            process.blockingReason = undefined
+          }
+
+          break
+        }
+
+        case 'SEMAPHORE_P': {
+          const semaphore =
+            this.getSemaphore(
+              process.blockingReason.semaphoreName,
+            )
+
+          if (semaphore.value > 0) {
+            process.state = 'READY'
+            process.blockingReason = undefined
+          }
+
+          break
+        }
+      }
+    }
+  }
+
+  private getSemaphore(
+    semaphoreName: string,
+  ) {
+    const semaphore =
+      this.state.program.semaphores?.[
+        semaphoreName
+      ]
+
+    if (!semaphore) {
+      throw new Error(
+        `Semaphore "${semaphoreName}" is not defined`,
+      )
+    }
+
+    return semaphore
   }
 }

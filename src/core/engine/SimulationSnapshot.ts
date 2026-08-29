@@ -4,13 +4,21 @@ import type { ProcessState } from '../process/ProcessState'
 import type { MicroOperationEvent } from './MicroOperationEvent'
 import type { MemoryAccessConflict } from './MemoryAccessConflict'
 import type { MemoryConflictSummary } from './MemoryConflictSummary'
+import type { BlockingReason } from '../process/BlockingReason'
 export interface SimulationSnapshot {
   readonly stepCount: number
   readonly sharedMemory: Memory
+  readonly semaphores: SemaphoreSnapshot[]
   readonly processes: ProcessSnapshot[]
   readonly microOperationHistory: MicroOperationEvent[]
   readonly memoryAccessConflicts: MemoryAccessConflict[]
   readonly memoryConflictSummaries: MemoryConflictSummary[]
+}
+
+export interface SemaphoreSnapshot {
+  readonly name: string
+  readonly value: number
+  readonly waitingProcessIds: ProcessId[]
 }
 
 export interface FunctionCallSnapshot {
@@ -24,4 +32,5 @@ export interface ProcessSnapshot {
   readonly programCounter: number
   readonly localMemory: Memory
   readonly callStack: FunctionCallSnapshot[]
+  readonly blockingReason?: BlockingReason
 }

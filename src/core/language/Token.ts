@@ -44,6 +44,10 @@ export type TokenType =
   | 'FUNCTION'
   | 'RETURN'
   | 'ATOMIC'
+  | 'AWAIT'
+  | 'SEM'
+  | 'SEMAPHORE_P'
+  | 'SEMAPHORE_V'
 
 export interface Token {
   readonly type: TokenType

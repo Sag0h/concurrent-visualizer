@@ -22,6 +22,10 @@ const keywords: Record<string, TokenType> = {
   function: 'FUNCTION',
   return: 'RETURN',
   atomic: 'ATOMIC',
+  await: 'AWAIT',
+  sem: 'SEM',
+  P: 'SEMAPHORE_P',
+  V: 'SEMAPHORE_V',
 }
 
 export function tokenize(source: string): Token[] {

@@ -266,4 +266,175 @@ describe('findMemoryAccessConflicts', () => {
       conflicts[0].classification,
     ).toBe('POTENTIAL_RACE')
   })
+
+  it('recognizes a general semaphore used as a mutex in the observed execution', () => {
+    const source = `
+      sem mutex = 1;
+      shared int x = 0;
+
+      process P1 {
+        P(mutex);
+        x = x + 1;
+        V(mutex);
+      }
+
+      process P2 {
+        P(mutex);
+        x = x + 1;
+        V(mutex);
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    const conflicts =
+      engine.getSnapshot().memoryAccessConflicts
+
+    expect(conflicts.length).toBeGreaterThan(0)
+    expect(
+      conflicts.every(
+        (conflict) =>
+          conflict.classification
+            === 'SYNCHRONIZED',
+      ),
+    ).toBe(true)
+    expect(conflicts[0].reason).toEqual({
+      type: 'SEMAPHORE_MUTEX',
+      semaphoreName: 'mutex',
+    })
+  })
+
+  it('keeps unilateral semaphore protection as a potential race', () => {
+    const source = `
+      sem mutex = 1;
+      shared int x = 0;
+
+      process P1 {
+        P(mutex);
+        x = x + 1;
+        V(mutex);
+      }
+
+      process P2 {
+        x = x + 1;
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    const conflicts =
+      engine.getSnapshot().memoryAccessConflicts
+
+    expect(conflicts.length).toBeGreaterThan(0)
+    expect(
+      conflicts.every(
+        (conflict) =>
+          conflict.classification
+            === 'POTENTIAL_RACE',
+      ),
+    ).toBe(true)
+  })
+
+  it('does not mistake a counting semaphore for a mutex', () => {
+    const source = `
+      sem permits = 2;
+      shared int x = 0;
+
+      process P1 {
+        P(permits);
+        x = x + 1;
+        V(permits);
+      }
+
+      process P2 {
+        P(permits);
+        x = x + 1;
+        V(permits);
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    const conflicts =
+      engine.getSnapshot().memoryAccessConflicts
+
+    expect(conflicts.length).toBeGreaterThan(0)
+    expect(
+      conflicts.every(
+        (conflict) =>
+          conflict.classification === 'UNKNOWN',
+      ),
+    ).toBe(true)
+    expect(conflicts[0].reason).toEqual({
+      type: 'AMBIGUOUS_SEMAPHORE_PROTOCOL',
+      semaphoreNames: ['permits'],
+    })
+  })
+
+  it('marks an observed extra V as an ambiguous semaphore protocol', () => {
+    const source = `
+      sem mutex = 1;
+      shared int x = 0;
+
+      process P1 {
+        V(mutex);
+        P(mutex);
+        x = x + 1;
+      }
+
+      process P2 {
+        P(mutex);
+        x = x + 1;
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    const conflicts =
+      engine.getSnapshot().memoryAccessConflicts
+
+    expect(conflicts.length).toBeGreaterThan(0)
+    expect(
+      conflicts.some(
+        (conflict) =>
+          conflict.classification === 'UNKNOWN',
+      ),
+    ).toBe(true)
+  })
 })

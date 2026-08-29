@@ -56,9 +56,9 @@ interacción serán subsistemas diferentes.
 
 La interfaz podrá ofrecer:
 
-- modo Memoria Compartida;
-- modo Pasaje de Mensajes;
-- modo Híbrido/Avanzado.
+-   modo Memoria Compartida;
+-   modo Pasaje de Mensajes;
+-   modo Híbrido/Avanzado.
 
 ------------------------------------------------------------------------
 
@@ -105,7 +105,7 @@ representaron mediante objetos TypeScript.
 El parser ya fue incorporado posteriormente y actualmente forma parte
 del flujo normal de ejecución:
 
-```text
+``` text
 Texto → Tokens → Parser → AST/Program → Simulation Engine
 ```
 
@@ -123,25 +123,25 @@ convencionales además de primitivas concurrentes.
 
 Incluye actualmente:
 
-- `if / else`;
-- `while`;
-- `repeat / until`;
-- `for`;
-- `foreach`;
-- `break`;
-- `continue`;
-- funciones;
-- parámetros;
-- variables locales de función;
-- llamadas a funciones;
-- llamadas a funciones dentro de expresiones;
-- `return`;
-- funciones vacías.
+-   `if / else`;
+-   `while`;
+-   `repeat / until`;
+-   `for`;
+-   `foreach`;
+-   `break`;
+-   `continue`;
+-   funciones;
+-   parámetros;
+-   variables locales de función;
+-   llamadas a funciones;
+-   llamadas a funciones dentro de expresiones;
+-   `return`;
+-   funciones vacías.
 
 Previstas posteriormente:
 
-- `sleep`;
-- `yield`.
+-   `sleep`;
+-   `yield`.
 
 **Motivo:** los procesos concurrentes contienen programas secuenciales y
 los ejercicios deben poder expresarse naturalmente.
@@ -169,12 +169,12 @@ evolucionar hacia análisis de errores y exploración de interleavings.
 
 Problemas objetivo:
 
-- deadlock;
-- race conditions;
-- exclusión mutua;
-- busy waiting;
-- starvation cuando sea viable;
-- errores de comunicación.
+-   deadlock;
+-   race conditions;
+-   exclusión mutua;
+-   busy waiting;
+-   starvation cuando sea viable;
+-   errores de comunicación.
 
 **Motivo:** ejecutar una vez un programa concurrente sin errores no
 demuestra su corrección.
@@ -215,7 +215,7 @@ semántica de años anteriores es idéntica a la utilizada actualmente.
 **Contexto:** una instrucción del pseudocódigo puede contener múltiples
 acciones relevantes para la concurrencia. Por ejemplo:
 
-```text
+``` text
 x = x + 1;
 ```
 
@@ -245,13 +245,13 @@ región atómica activa.
 Los accesos relevantes a memoria compartida deben poder representarse
 explícitamente. Una operación como:
 
-```text
+``` text
 x = x + 1;
 ```
 
 puede conceptualmente descomponerse como:
 
-```text
+``` text
 SHARED_READ x
 COMPUTE + 1
 SHARED_WRITE x
@@ -264,7 +264,7 @@ variable compartida antes de la escritura.
 La misma regla se aplica cuando una lectura compartida participa en la
 resolución de un target. Por ejemplo:
 
-```text
+``` text
 values[i + offset] = 50;
 ```
 
@@ -309,7 +309,7 @@ ubicación.
 
 Por ejemplo:
 
-```text
+``` text
 values[0]
 values[1]
 ```
@@ -321,7 +321,7 @@ mediante la abstracción `MemoryLocation`.
 
 Actualmente se distinguen:
 
-```text
+``` text
 VARIABLE(name)
 ARRAY_ELEMENT(arrayName, index)
 ```
@@ -334,11 +334,11 @@ misma variable o el mismo elemento exacto de un array.
 
 Esta abstracción se utiliza como base para:
 
-- historial de accesos compartidos;
-- visualización de lecturas y escrituras;
-- detección de accesos conflictivos;
-- agrupación y resumen de conflictos;
-- futuras extensiones del análisis concurrente.
+-   historial de accesos compartidos;
+-   visualización de lecturas y escrituras;
+-   detección de accesos conflictivos;
+-   agrupación y resumen de conflictos;
+-   futuras extensiones del análisis concurrente.
 
 **Consecuencia:** un acceso a `values[0]` no entra automáticamente en
 conflicto con un acceso a `values[1]`.
@@ -367,7 +367,7 @@ intercalable, no una única microoperación.
 
 Ejemplo:
 
-```text
+``` text
 atomic {
     x = x + 1;
 }
@@ -375,7 +375,7 @@ atomic {
 
 continúa pudiendo generar:
 
-```text
+``` text
 SHARED_READ x
 COMPUTE
 SHARED_WRITE x
@@ -388,7 +388,7 @@ Cada proceso mantiene un contador `atomicDepth`.
 
 Conceptualmente:
 
-```text
+``` text
 fuera de atomic       -> atomicDepth = 0
 primer atomic         -> atomicDepth = 1
 atomic anidado        -> atomicDepth = 2
@@ -413,7 +413,7 @@ misma memoria sin respetar esa protección.
 
 Por lo tanto, bajo el modelo actual:
 
-```text
+``` text
 P1 atomic + P2 normal -> POTENTIAL_RACE
 P1 atomic + P2 atomic -> SYNCHRONIZED
 ```
@@ -425,8 +425,8 @@ actualmente por el engine.
 `POTENTIAL_RACE` se utiliza cuando esa protección no está presente en
 ambos accesos.
 
-Esta clasificación no pretende todavía implementar una definición
-formal completa de data race basada en happens-before. El análisis podrá
+Esta clasificación no pretende todavía implementar una definición formal
+completa de data race basada en happens-before. El análisis podrá
 refinarse cuando existan semáforos, monitores y otros mecanismos de
 sincronización.
 
@@ -435,7 +435,437 @@ individuales de una región atómica y, al mismo tiempo, indicar que sus
 accesos se encuentran sincronizados.
 
 **Motivo:** preservar tanto la semántica correcta de exclusión como el
-valor educativo de observar qué acciones internas componen una
-operación aparentemente indivisible.
+valor educativo de observar qué acciones internas componen una operación
+aparentemente indivisible.
 
 ------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## ADR-016 --- `await` como acción atómica condicional con bloqueo real
+
+**Estado:** Aceptada
+
+**Contexto:** la primitiva `await` debe representar la semántica de la
+cátedra sin convertir la espera en busy waiting ni introducir una cola
+de espera con una política de scheduling propia.
+
+**Decisión:** soportar:
+
+``` text
+await (B);
+```
+
+y:
+
+``` text
+await (B) {
+    S
+}
+```
+
+Si `B` es falsa, el proceso pasa a `BLOCKED`, conserva el program
+counter sobre el `await` y almacena la condición en `blockingReason`.
+
+Los procesos bloqueados pueden ser reevaluados antes de una nueva
+selección del scheduler. Si la guarda pasa a ser verdadera, el proceso
+queda `READY`, pero esa reactivación no reserva la condición ni
+garantiza que vaya a ejecutarse a continuación.
+
+Cuando el scheduler selecciona nuevamente al proceso, la guarda se
+evalúa otra vez. Por ello un proceso reactivado puede volver a
+bloquearse si el estado cambió antes de que lograra ejecutar.
+
+Si `B` es verdadera, la comprobación y el cuerpo `S` constituyen una
+acción atómica condicional. El cuerpo reutiliza la infraestructura de
+`atomicDepth` para impedir interleavings sin ocultar sus
+microoperaciones.
+
+**Restricciones actuales:**
+
+-   la guarda debe producir un booleano;
+-   no se permiten llamadas a funciones dentro de la guarda;
+-   se rechaza `await` dentro de una región `atomic`;
+-   pueden existir regiones `atomic` dentro del cuerpo de un `await`
+    habilitado.
+
+**Consecuencia:** `READY` significa solamente que el proceso puede
+competir por CPU; no que la guarda siga necesariamente habilitada cuando
+finalmente sea seleccionado.
+
+**Motivo:** conservar la separación entre habilitación y scheduling y
+representar fielmente una acción atómica condicional sin busy waiting.
+
+------------------------------------------------------------------------
+
+## ADR-017 --- Bloqueos representados en el proceso mediante `BlockingReason`
+
+**Estado:** Aceptada
+
+**Contexto:** distintas primitivas concurrentes pueden impedir
+temporalmente el progreso de un proceso. La información necesaria para
+reactivarlo y explicarlo en la UI no debe quedar dispersa en mecanismos
+especiales para cada primitiva.
+
+**Decisión:** mantener el estado general `BLOCKED` y asociar al proceso
+un `blockingReason` discriminado.
+
+Actualmente se utilizan conceptualmente:
+
+``` text
+AWAIT(condition)
+SEMAPHORE_P(semaphoreName)
+```
+
+El motivo de bloqueo conserva únicamente la información necesaria para
+reevaluar o explicar la espera.
+
+**Consecuencia:** el engine puede centralizar la reevaluación de
+procesos bloqueados y la UI puede mostrar por qué espera cada proceso
+sin inferirlo desde el program counter.
+
+**Motivo:** ofrecer un modelo extensible para futuras primitivas
+bloqueantes sin crear estados de proceso específicos como
+`WAITING_AWAIT`, `WAITING_SEMAPHORE`, etc.
+
+------------------------------------------------------------------------
+
+## ADR-018 --- Semáforos como recursos de sincronización separados de memoria compartida
+
+**Estado:** Aceptada
+
+**Contexto:** aunque un semáforo general mantiene internamente un
+entero, su valor no representa una variable compartida ordinaria.
+Permitir que el programa lo manipule mediante asignaciones comunes
+rompería la semántica de `P` y `V`.
+
+**Decisión:** representar explícitamente `Semaphore` y mantener la
+colección de semáforos separada de la memoria compartida ordinaria
+dentro de `Program`.
+
+Un semáforo se modifica únicamente mediante sus operaciones de
+sincronización.
+
+Los accesos `P` / `V` no se modelan como `SHARED_READ` / `SHARED_WRITE`
+ordinarios ni como `MemoryLocation`.
+
+**Consecuencia:** la visualización y el análisis pueden distinguir
+memoria de datos y recursos de sincronización.
+
+**Motivo:** evitar que un detalle de implementación del TAD semáforo se
+confunda con una variable compartida del programa.
+
+------------------------------------------------------------------------
+
+## ADR-019 --- V1 utiliza únicamente semáforos generales/contadores
+
+**Estado:** Aceptada
+
+**Contexto:** el material académico utiliza semáforos cuyo estado es un
+entero no negativo y cuya semántica general puede representar tanto
+conteo de recursos como protocolos de exclusión mutua.
+
+**Decisión:** implementar en V1 únicamente semáforos
+generales/contadores.
+
+No se crea un tipo especial `BinarySemaphore`.
+
+Un semáforo general inicializado en:
+
+``` text
+sem mutex = 1;
+```
+
+puede utilizarse para exclusión mutua si los procesos respetan
+correctamente el protocolo `P(mutex)` / `V(mutex)`.
+
+La inicialización es obligatoria y el valor inicial debe ser un entero
+no negativo.
+
+**Consecuencia:** el modelo no incorpora `kind`, reglas especiales de
+saturación a `1` ni comportamientos diferentes para un supuesto subtipo
+binario.
+
+**Motivo:** mantener el modelo mínimo y alineado con la semántica
+general necesaria para los ejercicios, evitando tipos redundantes.
+
+------------------------------------------------------------------------
+
+## ADR-020 --- Semáforos sin cola FIFO, fairness, ownership ni reserva de permisos
+
+**Estado:** Aceptada
+
+**Contexto:** una implementación concreta de semáforos podría utilizar
+colas FIFO o imponer alguna política de fairness, pero esa
+implementación no forma parte de la semántica general que el simulador
+debe asumir.
+
+Además, un semáforo general no implica ownership: un proceso puede
+señalizar un evento mediante `V` sin haber ejecutado previamente el `P`
+correspondiente.
+
+**Decisión:** el modelo base de semáforos no mantiene:
+
+-   cola FIFO de waiters;
+-   garantía de fairness débil o fuerte;
+-   owner;
+-   permiso reservado durante la reactivación.
+
+Los procesos esperando `P(s)` se representan mediante `BLOCKED` y
+`blockingReason`.
+
+Cuando `s > 0`, uno o varios waiters pueden pasar a `READY`. Esto no
+decrementa el semáforo.
+
+El scheduler selecciona posteriormente un proceso y ese proceso vuelve a
+ejecutar `P(s)`. Solamente en ese momento, si `s > 0`, se consume una
+unidad.
+
+Por lo tanto:
+
+``` text
+reactivación
+    ≠
+reserva del recurso
+```
+
+y:
+
+``` text
+READY
+    ≠
+P garantizado
+```
+
+**Consecuencia:** si varios procesos son reactivados por una única
+unidad disponible, el ganador consume el recurso y los demás pueden
+volver a `BLOCKED`.
+
+La UI puede mostrar qué procesos esperan un semáforo, pero no debe
+presentar esa colección como una cola FIFO.
+
+**Motivo:** no introducir garantías que pertenecen a una implementación
+particular del semáforo ni mezclar la política del recurso con la del
+scheduler.
+
+------------------------------------------------------------------------
+
+## ADR-021 --- `P` y `V` son operaciones atómicas, pero no regiones `atomic`
+
+**Estado:** Aceptada
+
+**Contexto:** la operación:
+
+``` text
+P(s)
+```
+
+debe comprobar disponibilidad y decrementar el semáforo de manera
+indivisible. Del mismo modo, `V(s)` debe incrementar atómicamente.
+
+Sin embargo, una sección crítica delimitada por:
+
+``` text
+P(mutex);
+...
+V(mutex);
+```
+
+no significa que el proceso deba monopolizar el scheduler durante toda
+la región.
+
+**Decisión:** `P` y `V` se ejecutan como operaciones atómicas
+individuales sin utilizar `atomicDepth`.
+
+`P(s)`:
+
+``` text
+si s > 0:
+    s = s - 1
+    avanzar
+si s == 0:
+    BLOCKED
+    no avanzar
+```
+
+`V(s)`:
+
+``` text
+s = s + 1
+avanzar
+```
+
+No se incrementa `atomicDepth` al ejecutar `P` ni se mantiene hasta `V`.
+
+**Consecuencia:** otros procesos pueden seguir ejecutándose mientras uno
+se encuentra dentro de una sección crítica protegida por semáforo. La
+exclusión surge de que los demás procesos que respetan el mismo
+protocolo no pueden completar `P`, no de que el scheduler quede fijado.
+
+**Motivo:** reutilizar `atomicDepth` entre `P` y `V` alteraría
+incorrectamente la semántica de scheduling y convertiría exclusión mutua
+en ausencia total de interleaving.
+
+------------------------------------------------------------------------
+
+## ADR-022 --- Separar semántica de sincronización y análisis de interferencia
+
+**Estado:** Aceptada
+
+**Contexto:** M5 introdujo una primera clasificación de accesos
+conflictivos basada en la información disponible en
+`MicroOperationEvent`, especialmente `atomicDepth`.
+
+Con semáforos ya es posible que dos accesos estén correctamente
+protegidos por un protocolo `P` / `V` aunque las microoperaciones de la
+sección crítica tengan `atomicDepth == 0`.
+
+Modificar `atomicDepth` para hacer que el detector reconozca esa
+protección cambiaría la ejecución real del programa.
+
+**Decisión:** la semántica del engine y la información utilizada por el
+análisis de interferencia deben permanecer separadas.
+
+La integración de semáforos con `POTENTIAL_RACE` / `SYNCHRONIZED` deberá
+incorporar una representación específica del contexto de sincronización
+sin utilizar `atomicDepth` como sustituto.
+
+Hasta diseñar esa integración, la clasificación existente continúa
+siendo una aproximación educativa y no un detector formal de data races
+basado en happens-before.
+
+**Consecuencia:** una ejecución correcta mediante semáforos puede
+requerir una fase posterior de análisis para ser clasificada
+correctamente, pero no se modificará la semántica del scheduler con el
+único objetivo de satisfacer al detector.
+
+**Motivo:** evitar que una necesidad de visualización/análisis contamine
+la semántica de ejecución del simulador.
+
+------------------------------------------------------------------------
+
+## ADR-023 --- El parser construye semáforos, pero las referencias `P` / `V` se resuelven en runtime
+
+**Estado:** Aceptada
+
+**Contexto:** el parser ya valida la forma de una declaración:
+
+``` text
+sem mutex = 1;
+```
+
+y genera instrucciones:
+
+``` text
+P(mutex);
+V(mutex);
+```
+
+No existe todavía una fase general independiente de resolución de
+símbolos para todos los recursos del lenguaje.
+
+**Decisión:** el parser:
+
+-   valida declaraciones de semáforos;
+-   exige inicialización con literal entero no negativo;
+-   detecta declaraciones duplicadas;
+-   construye las instrucciones `SEMAPHORE_P` y `SEMAPHORE_V`.
+
+La existencia del semáforo referenciado por `P` / `V` se comprueba
+actualmente durante la ejecución.
+
+Una referencia inexistente produce un error de runtime explícito.
+
+**Consecuencia:** no se introduce todavía una fase semántica/symbol
+resolver solamente para semáforos. Si el lenguaje acumula suficientes
+recursos globales, esta decisión podrá revisarse y generalizarse.
+
+**Motivo:** mantener el parser enfocado en sintaxis y evitar una nueva
+capa arquitectónica prematura antes de que exista una necesidad
+transversal.
+
+------------------------------------------------------------------------
+
+## ADR-024 --- Los waiters de semáforos se derivan para visualización
+
+**Estado:** Aceptada
+
+**Contexto:** M7.5 necesita mostrar el valor de cada semáforo y los
+procesos que esperan completar `P`. El modelo de semáforo no contiene
+cola, ownership, fairness ni permisos reservados.
+
+Agregar una colección mutable de waiters al recurso duplicaría el estado
+ya representado por los procesos y podría sugerir una política FIFO que
+la semántica no garantiza.
+
+**Decisión:** `SimulationSnapshot` expone cada semáforo con su nombre,
+valor y `waitingProcessIds`. Esta colección se calcula a partir de los
+procesos cuyo estado es `BLOCKED` y cuyo `blockingReason` es
+`SEMAPHORE_P` para ese semáforo.
+
+La colección es exclusivamente informativa. Su orden de presentación no
+otorga prioridad ni modifica la selección del scheduler.
+
+Los eventos de `P` / `V` registran además operación, resultado y valores
+anterior/posterior como metadata estructurada independiente de la
+descripción textual.
+
+**Consecuencia:** la UI puede explicar esperas y transiciones sin
+introducir estado duplicado ni semántica de cola. Un proceso reactivado
+deja de figurar como bloqueado y deberá reevaluar `P` cuando sea
+seleccionado, tal como exige el runtime.
+
+**Motivo:** conservar una única fuente de verdad para el bloqueo y
+mantener separadas visualización, scheduling y semántica del recurso.
+
+------------------------------------------------------------------------
+
+## ADR-025 --- Reconocer protocolos mutex observados sin crear semáforos binarios
+
+**Estado:** Aceptada
+
+**Contexto:** M5 clasifica accesos conflictivos dentro de regiones
+`atomic`, pero una sección protegida correctamente por:
+
+``` text
+P(mutex);
+...
+V(mutex);
+```
+
+mantiene `atomicDepth == 0`. Al mismo tiempo, un semáforo general puede
+usarse como contador o para señalización; compartir el mismo nombre de
+semáforo no demuestra exclusión mutua.
+
+**Decisión:** el analizador reconstruye secciones `P` / `V` desde el
+historial estructurado sin modificar el estado ni el scheduler.
+
+Un semáforo general es un candidato mutex válido para la traza observada
+solo si comenzó en `1` y todas sus transiciones observadas respetan un
+protocolo `1 -> 0 -> 1`, donde el mismo proceso que completó `P` ejecuta
+el `V` que cierra la sección candidata. Un `V` extra, una transición por
+encima de `1` o una liberación cruzada invalidan el candidato.
+
+El proceso asociado es información inferida por el analizador; no se
+agrega ownership a la semántica de los semáforos.
+
+La clasificación guarda una razón estructurada:
+
+-   `ATOMIC_REGION`;
+-   `SEMAPHORE_MUTEX`;
+-   `AMBIGUOUS_SEMAPHORE_PROTOCOL`;
+-   `UNPROTECTED`.
+
+Un mismo candidato mutex válido en ambos accesos produce
+`SYNCHRONIZED`. La protección unilateral produce `POTENTIAL_RACE`. Un
+mismo semáforo ambiguo en ambos accesos produce `UNKNOWN` en lugar de
+afirmar protección o carrera.
+
+**Consecuencia:** la UI puede explicar por qué clasificó cada conflicto
+y distinguir mutex, contadores y usos problemáticos. La conclusión vale
+para la ejecución observada y no constituye prueba de corrección para
+todos los interleavings.
+
+**Motivo:** reconocer el caso académico común de exclusión mutua sin
+crear un tipo binario, imponer ownership al runtime ni confundir
+sincronización con ausencia total de interleaving.

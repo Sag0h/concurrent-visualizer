@@ -7,6 +7,8 @@ import { parseProgram } from './core/language/parseProgram'
 import type { RuntimeValue } from './core/memory/RuntimeValue'
 import { createScheduler } from './core/scheduler/createScheduler'
 import type { SchedulerType } from './core/scheduler/SchedulerType'
+import { formatExpression } from './core/expressions/formatExpression'
+import type { MemoryAccessConflict } from './core/engine/MemoryAccessConflict'
 
 const initialCode = `shared int counter = 0;
 shared string message = "Concurrent Visualizer";
@@ -121,15 +123,9 @@ function App() {
     }
 
     try {
-      const progressed = engine.step()
+      engine.step()
 
-      if (!progressed) {
-        setError(
-          'The simulation could not make progress.',
-        )
-      } else {
-        setError(null)
-      }
+      setError(null)
 
       setSnapshot(
         engine.getSnapshot(),
@@ -518,6 +514,34 @@ function App() {
         conflict.classification === 'SYNCHRONIZED',
     ) ?? []
 
+  const unknownConflicts =
+    snapshot?.memoryAccessConflicts.filter(
+      (conflict) =>
+        conflict.classification === 'UNKNOWN',
+    ) ?? []
+
+  const conflictsNeedingAttention = [
+    ...potentialRaces,
+    ...unknownConflicts,
+  ]
+
+  const programStatus =
+    engine?.isFinished()
+      ? 'FINISHED'
+      : snapshot
+        && snapshot.processes.length > 0
+        && snapshot.processes.every(
+          (process) =>
+            process.state === 'BLOCKED'
+            || process.state === 'FINISHED',
+        )
+        && snapshot.processes.some(
+          (process) =>
+            process.state === 'BLOCKED',
+        )
+          ? 'BLOCKED'
+          : 'RUNNING'
+
   return (
     <main className="app">
       <header className="header">
@@ -702,9 +726,7 @@ function App() {
                 <span>
                   Program:{' '}
                   <strong>
-                    {engine.isFinished()
-                      ? 'FINISHED'
-                      : 'RUNNING'}
+                    {programStatus}
                   </strong>
                 </span>
               </section>
@@ -741,6 +763,28 @@ function App() {
                             }
                           </strong>
                         </p>
+
+                        {process.blockingReason?.type === 'AWAIT' && (
+                          <div className="await-blocking-reason">
+                            <strong>Waiting for</strong>
+
+                            <code>
+                              {formatExpression(
+                                process.blockingReason.condition,
+                              )}
+                            </code>
+                          </div>
+                        )}
+
+                        {process.blockingReason?.type === 'SEMAPHORE_P' && (
+                          <div className="semaphore-blocking-reason">
+                            <strong>Waiting on P</strong>
+
+                            <code>
+                              {`P(${process.blockingReason.semaphoreName})`}
+                            </code>
+                          </div>
+                        )}
 
                         <h4>
                           Local memory
@@ -805,6 +849,60 @@ function App() {
                 </div>
               </section>
 
+              {snapshot.semaphores.length > 0 && (
+                <section>
+                  <h2>Semaphores</h2>
+
+                  <div className="semaphore-grid">
+                    {snapshot.semaphores.map(
+                      (semaphore) => (
+                        <article
+                          className="semaphore-card"
+                          key={semaphore.name}
+                        >
+                          <div className="semaphore-header">
+                            <code>{semaphore.name}</code>
+
+                            <strong className="semaphore-value">
+                              {semaphore.value}
+                            </strong>
+                          </div>
+
+                          <div className="semaphore-waiters">
+                            <span>
+                              Waiting processes
+                            </span>
+
+                            {semaphore.waitingProcessIds.length === 0 ? (
+                              <span className="empty">
+                                None
+                              </span>
+                            ) : (
+                              <div className="semaphore-waiter-list">
+                                {semaphore.waitingProcessIds.map(
+                                  (processId) => (
+                                    <span
+                                      className="semaphore-waiter"
+                                      key={processId}
+                                    >
+                                      {processId}
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <small>
+                            Informational only · no FIFO order
+                          </small>
+                        </article>
+                      ),
+                    )}
+                  </div>
+                </section>
+              )}
+
               <section>
                 <div className="history-header">
                   <h2>Execution History</h2>
@@ -853,6 +951,8 @@ function App() {
                             <th>Step</th>
                             <th>Process</th>
                             <th>Instruction</th>
+                            <th>Status</th>
+                            <th>Detail</th>
                           </tr>
                         </thead>
 
@@ -866,8 +966,49 @@ function App() {
                               >
                                 <td>{entry.step}</td>
                                 <td>{entry.processId}</td>
+
                                 <td>
                                   {entry.instructionType}
+                                </td>
+
+                                <td>
+                                  {entry.semaphoreEvent ? (
+                                    <span
+                                      className={
+                                        `semaphore-status semaphore-status-${entry.semaphoreEvent.status.toLowerCase()}`
+                                      }
+                                    >
+                                      {entry.semaphoreEvent.status}
+                                    </span>
+                                  ) : entry.awaitStatus ? (
+                                    <span
+                                      className={
+                                        `await-status await-status-${entry.awaitStatus.toLowerCase()}`
+                                      }
+                                    >
+                                      {entry.awaitStatus}
+                                    </span>
+                                  ) : (
+                                    '—'
+                                  )}
+                                </td>
+
+                                <td>
+                                  {entry.semaphoreEvent ? (
+                                    <span className="semaphore-history-detail">
+                                      <code>
+                                        {`${entry.semaphoreEvent.operation}(${entry.semaphoreEvent.semaphoreName})`}
+                                      </code>
+
+                                      <span>
+                                        {entry.semaphoreEvent.valueBefore}
+                                        {' → '}
+                                        {entry.semaphoreEvent.valueAfter}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    entry.description ?? '—'
+                                  )}
                                 </td>
                               </tr>
                             ))}
@@ -913,12 +1054,17 @@ function App() {
                               const hasSynchronizedAccess =
                                 synchronizedConflicts.some(belongsToConflict)
 
+                              const hasUnknownAccess =
+                                unknownConflicts.some(belongsToConflict)
+
                               return (
                                 <tr
                                   key={`${entry.step}-${entry.processId}-${entry.type}-${index}`}
                                   className={
                                     hasPotentialRace
                                       ? 'memory-conflict-row'
+                                      : hasUnknownAccess
+                                        ? 'memory-unknown-row'
                                       : hasSynchronizedAccess
                                         ? 'memory-synchronized-row'
                                         : undefined
@@ -948,6 +1094,12 @@ function App() {
                                         Synchronized
                                       </span>
                                     )}
+
+                                    {hasUnknownAccess && (
+                                      <span className="memory-unknown-indicator">
+                                        Unknown
+                                      </span>
+                                    )}
                                   </td>
                                 </tr>
                               )
@@ -973,9 +1125,21 @@ function App() {
                               {synchronizedConflicts.length}{' '}
                               synchronized
                             </span>
+
+                            {' · '}
+
+                            <span className="memory-unknown-count">
+                              {unknownConflicts.length}{' '}
+                              unknown
+                            </span>
                           </div>
                         </div>
-                        {potentialRaces.length > 0
+                        <p className="analysis-scope-note">
+                          Classification applies to this observed execution.
+                          It is not a proof for every possible interleaving.
+                        </p>
+
+                        {conflictsNeedingAttention.length > 0
                           && snapshot.memoryConflictSummaries.length > 0 && (
                           <div className="memory-conflict-summary-grid">
                             {snapshot.memoryConflictSummaries.map(
@@ -1013,9 +1177,9 @@ function App() {
                             )}
                           </div>
                         )}
-                        {potentialRaces.length === 0 ? (
+                        {conflictsNeedingAttention.length === 0 ? (
                             <p className="empty">
-                              No conflicting shared-memory accesses detected.
+                              No unprotected or ambiguous shared-memory conflicts detected.
                             </p>
                           ) : (
                             <table>
@@ -1024,11 +1188,12 @@ function App() {
                                   <th>Location</th>
                                   <th>First access</th>
                                   <th>Second access</th>
+                                  <th>Analysis</th>
                                 </tr>
                               </thead>
 
                               <tbody>
-                                {potentialRaces.map(
+                                {conflictsNeedingAttention.map(
                                   (conflict, index) => {
                                     const location =
                                       conflict.first.location
@@ -1094,6 +1259,24 @@ function App() {
                                               .second
                                               .step
                                           }
+                                        </td>
+
+                                        <td>
+                                          <span
+                                            className={
+                                              conflict.classification === 'UNKNOWN'
+                                                ? 'memory-unknown-indicator'
+                                                : 'memory-conflict-indicator'
+                                            }
+                                          >
+                                            {conflict.classification === 'UNKNOWN'
+                                              ? 'Unknown'
+                                              : 'Potential race'}
+                                          </span>
+
+                                          <div className="memory-analysis-reason">
+                                            {describeConflictReason(conflict)}
+                                          </div>
                                         </td>
                                       </tr>
                                     )
@@ -1164,6 +1347,10 @@ function App() {
                                             <span className="memory-synchronized-indicator">
                                               Synchronized
                                             </span>
+
+                                            <div className="memory-analysis-reason">
+                                              {describeConflictReason(conflict)}
+                                            </div>
                                           </td>
                                         </tr>
                                       )
@@ -1237,6 +1424,24 @@ function formatValue(
   }
 
   return String(value)
+}
+
+function describeConflictReason(
+  conflict: MemoryAccessConflict,
+): string {
+  switch (conflict.reason.type) {
+    case 'ATOMIC_REGION':
+      return 'Both accesses ran inside atomic regions.'
+
+    case 'SEMAPHORE_MUTEX':
+      return `Observed mutex protocol with ${conflict.reason.semaphoreName}.`
+
+    case 'AMBIGUOUS_SEMAPHORE_PROTOCOL':
+      return `Semaphore use is not a verified mutex protocol: ${conflict.reason.semaphoreNames.join(', ')}.`
+
+    case 'UNPROTECTED':
+      return 'The accesses do not share a recognized protection mechanism.'
+  }
 }
 
 function schedulerLabel(

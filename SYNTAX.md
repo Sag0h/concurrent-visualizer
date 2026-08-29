@@ -2,14 +2,18 @@
 
 ## Versión
 
-**Sintaxis V1**
+**Sintaxis V2**
 
 Esta versión documenta las características actualmente soportadas por el
-lenguaje y el motor al cierre de M5.
+lenguaje y el motor al cierre de M6 y durante M7.5.
 
-La sintaxis crecerá junto con el simulador. Las primitivas concurrentes
-posteriores se incorporarán siguiendo prioritariamente la terminología y
-semántica utilizada por la cátedra.
+Además de la capa secuencial y `atomic`, la sintaxis incorpora
+actualmente `await`, declaraciones escalares de semáforos y operaciones
+`P` / `V`.
+
+La sintaxis crecerá junto con el simulador. Las nuevas primitivas
+concurrentes se incorporarán siguiendo prioritariamente la terminología
+y semántica utilizada por la cátedra.
 
 ------------------------------------------------------------------------
 
@@ -17,13 +21,14 @@ semántica utilizada por la cátedra.
 
 Un programa puede contener:
 
-1. variables compartidas;
-2. definiciones de funciones;
-3. uno o más procesos.
+1.  variables compartidas;
+2.  declaraciones de semáforos;
+3.  definiciones de funciones;
+4.  uno o más procesos.
 
 Ejemplo:
 
-```text
+``` text
 shared int counter = 0;
 
 function increment(int value) {
@@ -50,7 +55,7 @@ process P2 {
 Las variables compartidas se declaran fuera de los procesos utilizando
 `shared`.
 
-```text
+``` text
 shared int counter = 0;
 shared bool active = true;
 shared string message = "hello";
@@ -60,17 +65,18 @@ shared int[] values = [10, 20, 30];
 Todos los procesos pueden leer y modificar estas variables.
 
 Los accesos relevantes a memoria compartida pueden ser descompuestos
-internamente por el motor en microoperaciones para permitir interleavings.
+internamente por el motor en microoperaciones para permitir
+interleavings.
 
 Por ejemplo:
 
-```text
+``` text
 counter = counter + 1;
 ```
 
 puede producir conceptualmente:
 
-```text
+``` text
 SHARED_READ counter
 COMPUTE
 SHARED_WRITE counter
@@ -78,11 +84,112 @@ SHARED_WRITE counter
 
 ------------------------------------------------------------------------
 
+## Semáforos
+
+Los semáforos se declaran en el nivel global mediante `sem`.
+
+Sintaxis soportada:
+
+``` text
+sem mutex = 1;
+sem available = 3;
+sem event = 0;
+```
+
+La inicialización es obligatoria.
+
+El valor inicial debe ser un **literal entero no negativo**.
+
+Ejemplos válidos:
+
+``` text
+sem s0 = 0;
+sem s1 = 1;
+sem slots = 5;
+```
+
+Ejemplos no válidos:
+
+``` text
+sem missing;
+sem negative = -1;
+sem computed = 1 + 1;
+```
+
+Actualmente los semáforos son escalares. No se soportan todavía arrays
+de semáforos.
+
+Los semáforos no son variables compartidas ordinarias. No se leen ni
+modifican mediante asignaciones como:
+
+``` text
+mutex = 0;   // no corresponde al modelo actual
+```
+
+Su estado se modifica mediante `P` y `V`.
+
+### `P`
+
+Sintaxis:
+
+``` text
+P(mutex);
+```
+
+`P` intenta adquirir una unidad del semáforo.
+
+Si el valor es mayor que cero, la comprobación y el decremento se
+realizan atómicamente y el proceso continúa.
+
+Si el valor es cero, el proceso queda `BLOCKED` y permanece sobre la
+misma instrucción `P` hasta poder volver a intentarla.
+
+La reactivación no reserva el recurso: cuando el proceso sea
+seleccionado por el scheduler, `P` se evalúa nuevamente.
+
+### `V`
+
+Sintaxis:
+
+``` text
+V(mutex);
+```
+
+`V` incrementa atómicamente el valor del semáforo y nunca bloquea.
+
+Los semáforos generales no modelan ownership, por lo que el lenguaje no
+exige que el proceso que ejecuta `V` sea el mismo que ejecutó
+previamente `P`.
+
+### Ejemplo de exclusión mutua
+
+``` text
+sem mutex = 1;
+shared int x = 0;
+
+process P1 {
+    P(mutex);
+    x = x + 1;
+    V(mutex);
+}
+
+process P2 {
+    P(mutex);
+    x = x + 1;
+    V(mutex);
+}
+```
+
+No existe un tipo sintáctico especial de semáforo binario. Para V1 se
+utilizan únicamente semáforos generales/contadores.
+
+------------------------------------------------------------------------
+
 ## Variables locales
 
 Las variables declaradas dentro de un proceso son locales a ese proceso.
 
-```text
+``` text
 process P1 {
     int value = 10;
     bool ready = true;
@@ -93,7 +200,7 @@ process P1 {
 Dos procesos pueden declarar una variable con el mismo nombre sin
 compartirla.
 
-```text
+``` text
 process P1 {
     int x = 10;
 }
@@ -112,26 +219,26 @@ esa llamada y no son compartidas entre procesos ni entre invocaciones.
 
 ### int
 
-```text
+``` text
 int x = 10;
 ```
 
 ### bool
 
-```text
+``` text
 bool active = true;
 bool finished = false;
 ```
 
 ### string
 
-```text
+``` text
 string message = "hello";
 ```
 
 ### arrays
 
-```text
+``` text
 int[] numbers = [10, 20, 30];
 bool[] flags = [true, false];
 string[] names = ["P1", "P2"];
@@ -143,7 +250,7 @@ Los arrays anidados no están soportados actualmente.
 
 ## Asignaciones
 
-```text
+``` text
 x = 10;
 x = x + 1;
 counter = counter + 1;
@@ -151,7 +258,7 @@ counter = counter + 1;
 
 Los nombres locales tienen prioridad sobre los nombres compartidos.
 
-```text
+``` text
 shared int x = 100;
 
 process P1 {
@@ -168,7 +275,7 @@ En este caso la asignación modifica la variable local de `P1`.
 
 Lectura:
 
-```text
+``` text
 x = numbers[0];
 x = numbers[i];
 x = numbers[i + 1];
@@ -176,7 +283,7 @@ x = numbers[i + 1];
 
 Escritura:
 
-```text
+``` text
 numbers[1] = 50;
 numbers[i] = value;
 numbers[i + offset] = value;
@@ -186,13 +293,13 @@ Los índices comienzan en cero.
 
 Los índices pueden ser expresiones.
 
-Cuando un target de un array compartido depende de variables compartidas,
-las lecturas necesarias para resolver el índice forman parte de la
-ejecución concurrente.
+Cuando un target de un array compartido depende de variables
+compartidas, las lecturas necesarias para resolver el índice forman
+parte de la ejecución concurrente.
 
 Por ejemplo:
 
-```text
+``` text
 shared int i = 0;
 shared int offset = 1;
 shared int[] values = [0, 0, 0];
@@ -211,7 +318,7 @@ variables antes del `WRITE`.
 
 ## Expresiones aritméticas
 
-```text
+``` text
 a + b
 a - b
 a * b
@@ -220,7 +327,7 @@ a / b
 
 También se soporta el menos unario:
 
-```text
+``` text
 -5
 -x
 -(x + 1)
@@ -228,7 +335,7 @@ También se soporta el menos unario:
 
 `+` permite concatenar dos strings:
 
-```text
+``` text
 "hello " + "world"
 ```
 
@@ -236,7 +343,7 @@ Actualmente no existe conversión automática entre números y strings.
 
 Esto no es válido:
 
-```text
+``` text
 "value: " + 10
 ```
 
@@ -244,7 +351,7 @@ Esto no es válido:
 
 ## Comparaciones
 
-```text
+``` text
 a == b
 a != b
 a < b
@@ -257,7 +364,7 @@ a >= b
 
 ## Expresiones booleanas
 
-```text
+``` text
 a && b
 a || b
 !a
@@ -265,7 +372,7 @@ a || b
 
 Se pueden combinar expresiones mediante paréntesis:
 
-```text
+``` text
 (a < b) && active
 !(finished || cancelled)
 ```
@@ -274,7 +381,7 @@ Se pueden combinar expresiones mediante paréntesis:
 
 ## `if / else`
 
-```text
+``` text
 if (x > 0) {
     x = x - 1;
 }
@@ -282,7 +389,7 @@ if (x > 0) {
 
 Con `else`:
 
-```text
+``` text
 if (x > 0) {
     result = 1;
 } else {
@@ -297,7 +404,7 @@ funciones y asignaciones.
 
 ## `while`
 
-```text
+``` text
 while (x < 10) {
     x = x + 1;
 }
@@ -309,7 +416,7 @@ La condición se vuelve a evaluar antes de cada iteración.
 
 ## `repeat / until`
 
-```text
+``` text
 repeat {
     x = x + 1;
 } until (x >= 10);
@@ -323,7 +430,7 @@ El cuerpo se ejecuta antes de evaluar la condición `until`.
 
 Sintaxis soportada:
 
-```text
+``` text
 for (int i = 0; i < 10; i = i + 1) {
     sum = sum + i;
 }
@@ -341,7 +448,7 @@ evaluar la condición.
 
 Sintaxis:
 
-```text
+``` text
 foreach (item in values) {
     sum = sum + item;
 }
@@ -359,7 +466,7 @@ funciones.
 
 `break` termina el loop más cercano.
 
-```text
+``` text
 while (true) {
     if (x >= 10) {
         break;
@@ -377,7 +484,7 @@ Funciona dentro de estructuras de control anidadas.
 
 `continue` continúa con la siguiente iteración del loop más cercano.
 
-```text
+``` text
 for (int i = 0; i < 10; i = i + 1) {
     if (i == 5) {
         continue;
@@ -389,10 +496,10 @@ for (int i = 0; i < 10; i = i + 1) {
 
 Su comportamiento depende del tipo de loop:
 
-- `while`: vuelve a evaluar la condición;
-- `repeat / until`: evalúa la condición `until`;
-- `for`: ejecuta el incremento y luego evalúa la condición;
-- `foreach`: avanza al siguiente elemento.
+-   `while`: vuelve a evaluar la condición;
+-   `repeat / until`: evalúa la condición `until`;
+-   `for`: ejecuta el incremento y luego evalúa la condición;
+-   `foreach`: avanza al siguiente elemento.
 
 ------------------------------------------------------------------------
 
@@ -402,7 +509,7 @@ Las funciones se definen fuera de los procesos.
 
 Ejemplo:
 
-```text
+``` text
 function double(int value) {
     return value * 2;
 }
@@ -410,7 +517,7 @@ function double(int value) {
 
 Pueden recibir parámetros:
 
-```text
+``` text
 function add(int a, int b) {
     return a + b;
 }
@@ -431,13 +538,13 @@ control y llamadas a otras funciones.
 
 Una función puede invocarse como instrucción:
 
-```text
+``` text
 doWork();
 ```
 
 También puede utilizarse dentro de una expresión:
 
-```text
+``` text
 int result = double(5);
 int result = double(5) + 3;
 int result = double(double(5));
@@ -446,7 +553,7 @@ int result = double(5) + double(10);
 
 Los argumentos también pueden contener llamadas:
 
-```text
+``` text
 add(double(5), double(10));
 ```
 
@@ -461,20 +568,20 @@ expresión original.
 
 Una función puede retornar sin valor:
 
-```text
+``` text
 return;
 ```
 
 o retornar una expresión:
 
-```text
+``` text
 return x + 1;
 ```
 
 También se permiten llamadas a funciones dentro de la expresión
 retornada:
 
-```text
+``` text
 return double(x) + 1;
 ```
 
@@ -488,7 +595,7 @@ la llamada actual.
 
 Los procesos se declaran utilizando `process`.
 
-```text
+``` text
 process P1 {
     int x = 0;
     x = x + 1;
@@ -497,18 +604,19 @@ process P1 {
 
 Cada proceso mantiene su propio estado de ejecución, incluyendo:
 
-- memoria local;
-- program counter;
-- secuencia de instrucciones;
-- execution stack;
-- call stack;
-- evaluaciones suspendidas;
-- estado temporal de microoperaciones cuando corresponde;
-- profundidad de región atómica.
+-   memoria local;
+-   program counter;
+-   secuencia de instrucciones;
+-   execution stack;
+-   call stack;
+-   evaluaciones suspendidas;
+-   estado temporal de microoperaciones cuando corresponde;
+-   profundidad de región atómica;
+-   motivo de bloqueo cuando se encuentra en `BLOCKED`.
 
 Estados posibles:
 
-```text
+``` text
 READY
 RUNNING
 BLOCKED
@@ -525,7 +633,7 @@ Cuando un proceso consume todas sus instrucciones pasa automáticamente a
 
 Una región atómica se declara mediante:
 
-```text
+``` text
 atomic {
     x = x + 1;
 }
@@ -539,7 +647,7 @@ microoperación.
 
 Por ejemplo:
 
-```text
+``` text
 atomic {
     x = x + 1;
 }
@@ -547,7 +655,7 @@ atomic {
 
 puede seguir produciendo conceptualmente:
 
-```text
+``` text
 SHARED_READ x
 COMPUTE
 SHARED_WRITE x
@@ -559,7 +667,7 @@ pero ningún otro proceso puede ejecutar una microoperación entre ellas.
 
 Se soportan regiones `atomic` anidadas:
 
-```text
+``` text
 atomic {
     atomic {
         x = x + 1;
@@ -579,7 +687,7 @@ durante estos cambios de flujo.
 
 También se permiten regiones vacías:
 
-```text
+``` text
 atomic {
 }
 ```
@@ -591,7 +699,7 @@ atomicidad explícita actual, ambos deben respetar el mecanismo.
 
 Por ejemplo:
 
-```text
+``` text
 shared int x = 0;
 
 process P1 {
@@ -610,6 +718,98 @@ fuera de la región protegida.
 
 ------------------------------------------------------------------------
 
+## `await`
+
+`await` representa una acción atómica condicional.
+
+Se soportan dos formas.
+
+### Espera sin cuerpo
+
+``` text
+await (ready);
+```
+
+Equivale conceptualmente a esperar hasta que la condición pueda
+cumplirse.
+
+Si la condición es falsa:
+
+-   el proceso pasa a `BLOCKED`;
+-   el program counter permanece sobre el `await`;
+-   la condición se conserva para futuras reevaluaciones.
+
+Cuando la condición pasa a ser verdadera, el proceso puede volver a
+`READY`, pero esto no garantiza que vaya a ejecutar inmediatamente.
+
+Al ser seleccionado nuevamente, la guarda se reevalúa.
+
+### Espera con cuerpo
+
+``` text
+await (x > 0) {
+    x = x - 1;
+}
+```
+
+Cuando la guarda es verdadera, la comprobación exitosa y el cuerpo
+forman una acción atómica condicional.
+
+Las microoperaciones internas del cuerpo pueden seguir siendo visibles
+en el simulador, pero ningún otro proceso puede intercalarse durante esa
+acción.
+
+### Tipo de la guarda
+
+La guarda debe producir un `bool`.
+
+Ejemplos válidos:
+
+``` text
+await (ready);
+await (x > 0);
+await ((x > 0) && active);
+```
+
+Actualmente no se permiten llamadas a funciones dentro de una guarda:
+
+``` text
+await (isReady()); // no soportado actualmente
+```
+
+Tampoco se soporta por ahora `await` dentro de una región `atomic`.
+
+Sí pueden existir regiones `atomic` dentro del cuerpo de un `await`
+habilitado.
+
+### Ejemplo de lock con `await`
+
+``` text
+shared bool lock = false;
+
+process P1 {
+    await (!lock) {
+        lock = true;
+    }
+
+    // sección crítica
+
+    lock = false;
+}
+
+process P2 {
+    await (!lock) {
+        lock = true;
+    }
+
+    // sección crítica
+
+    lock = false;
+}
+```
+
+------------------------------------------------------------------------
+
 ## Scheduling
 
 El scheduler no se declara dentro del programa. Se selecciona desde la
@@ -617,7 +817,7 @@ interfaz del simulador.
 
 Schedulers disponibles:
 
-```text
+``` text
 First Ready
 Round Robin
 Random
@@ -626,7 +826,14 @@ Random
 `Random` permite especificar una seed para reproducir una ejecución.
 
 El scheduling puede ocurrir entre microoperaciones de una instrucción
-cuando no existe una región `atomic` activa que lo impida.
+cuando no existe una región de atomicidad activa que lo impida.
+
+Los procesos `BLOCKED` no son seleccionables por el scheduler.
+
+Cuando una condición de `await` o una operación `P` puede volver a
+progresar, el proceso puede pasar a `READY`. Esa reactivación no reserva
+una condición ni un recurso: `READY` solo significa que el proceso
+vuelve a ser elegible.
 
 ------------------------------------------------------------------------
 
@@ -639,7 +846,7 @@ hacer visible la interferencia.
 Los tipos utilizados actualmente para las operaciones relevantes
 incluyen:
 
-```text
+``` text
 SHARED_READ
 COMPUTE
 SHARED_WRITE
@@ -648,28 +855,24 @@ SHARED_WRITE
 Una instrucción fuente puede requerir varios steps para completarse.
 
 Las lecturas compartidas capturan el valor observado en el momento del
-acceso. Ese valor capturado se utiliza posteriormente aunque otro proceso
-modifique la memoria antes de que termine la instrucción.
+acceso. Ese valor capturado se utiliza posteriormente aunque otro
+proceso modifique la memoria antes de que termine la instrucción.
 
 La interfaz permite observar el historial de estas operaciones y los
 interleavings producidos por el scheduler.
 
 ------------------------------------------------------------------------
 
-## Características todavía no disponibles en la Sintaxis V1
+## Características todavía no disponibles
 
 Las siguientes características forman parte del roadmap pero todavía no
 están disponibles:
 
-```text
+``` text
 sleep
 yield
 
-await
-
-sem
-P
-V
+arrays de semáforos
 
 monitor
 wait
@@ -682,10 +885,14 @@ receive
 sync_send
 ```
 
-`await` es la próxima extensión prevista.
+También permanecen fuera del alcance actual:
 
-Su sintaxis y semántica definitiva se documentarán después de verificar
-el comportamiento requerido por el material actual de la cátedra.
+-   llamadas a funciones dentro de guardas de `await`;
+-   `await` dentro de regiones `atomic`;
+-   un tipo especial de semáforo binario;
+-   fairness formal/FIFO para semáforos;
+-   sintaxis especial como `i++`;
+-   arrays anidados.
 
 Las primitivas posteriores se incorporarán incrementalmente y este
 documento se actualizará cuando sean implementadas.

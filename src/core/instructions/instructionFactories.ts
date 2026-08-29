@@ -12,6 +12,10 @@ import type {
   ContinueInstruction,
   CallInstruction,
   ReturnInstruction,
+  AwaitInstruction,
+  AtomicInstruction,
+  SemaphoreVInstruction,
+  SemaphorePInstruction,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -171,9 +175,38 @@ export function returnInstruction(
 
 export function atomicInstruction(
   body: Instruction[],
-): Instruction {
+): AtomicInstruction {
   return {
     type: 'ATOMIC',
     body,
+  }
+}
+
+export function awaitInstruction(
+  condition: Expression,
+  body: Instruction[] = [],
+): AwaitInstruction {
+  return {
+    type: 'AWAIT',
+    condition,
+    body,
+  }
+}
+
+export function semaphorePInstruction(
+  semaphoreName: string,
+): SemaphorePInstruction {
+  return {
+    type: 'SEMAPHORE_P',
+    semaphoreName,
+  }
+}
+
+export function semaphoreVInstruction(
+  semaphoreName: string,
+): SemaphoreVInstruction {
+  return {
+    type: 'SEMAPHORE_V',
+    semaphoreName,
   }
 }

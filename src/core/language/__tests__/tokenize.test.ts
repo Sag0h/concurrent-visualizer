@@ -167,4 +167,74 @@ describe('tokenize', () => {
 
     expect(tokens[0].type).toBe('ATOMIC')
   })
+
+  it('tokenizes await as a keyword', () => {
+    const tokens = tokenize(`
+      await (ready);
+    `)
+
+    expect(
+      tokens.map((token) => token.type),
+    ).toEqual([
+      'AWAIT',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
+
+  it('keeps await line and column information', () => {
+    const tokens = tokenize(
+      'await (ready);',
+    )
+
+    expect(tokens[0]).toMatchObject({
+      type: 'AWAIT',
+      lexeme: 'await',
+      line: 1,
+      column: 1,
+    })
+  })
+
+  it('tokenizes semaphore declarations', () => {
+  const tokens = tokenize(
+    'sem mutex = 1;',
+  )
+
+  expect(
+    tokens.map((token) => token.type),
+  ).toEqual([
+    'SEM',
+    'IDENTIFIER',
+    'ASSIGN',
+    'NUMBER',
+    'SEMICOLON',
+    'EOF',
+  ])
+})
+
+  it('tokenizes semaphore operations', () => {
+    const tokens = tokenize(`
+      P(mutex);
+      V(mutex);
+    `)
+
+    expect(
+      tokens.map((token) => token.type),
+    ).toEqual([
+      'SEMAPHORE_P',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'SEMAPHORE_V',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
 })

@@ -79,6 +79,22 @@ export interface AtomicInstruction {
   readonly body: Instruction[]
 }
 
+export interface AwaitInstruction {
+  readonly type: 'AWAIT'
+  readonly condition: Expression
+  readonly body: Instruction[]
+}
+
+export interface SemaphorePInstruction {
+  readonly type: 'SEMAPHORE_P'
+  readonly semaphoreName: string
+}
+
+export interface SemaphoreVInstruction {
+  readonly type: 'SEMAPHORE_V'
+  readonly semaphoreName: string
+}
+
 export type Instruction =
   | NoOpInstruction
   | FinishInstruction
@@ -94,3 +110,6 @@ export type Instruction =
   | CallInstruction
   | ReturnInstruction
   | AtomicInstruction
+  | AwaitInstruction
+  | SemaphorePInstruction
+  | SemaphoreVInstruction

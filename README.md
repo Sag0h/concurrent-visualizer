@@ -1,28 +1,51 @@
 # Concurrent Visualizer
 
-> Simulador educativo de programación concurrente para **escribir, ejecutar, visualizar y analizar pseudocódigo concurrente paso a paso**.
+> Simulador educativo de programación concurrente para **escribir,
+> ejecutar, visualizar y analizar pseudocódigo concurrente paso a
+> paso**.
 
-Concurrent Visualizer nace como herramienta de estudio para **Programación Concurrente de la Facultad de Informática de la UNLP**, pero está diseñado como un motor general de pseudocódigo concurrente.
+Concurrent Visualizer nace como herramienta de estudio para
+**Programación Concurrente de la Facultad de Informática de la UNLP**,
+pero está diseñado como un motor general de pseudocódigo concurrente.
 
-La idea central es que los problemas de concurrencia no sean animaciones prefabricadas: deben **emerger de la ejecución real del programa**, del scheduler y de los interleavings producidos por el motor.
+La idea central es que los problemas de concurrencia no sean animaciones
+prefabricadas: deben **emerger de la ejecución real del programa**, del
+scheduler y de los interleavings producidos por el motor.
 
----
+------------------------------------------------------------------------
 
 ## Estado del proyecto
 
-**Milestone actual:** M5 completado — **Atomicidad e interferencia**.
+**Milestone actual:** M7 --- **Semáforos**.
 
-El simulador ya dispone de un lenguaje ejecutable, parser, procesos, estructuras de control, funciones, scheduling reproducible, memoria compartida, ejecución mediante microoperaciones, detección básica de interferencias y secciones `atomic`.
+**Último milestone completado:** M6 --- **`await`**.
 
-Actualmente el desarrollo avanza hacia **M6 — `await`**, siguiendo prioritariamente la semántica utilizada por la cátedra.
+Actualmente están completadas las primeras cinco fases de M7:
 
----
+-   **M7.1:** semántica de semáforos generales/contadores;
+-   **M7.2:** modelo y AST;
+-   **M7.3:** tokenizer, sintaxis y parser;
+-   **M7.4:** runtime base de `P` / `V`.
+-   **M7.5:** historial y visualización de semáforos.
+
+El simulador ya dispone de lenguaje ejecutable, parser, procesos,
+estructuras de control, funciones, scheduling reproducible, memoria
+compartida, microoperaciones intercalables, análisis básico de
+interferencias, regiones `atomic`, acciones atómicas condicionales
+mediante `await` y semáforos escalares.
+
+Las próximas fases de M7 incorporan la integración con el análisis de
+interferencia y casos académicos.
+
+------------------------------------------------------------------------
 
 ## ¿Qué permite hacer actualmente?
 
-El usuario puede escribir pseudocódigo como:
+### Observar interferencia real
 
-```text
+El usuario puede escribir:
+
+``` text
 shared int x = 0;
 
 process P1 {
@@ -34,9 +57,10 @@ process P2 {
 }
 ```
 
-y observar cómo una operación aparentemente simple puede descomponerse en acciones intercalables:
+y observar cómo una operación aparentemente simple puede descomponerse
+en acciones intercalables:
 
-```text
+``` text
 P1 SHARED_READ  x = 0
 P2 SHARED_READ  x = 0
 P1 COMPUTE      result = 1
@@ -47,27 +71,80 @@ P2 SHARED_WRITE x = 1
 
 El resultado puede ser:
 
-```text
+``` text
 x = 1
 ```
 
-reproduciendo un **lost update** a partir del interleaving real de los procesos.
+reproduciendo un **lost update** a partir del interleaving real de los
+procesos.
 
-El mismo programa puede protegerse mediante:
+### Proteger una región con `atomic`
 
-```text
+``` text
 atomic {
     x = x + 1;
 }
 ```
 
-Las microoperaciones siguen siendo visibles, pero otro proceso no puede intercalarse mientras la región atómica permanezca activa.
+Las microoperaciones siguen siendo visibles, pero otro proceso no puede
+intercalarse mientras la región atómica permanezca activa.
 
----
+### Esperar una condición con `await`
+
+``` text
+shared bool ready = false;
+
+process Consumer {
+    await (ready);
+}
+
+process Producer {
+    ready = true;
+}
+```
+
+Si la guarda es falsa, el proceso queda `BLOCKED`. Cuando puede volver a
+progresar queda habilitado para competir por CPU y la condición se
+reevalúa al ejecutar nuevamente.
+
+También se soporta una acción atómica condicional con cuerpo:
+
+``` text
+await (x > 0) {
+    x = x - 1;
+}
+```
+
+### Sincronizar mediante semáforos
+
+``` text
+sem mutex = 1;
+shared int x = 0;
+
+process P1 {
+    P(mutex);
+    x = x + 1;
+    V(mutex);
+}
+
+process P2 {
+    P(mutex);
+    x = x + 1;
+    V(mutex);
+}
+```
+
+`P` bloquea cuando el semáforo vale `0`; `V` incrementa y nunca bloquea.
+
+La implementación no impone FIFO, fairness ni ownership. La reactivación
+de un proceso no reserva el recurso: la adquisición efectiva ocurre
+cuando `P` vuelve a ejecutarse.
+
+------------------------------------------------------------------------
 
 ## Flujo de ejecución
 
-```text
+``` text
 Código fuente
       ↓
   Tokenizer
@@ -87,116 +164,185 @@ Execution State
 
 La lógica del simulador vive en el motor y es independiente de React.
 
----
+------------------------------------------------------------------------
 
 ## Funcionalidades implementadas
 
 ### Lenguaje
 
-- Variables locales y compartidas.
-- `int`, `bool` y `string`.
-- Arrays.
-- Expresiones aritméticas, booleanas y comparaciones.
-- Asignaciones.
-- `if / else`.
-- `while`.
-- `repeat / until`.
-- `for`.
-- `foreach`.
-- `break`.
-- `continue`.
-- Funciones y parámetros.
-- Call stack.
-- Llamadas a funciones dentro de expresiones.
-- `return`.
-- Evaluaciones suspendibles.
-- `atomic`.
+-   Variables locales y compartidas.
+-   `int`, `bool` y `string`.
+-   Arrays.
+-   Expresiones aritméticas, booleanas y comparaciones.
+-   Asignaciones.
+-   `if / else`.
+-   `while`.
+-   `repeat / until`.
+-   `for`.
+-   `foreach`.
+-   `break`.
+-   `continue`.
+-   Funciones y parámetros.
+-   Call stack.
+-   Llamadas a funciones dentro de expresiones.
+-   `return`.
+-   Evaluaciones suspendibles.
+-   `atomic`.
+-   `await (B);`.
+-   `await (B) { S }`.
+-   Declaraciones escalares `sem`.
+-   Operaciones `P` / `V`.
 
 ### Motor concurrente
 
-- Procesos independientes.
-- Estados `READY`, `RUNNING`, `BLOCKED` y `FINISHED`.
-- Memoria local por proceso.
-- Memoria compartida.
-- Ejecución paso a paso.
-- Scheduling **First Ready**.
-- Scheduling **Round Robin**.
-- Scheduling **Random** reproducible mediante seed.
-- Microoperaciones intercalables.
-- Captura de valores observados durante lecturas compartidas.
-- Accesos a variables y elementos concretos de arrays mediante `MemoryLocation`.
-- Resolución de índices compartidos en targets de arrays.
-- Regiones atómicas anidables mediante `atomicDepth`.
+-   Procesos independientes.
+-   Estados `READY`, `RUNNING`, `BLOCKED` y `FINISHED`.
+-   Motivos explícitos de bloqueo mediante `blockingReason`.
+-   Memoria local por proceso.
+-   Memoria compartida.
+-   Semáforos separados de la memoria compartida ordinaria.
+-   Ejecución paso a paso.
+-   Scheduling **First Ready**.
+-   Scheduling **Round Robin**.
+-   Scheduling **Random** reproducible mediante seed.
+-   Microoperaciones intercalables.
+-   Captura de valores observados durante lecturas compartidas.
+-   Accesos a variables y elementos concretos de arrays mediante
+    `MemoryLocation`.
+-   Resolución de índices compartidos en targets de arrays.
+-   Regiones atómicas anidables mediante `atomicDepth`.
+-   Bloqueo y reactivación de `await`.
+-   Acciones atómicas condicionales.
+-   Bloqueo y reactivación de `P`.
+-   `P` / `V` como operaciones atómicas individuales.
+-   Reactivación de waiters sin reserva del recurso.
+-   Reset reproducible del estado de ejecución.
 
 ### Visualización y análisis
 
-- Estado de los procesos.
-- Memoria local.
-- Memoria compartida.
-- Call stack.
-- Historial de ejecución.
-- Historial de microoperaciones.
-- Lecturas y escrituras compartidas.
-- Detección de accesos conflictivos.
-- Clasificación `POTENTIAL_RACE`.
-- Clasificación `SYNCHRONIZED`.
-- Resumen de conflictos por ubicación de memoria.
+-   Estado de los procesos.
+-   Estado `BLOCKED`.
+-   Condición esperada por `await`.
+-   Distinción entre programa bloqueado y finalizado.
+-   Memoria local.
+-   Memoria compartida.
+-   Call stack.
+-   Historial de ejecución.
+-   Historial de microoperaciones.
+-   Lecturas y escrituras compartidas.
+-   Detección de accesos conflictivos.
+-   Clasificación `POTENTIAL_RACE`.
+-   Clasificación `SYNCHRONIZED`.
+-   Resumen de conflictos por ubicación de memoria.
+-   Valores actuales de semáforos.
+-   Procesos bloqueados esperando cada semáforo, sin representar FIFO.
+-   Transiciones estructuradas de `P` / `V` en el historial.
 
----
+------------------------------------------------------------------------
 
-## Ejemplo de atomicidad
+## Semántica concurrente actual
 
-Sin protección:
+### Microoperaciones
 
-```text
-shared int x = 0;
+Una instrucción fuente no es necesariamente una única acción atómica.
 
-process P1 {
-    x = x + 1;
-}
+Por ejemplo:
 
-process P2 {
-    x = x + 1;
-}
+``` text
+x = x + 1;
 ```
 
-puede existir un interleaving que termine con:
+puede producir conceptualmente:
 
-```text
-x = 1
+``` text
+SHARED_READ x
+COMPUTE
+SHARED_WRITE x
 ```
 
-Con protección:
+Una lectura captura el valor observado en ese momento. El scheduler
+puede intercalar otros procesos entre microoperaciones cuando no existe
+una región atómica activa.
 
-```text
-shared int x = 0;
+### `atomic`
 
-process P1 {
-    atomic {
-        x = x + 1;
-    }
-}
+`atomic { ... }` representa una región no intercalable, no una única
+microoperación.
 
-process P2 {
-    atomic {
-        x = x + 1;
-    }
-}
+Las microoperaciones continúan existiendo y registrándose, pero el
+scheduler no puede cambiar de proceso mientras la región permanezca
+activa.
+
+Se soportan regiones anidadas y unwind correcto ante `return`, `break` y
+`continue`.
+
+### `await`
+
+`await` es una acción atómica condicional.
+
+Si la guarda es falsa, el proceso queda `BLOCKED` sin avanzar.
+
+Cuando la guarda vuelve a ser verdadera puede pasar a `READY`, pero esto
+no reserva la condición. El proceso reevalúa la guarda cuando finalmente
+sea seleccionado.
+
+Si la guarda es verdadera y existe cuerpo, la comprobación exitosa y el
+cuerpo forman una acción atómica condicional.
+
+Actualmente las guardas de `await` no soportan llamadas a funciones y se
+rechaza `await` dentro de una región `atomic`.
+
+### Semáforos
+
+V1 utiliza únicamente **semáforos generales/contadores**.
+
+Conceptualmente:
+
+``` text
+P(s): < await (s > 0) s = s - 1; >
+V(s): < s = s + 1; >
 ```
 
-las microoperaciones de cada región no pueden intercalarse con las del otro proceso y el resultado esperado es:
+`P` y `V` son operaciones atómicas individuales, pero no utilizan
+`atomicDepth`.
 
-```text
-x = 2
+Por lo tanto:
+
+``` text
+P(mutex);
+critical_section();
+V(mutex);
 ```
 
----
+no fija el scheduler durante toda la sección crítica. La exclusión surge
+del protocolo de sincronización, no de convertir toda la región en
+`atomic`.
+
+No se asume:
+
+-   FIFO;
+-   fairness débil/fuerte;
+-   ownership;
+-   reserva de permisos durante la reactivación.
+
+El análisis de memoria puede reconocer un semáforo general inicializado
+en `1` cuando la ejecución observada respeta un protocolo mutex correcto.
+La protección por el mismo mutex se muestra como `SYNCHRONIZED`; la
+protección unilateral como `POTENTIAL_RACE`; y un contador, señalización
+o protocolo ambiguo como `UNKNOWN`.
+
+Esta clasificación no crea un tipo binario ni agrega ownership al
+runtime. Tampoco demuestra el comportamiento para todos los
+interleavings: explica únicamente la traza ejecutada.
+
+------------------------------------------------------------------------
 
 ## Arquitectura
 
-El proyecto separa deliberadamente el motor de simulación de la interfaz:
+El proyecto separa deliberadamente el motor de simulación de la
+interfaz:
 
-```text
+``` text
 src/
 ├── core/
 │   ├── engine/
@@ -205,30 +351,37 @@ src/
 │   ├── instructions/
 │   ├── expressions/
 │   ├── memory/
+│   ├── semaphores/
 │   └── analysis/
 ├── components/
 └── App.tsx
 ```
 
-Esto permite probar la semántica sin depender de React y deja preparado el motor para futuros mecanismos como semáforos, monitores y pasaje de mensajes.
+El núcleo ya soporta memoria compartida, `atomic`, `await` y semáforos
+sobre el mismo motor general. Monitores y pasaje de mensajes se
+incorporarán posteriormente sin crear simuladores independientes.
 
 Para más detalle:
 
 **[Arquitectura completa](docs/ARCHITECTURE.md)**
 
----
+------------------------------------------------------------------------
 
 ## Principios del proyecto
 
 ### Un motor real, no animaciones prefabricadas
 
-Productor/Consumidor, Lectores/Escritores, Filósofos, exclusión mutua y otros problemas clásicos deben poder expresarse como programas normales y ejecutarse mediante el mismo motor.
+Productor/Consumidor, Lectores/Escritores, Filósofos, exclusión mutua y
+otros problemas clásicos deben expresarse como programas normales y
+ejecutarse mediante el mismo motor.
 
 ### Los errores deben emerger de la ejecución
 
-Una race condition no debería aparecer porque la UI decidió mostrar una animación de una race condition.
+Una race condition no debería aparecer porque la UI decidió mostrar una
+animación de una race condition.
 
-Debe aparecer porque el scheduler produjo un interleaving válido que expuso el problema.
+Debe aparecer porque el scheduler produjo un interleaving válido que
+expuso el problema.
 
 ### Motor independiente de la UI
 
@@ -236,40 +389,52 @@ React visualiza el estado. La semántica vive en `core`.
 
 ### Ejecuciones reproducibles
 
-Los escenarios aleatorios pueden utilizar una seed para volver a ejecutar exactamente un comportamiento interesante o problemático.
+Los escenarios aleatorios pueden utilizar una seed para volver a
+ejecutar exactamente un comportamiento interesante o problemático.
 
 ### Fidelidad académica
 
-Las primitivas concurrentes se incorporan siguiendo prioritariamente la terminología y semántica utilizada por la cátedra de Programación Concurrente.
+Las primitivas concurrentes se incorporan siguiendo prioritariamente la
+terminología y semántica utilizada por la cátedra de Programación
+Concurrente.
 
----
+### Separar ejecución y análisis
+
+La semántica del motor no debe alterarse únicamente para facilitar un
+detector o una visualización.
+
+Por ejemplo, una sección protegida mediante `P` / `V` no se representa
+artificialmente mediante `atomicDepth` para conseguir que el análisis de
+interferencia la clasifique como sincronizada.
+
+------------------------------------------------------------------------
 
 ## Stack
 
-| Tecnología | Uso |
-| --- | --- |
-| **React** | Interfaz y visualización |
-| **TypeScript** | Lenguaje y motor de simulación |
-| **Vite** | Desarrollo y build |
-| **Vitest** | Tests automatizados |
-| **ESLint** | Calidad y consistencia del código |
-| **Git / GitHub** | Versionado y evolución del proyecto |
+  Tecnología         Uso
+  ------------------ -------------------------------------
+  **React**          Interfaz y visualización
+  **TypeScript**     Lenguaje y motor de simulación
+  **Vite**           Desarrollo y build
+  **Vitest**         Tests automatizados
+  **ESLint**         Calidad y consistencia del código
+  **Git / GitHub**   Versionado y evolución del proyecto
 
 No se requiere backend para la versión actual.
 
----
+------------------------------------------------------------------------
 
 ## Ejecutar localmente
 
 ### Requisitos
 
-- Node.js
-- npm
-- Git
+-   Node.js
+-   npm
+-   Git
 
 ### Instalación
 
-```bash
+``` bash
 git clone <URL-DEL-REPOSITORIO>
 cd concurrent-visualizer
 npm install
@@ -277,51 +442,59 @@ npm install
 
 ### Desarrollo
 
-```bash
+``` bash
 npm run dev
 ```
 
-### Tests
+### Verificación
 
-```bash
+``` bash
 npm test
-```
-
-### Lint
-
-```bash
 npm run lint
-```
-
-### Build
-
-```bash
 npm run build
 ```
 
----
+Los tres comandos deben finalizar correctamente antes de considerar
+cerrada una fase que modifica código.
+
+------------------------------------------------------------------------
 
 ## Documentación
 
-La documentación forma parte del proyecto y se actualiza junto con el código.
+La documentación forma parte del proyecto y se actualiza junto con el
+código.
 
-| Documento | Contenido |
-| --- | --- |
-| **[BACKLOG.md](BACKLOG.md)** | Roadmap, milestones y tickets del proyecto |
-| **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Arquitectura vigente y funcionamiento interno del motor |
-| **[DECISIONS.md](docs/DECISIONS.md)** | Decisiones arquitectónicas y motivos detrás del diseño |
-| **[PROGRESS.md](docs/PROGRESS.md)** | Historial de implementación y estado actual |
-| **[SYNTAX.md](docs/SYNTAX.md)** | Sintaxis actualmente soportada por el lenguaje |
+  ---------------------------------------------------------------------------------
+  Documento                                     Contenido
+  --------------------------------------------- -----------------------------------
+  **[BACKLOG.md](BACKLOG.md)**                  Fuente de verdad del roadmap,
+                                                milestones y tickets
 
-> Los enlaces anteriores asumen que `BACKLOG.md` está en la raíz del repositorio y el resto de los documentos se encuentra dentro de `docs/`.
+  **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**   Arquitectura vigente y
+                                                funcionamiento interno del motor
 
----
+  **[DECISIONS.md](docs/DECISIONS.md)**         Decisiones arquitectónicas costosas
+                                                de olvidar
+
+  **[PROGRESS.md](docs/PROGRESS.md)**           Historial de implementación y
+                                                estado actual
+
+  **[SYNTAX.md](docs/SYNTAX.md)**               Sintaxis actualmente soportada por
+                                                el lenguaje
+  ---------------------------------------------------------------------------------
+
+> Los enlaces anteriores asumen que `BACKLOG.md` está en la raíz del
+> repositorio y el resto de los documentos se encuentra dentro de
+> `docs/`.
+
+------------------------------------------------------------------------
 
 ## Roadmap
 
-El desarrollo está organizado incrementalmente para que cada nueva primitiva se apoye sobre semántica ya probada.
+El desarrollo está organizado incrementalmente para que cada nueva
+primitiva se apoye sobre semántica ya probada.
 
-```text
+``` text
 Lenguaje secuencial
         ↓
 Scheduling
@@ -332,58 +505,69 @@ Microoperaciones
         ↓
 Atomicidad
         ↓
-await              ← próximo
+await
         ↓
-Semáforos P / V
+Semáforos P / V      ← actual
+        ↓
+Análisis y errores
+        ↓
+Exploración
         ↓
 Monitores
         ↓
 Pasaje de mensajes
         ↓
-Análisis avanzado
+Visualización y análisis avanzado
 ```
 
-### Próximo milestone — M6: `await`
+### Milestone actual --- M7: Semáforos
 
-El próximo objetivo es representar:
+Completado:
 
-```text
-<await (B); S>
+``` text
+M7.1  Semántica
+M7.2  Modelo y AST
+M7.3  Lenguaje, tokenizer y parser
+M7.4  Runtime P / V
+M7.5  Historial y visualización
 ```
 
-La implementación debe cubrir, de acuerdo con la semántica utilizada por la cátedra:
+Pendiente:
 
-- evaluación de la guarda `B`;
-- bloqueo cuando la condición no permita progresar;
-- reactivación de procesos;
-- atomicidad correspondiente;
-- visualización del estado de espera;
-- ejercicios reales de la materia como tests.
+``` text
+M7.7  Casos académicos
+```
+
+M7.6 extendió el análisis de M5 para comprender protocolos mutex
+observados sin alterar la semántica real de ejecución.
 
 El roadmap completo está en **[BACKLOG.md](BACKLOG.md)**.
 
----
+------------------------------------------------------------------------
 
 ## Objetivo a largo plazo
 
-Concurrent Visualizer busca evolucionar desde un simulador paso a paso hacia una herramienta capaz de **explorar y explicar ejecuciones concurrentes**.
+Concurrent Visualizer busca evolucionar desde un simulador paso a paso
+hacia una herramienta capaz de **explorar y explicar ejecuciones
+concurrentes**.
 
 Entre los objetivos futuros se encuentran:
 
-- `await`;
-- semáforos `P` / `V`;
-- monitores y variables condición;
-- pasaje de mensajes;
-- canales síncronos y asíncronos;
-- deadlock detection;
-- exploración de múltiples interleavings;
-- reproducción de contraejemplos;
-- problemas clásicos expresados directamente en el lenguaje;
-- visualizaciones educativas de procesos, recursos y comunicación.
+-   monitores y variables condición;
+-   pasaje de mensajes;
+-   canales síncronos y asíncronos;
+-   deadlock detection;
+-   análisis más preciso de race conditions;
+-   exploración de múltiples interleavings;
+-   reproducción de contraejemplos;
+-   problemas clásicos expresados directamente en el lenguaje;
+-   visualizaciones educativas de procesos, recursos y comunicación.
 
-Una ejecución que termina correctamente no demuestra que un programa concurrente sea correcto. El objetivo final es que el simulador pueda ayudar a encontrar **la ejecución que demuestra que no lo es**.
+Una ejecución que termina correctamente no demuestra que un programa
+concurrente sea correcto. El objetivo final es que el simulador pueda
+ayudar a encontrar **la ejecución que demuestra que no lo es**.
 
----
+------------------------------------------------------------------------
 
 ## Regla de trabajo
 
@@ -391,16 +575,24 @@ Un ticket no se considera terminado solamente porque "parece funcionar".
 
 Debe:
 
-1. estar implementado;
-2. estar verificado o testeado según corresponda;
-3. mantener funcionando los tests existentes;
-4. reflejarse en el backlog y el progreso;
-5. actualizar arquitectura, decisiones o sintaxis cuando el cambio lo requiera.
+1.  estar implementado;
+2.  estar verificado o testeado según corresponda;
+3.  mantener funcionando los tests existentes;
+4.  reflejarse en el backlog y el progreso;
+5.  actualizar arquitectura, decisiones o sintaxis cuando el cambio lo
+    requiera.
 
----
+------------------------------------------------------------------------
 
 ## Contexto académico
 
-Proyecto desarrollado como herramienta de aprendizaje para **Programación Concurrente — Facultad de Informática, UNLP**.
+Proyecto desarrollado como herramienta de aprendizaje para
+**Programación Concurrente --- Facultad de Informática, UNLP**.
 
-La arquitectura busca acompañar el avance de la materia: primero construir una base general y verificable, y luego incorporar cada mecanismo de concurrencia sobre ese mismo motor.
+La arquitectura busca acompañar el avance de la materia: primero
+construir una base general y verificable, y luego incorporar cada
+mecanismo de concurrencia sobre ese mismo motor.
+
+La semántica de las primitivas concurrentes prioriza el material oficial
+de la cátedra y los problemas clásicos deben emerger del mismo engine
+general, no de implementaciones especiales.

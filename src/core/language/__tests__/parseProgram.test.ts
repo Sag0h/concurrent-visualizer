@@ -298,4 +298,197 @@ describe('parseProgram', () => {
     })
   })
 
+  it('parses await without a body', () => {
+    const program = parseProgram(`
+      shared bool ready = false;
+
+      process P1 {
+        await (ready);
+      }
+    `)
+
+    expect(
+      program.processes[0].instructions[0],
+    ).toMatchObject({
+      type: 'AWAIT',
+      condition: {
+        type: 'VARIABLE',
+        name: 'ready',
+      },
+      body: [],
+    })
+  })
+
+  it('parses await with a body', () => {
+    const program = parseProgram(`
+      shared bool lock = false;
+
+      process P1 {
+        await (!lock) {
+          lock = true;
+        }
+      }
+    `)
+
+    expect(
+      program.processes[0].instructions[0],
+    ).toMatchObject({
+      type: 'AWAIT',
+      condition: {
+        type: 'UNARY',
+        operator: '!',
+      },
+      body: [
+        {
+          type: 'ASSIGN',
+        },
+      ],
+    })
+  })
+
+  it('parses await with a compound condition', () => {
+    const program = parseProgram(`
+      shared bool in2 = false;
+      shared int ultimo = 2;
+
+      process P1 {
+        await (!in2 || ultimo == 2);
+      }
+    `)
+
+    const instruction =
+      program.processes[0].instructions[0]
+
+    expect(instruction.type).toBe('AWAIT')
+
+    if (instruction.type !== 'AWAIT') {
+      throw new Error(
+        'Expected AWAIT instruction',
+      )
+    }
+
+    expect(instruction.condition).toMatchObject({
+      type: 'BINARY',
+      operator: '||',
+    })
+  })
+
+  it('throws when await is missing opening parenthesis', () => {
+    expect(() =>
+      parseProgram(`
+        process P1 {
+          await true;
+        }
+      `),
+    ).toThrow('Expected "(" after "await"')
+  })
+
+  it('throws when await is missing closing parenthesis', () => {
+    expect(() =>
+      parseProgram(`
+        shared bool ready = false;
+
+        process P1 {
+          await (ready;
+        }
+      `),
+    ).toThrow('Expected ")" after await condition')
+  })
+
+  it('throws when await has neither body nor semicolon', () => {
+    expect(() =>
+      parseProgram(`
+        shared bool ready = false;
+
+        process P1 {
+          await (ready)
+          ready = true;
+        }
+      `),
+    ).toThrow('Expected "{" before block')
+  })
+
+  it('parses semaphore declarations', () => {
+    const program = parseProgram(`
+      sem mutex = 1;
+      sem available = 3;
+    `)
+
+    expect(program.semaphores).toEqual({
+      mutex: {
+        name: 'mutex',
+        value: 1,
+      },
+      available: {
+        name: 'available',
+        value: 3,
+      },
+    })
+  })
+
+  it('parses semaphore P and V operations', () => {
+    const program = parseProgram(`
+      sem mutex = 1;
+
+      process P1 {
+        P(mutex);
+        V(mutex);
+      }
+    `)
+
+    expect(
+      program.processes[0].instructions,
+    ).toEqual([
+      {
+        type: 'SEMAPHORE_P',
+        semaphoreName: 'mutex',
+      },
+      {
+        type: 'SEMAPHORE_V',
+        semaphoreName: 'mutex',
+      },
+    ])
+  })
+
+  it('throws when semaphore initialization is missing', () => {
+    expect(() =>
+      parseProgram(`
+        sem mutex;
+      `),
+    ).toThrow(
+      'Expected "=" after semaphore name',
+    )
+  })
+
+  it('throws when semaphore initial value is negative', () => {
+    expect(() =>
+      parseProgram(`
+        sem mutex = -1;
+      `),
+    ).toThrow(
+      'Expected non-negative integer semaphore value',
+    )
+  })
+
+  it('throws when semaphore initial value is not an integer literal', () => {
+    expect(() =>
+      parseProgram(`
+        sem mutex = true;
+      `),
+    ).toThrow(
+      'Expected non-negative integer semaphore value',
+    )
+  })
+
+  it('throws when a semaphore is declared twice', () => {
+    expect(() =>
+      parseProgram(`
+        sem mutex = 1;
+        sem mutex = 2;
+      `),
+    ).toThrow(
+      'Semaphore "mutex" is already defined',
+    )
+  })
+
 })

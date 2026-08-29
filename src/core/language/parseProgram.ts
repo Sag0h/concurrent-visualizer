@@ -23,6 +23,9 @@ import {
   whileInstruction,
   returnInstruction,
   atomicInstruction,
+  awaitInstruction,
+  semaphoreVInstruction,
+  semaphorePInstruction,
 } from '../instructions/instructionFactories'
 import type { RuntimeValue } from '../memory/RuntimeValue'
 import type { Process } from '../process/Process'
@@ -57,9 +60,18 @@ class Parser {
       FunctionDefinition
     > = {}
 
+    const semaphores: NonNullable<
+      Program['semaphores']
+    > = {}
+
     while (!this.isAtEnd()) {
       if (this.match('SHARED')) {
         this.parseSharedDeclaration(sharedMemory)
+        continue
+      }
+
+      if (this.match('SEM')) {
+        this.parseSemaphoreDeclaration(semaphores)
         continue
       }
 
@@ -87,7 +99,7 @@ class Parser {
 
       throw this.error(
         this.peek(),
-        'Expected "shared", "function" or "process"'
+        'Expected "shared", "sem", "function" or "process"'
       )
     }
 
@@ -95,6 +107,7 @@ class Parser {
       processes,
       sharedMemory,
       functions,
+      semaphores,
     }
   }
 
@@ -121,6 +134,42 @@ class Parser {
     )
 
     sharedMemory[name.lexeme] = value
+  }
+
+    private parseSemaphoreDeclaration(
+    semaphores: NonNullable<Program['semaphores']>,
+  ): void {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected semaphore name',
+    )
+
+    this.consume(
+      'ASSIGN',
+      'Expected "=" after semaphore name',
+    )
+
+    const value = this.consume(
+      'NUMBER',
+      'Expected non-negative integer semaphore value',
+    )
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after semaphore declaration',
+    )
+
+    if (semaphores[name.lexeme]) {
+      throw this.error(
+        name,
+        `Semaphore "${name.lexeme}" is already defined`,
+      )
+    }
+
+    semaphores[name.lexeme] = {
+      name: name.lexeme,
+      value: Number(value.lexeme),
+    }
   }
 
   private parseProcess(): Process {
@@ -195,6 +244,18 @@ class Parser {
 
     if (this.match('ATOMIC')) {
       return this.parseAtomicInstruction()
+    }
+
+    if (this.match('AWAIT')) {
+      return this.parseAwaitInstruction()
+    }
+
+    if (this.match('SEMAPHORE_P')) {
+      return this.parseSemaphoreOperation('P')
+    }
+
+    if (this.match('SEMAPHORE_V')) {
+      return this.parseSemaphoreOperation('V')
     }
 
     if (this.match('BREAK')) {
@@ -1064,6 +1125,34 @@ class Parser {
     return atomicInstruction(body)
   }
 
+  private parseAwaitInstruction(): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "await"',
+    )
+
+    const condition = this.parseExpression()
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after await condition',
+    )
+
+    if (this.match('SEMICOLON')) {
+      return awaitInstruction(
+        condition,
+        [],
+      )
+    }
+
+    const body = this.parseInstructionBlock()
+
+    return awaitInstruction(
+      condition,
+      body,
+    )
+  }
+
   private parseReturnInstruction(): Instruction {
     if (this.match('SEMICOLON')) {
       return returnInstruction()
@@ -1077,5 +1166,33 @@ class Parser {
     )
 
     return returnInstruction(value)
+  }
+
+  private parseSemaphoreOperation(
+    operation: 'P' | 'V',
+  ): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      `Expected "(" after "${operation}"`,
+    )
+
+    const semaphore = this.consume(
+      'IDENTIFIER',
+      'Expected semaphore name',
+    )
+
+    this.consume(
+      'RIGHT_PAREN',
+      `Expected ")" after semaphore name`,
+    )
+
+    this.consume(
+      'SEMICOLON',
+      `Expected ";" after ${operation} operation`,
+    )
+
+    return operation === 'P'
+      ? semaphorePInstruction(semaphore.lexeme)
+      : semaphoreVInstruction(semaphore.lexeme)
   }
 }

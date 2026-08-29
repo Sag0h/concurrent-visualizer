@@ -11,6 +11,8 @@ import type {
 } from '../expressions/ExpressionRuntime'
 import type { MicroOperationRuntime } from '../engine/MicroOperationRuntime'
 
+import type { BlockingReason } from './BlockingReason'
+
 export interface Process {
   readonly id: ProcessId
   state: ProcessState
@@ -24,4 +26,5 @@ export interface Process {
   expressionRuntimeStatus: ExpressionRuntimeStatus
   microOperationRuntime?: MicroOperationRuntime
   atomicDepth: number
+  blockingReason?: BlockingReason
 }

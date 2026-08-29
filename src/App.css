@@ -128,6 +128,7 @@ button:disabled {
 
 .process-card,
 .shared-memory,
+.semaphore-card,
 .not-built {
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -337,6 +338,10 @@ h2 {
   background: rgba(255, 90, 90, 0.08);
 }
 
+.memory-unknown-row {
+  background: rgba(217, 153, 28, 0.1);
+}
+
 .memory-conflict-indicator {
   display: inline-block;
   margin-left: 0.6rem;
@@ -361,6 +366,12 @@ h2 {
 
 .memory-conflicts-header h3 {
   margin: 0;
+}
+
+.analysis-scope-note {
+  margin: 0 0 1rem;
+  color: #666;
+  font-size: 0.85rem;
 }
 
 .memory-conflict-count {
@@ -418,4 +429,169 @@ h2 {
 
 .memory-synchronized-count {
   font-weight: 600;
+}
+
+.memory-unknown-count {
+  font-weight: 600;
+  color: #8a5a00;
+}
+
+.memory-unknown-indicator {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #754c00;
+  background: rgba(217, 153, 28, 0.18);
+}
+
+.memory-analysis-reason {
+  margin-top: 0.35rem;
+  max-width: 28rem;
+  color: #666;
+  font-size: 0.78rem;
+}
+
+.await-blocking-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.semaphore-blocking-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #d8b36a;
+  border-radius: 6px;
+  background: #fffaf0;
+}
+
+.semaphore-blocking-reason strong {
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.semaphore-blocking-reason code,
+.semaphore-card code,
+.semaphore-history-detail code {
+  font-family: Consolas, Monaco, monospace;
+}
+
+.semaphore-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.semaphore-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.semaphore-header code {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.semaphore-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #e8f1ff;
+  font-size: 18px;
+}
+
+.semaphore-waiters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 10px;
+}
+
+.semaphore-waiters > span:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.semaphore-waiter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.semaphore-waiter {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f8d7da;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.semaphore-card small {
+  color: #777;
+}
+
+.semaphore-status {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.semaphore-status-blocked {
+  background: #f8d7da;
+}
+
+.semaphore-status-succeeded {
+  background: #d1e7dd;
+}
+
+.semaphore-history-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.await-blocking-reason strong {
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.await-blocking-reason code {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+}
+
+.await-status {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.await-status-blocked {
+  background: #f8d7da;
+}
+
+.await-status-enabled {
+  background: #d1e7dd;
 }

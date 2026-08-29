@@ -5,16 +5,16 @@
 
 ## 1. Visión
 
-Concurrent Visualizer es una aplicación web educativa capaz de interpretar
-y simular pseudocódigo concurrente.
+Concurrent Visualizer es una aplicación web educativa capaz de
+interpretar y simular pseudocódigo concurrente.
 
 El objetivo no es crear animaciones prefabricadas para problemas
-específicos. Los problemas deben emerger de la ejecución real del programa
-ingresado.
+específicos. Los problemas deben emerger de la ejecución real del
+programa ingresado.
 
 Flujo vigente:
 
-```text
+``` text
 Código fuente
     ↓
 Tokenizer
@@ -32,16 +32,16 @@ Visualización / Análisis
 
 ## 2. Stack
 
-- React
-- TypeScript
-- Vite
-- ESLint
-- Git
+-   React
+-   TypeScript
+-   Vite
+-   ESLint
+-   Git
 
 Previstos cuando sean necesarios:
 
-- Tailwind CSS;
-- React Flow para visualizaciones de procesos, recursos y canales.
+-   Tailwind CSS;
+-   React Flow para visualizaciones de procesos, recursos y canales.
 
 No se requiere backend para la primera versión.
 
@@ -49,25 +49,25 @@ No se requiere backend para la primera versión.
 
 El motor de simulación es independiente de React.
 
-La UI consume el estado producido por el motor, pero no contiene la lógica
-de concurrencia.
+La UI consume el estado producido por el motor, pero no contiene la
+lógica de concurrencia.
 
 Esto permite:
 
-- probar el motor mediante tests;
-- ejecutar análisis sin renderizar la UI;
-- cambiar la interfaz sin modificar la semántica;
-- explorar múltiples ejecuciones programáticamente;
-- reutilizar el mismo motor para distintos modelos de concurrencia.
+-   probar el motor mediante tests;
+-   ejecutar análisis sin renderizar la UI;
+-   cambiar la interfaz sin modificar la semántica;
+-   explorar múltiples ejecuciones programáticamente;
+-   reutilizar el mismo motor para distintos modelos de concurrencia.
 
 ## 4. Estructura general
 
-La arquitectura se organiza alrededor de un núcleo de simulación separado
-de la interfaz.
+La arquitectura se organiza alrededor de un núcleo de simulación
+separado de la interfaz.
 
 Estructura conceptual:
 
-```text
+``` text
 src/
 ├── core/
 │   ├── engine/
@@ -88,126 +88,151 @@ primitivas concurrentes.
 
 ### Program
 
-Representa un programa concurrente completo.
+`Program` representa un programa concurrente completo.
 
-Actualmente contiene principalmente:
+Actualmente contiene:
 
-- procesos;
-- memoria compartida;
-- definiciones de funciones.
+-   procesos;
+-   memoria compartida;
+-   definiciones de funciones;
+-   semáforos.
 
-A futuro podrá incorporar:
+Los semáforos forman parte del programa, pero permanecen separados de la
+memoria compartida ordinaria. Esta separación es semántica: un semáforo
+es un recurso de sincronización y no una variable `int` común accesible
+mediante asignaciones del lenguaje.
 
-- semáforos;
-- monitores;
-- canales;
-- configuración adicional del modelo de ejecución.
+A futuro `Program` podrá incorporar monitores, canales y configuración
+adicional del modelo de ejecución.
+
+### Semaphore
+
+Un `Semaphore` representa actualmente un semáforo general/contador:
+
+``` ts
+interface Semaphore {
+    readonly name: string
+    value: number
+}
+```
+
+El valor es un entero no negativo. En V1 no existe un tipo especial de
+semáforo binario: un semáforo general inicializado en `1` puede
+utilizarse para exclusión mutua cuando los procesos respetan
+correctamente el protocolo `P` / `V`.
+
+El objeto no mantiene:
+
+-   owner;
+-   cola FIFO de procesos;
+-   política de fairness;
+-   permisos reservados durante la reactivación.
+
+Los procesos que esperan un semáforo se representan mediante su propio
+estado y `blockingReason`.
 
 ### Process
 
-Representa una unidad de ejecución concurrente.
+`Process` representa una unidad de ejecución concurrente.
 
 Cada proceso mantiene estado propio, incluyendo:
 
-- identificador;
-- estado;
-- program counter;
-- instrucciones;
-- memoria local;
-- execution stack;
-- call stack;
-- evaluaciones suspendidas;
-- estado temporal de microoperaciones;
-- profundidad atómica.
+-   identificador;
+-   estado;
+-   program counter;
+-   instrucciones;
+-   memoria local;
+-   execution stack;
+-   call stack;
+-   evaluaciones suspendidas;
+-   estado temporal de microoperaciones;
+-   profundidad atómica;
+-   motivo de bloqueo cuando corresponde.
 
 Estados soportados:
 
-```text
+``` text
 READY
 RUNNING
 BLOCKED
 FINISHED
 ```
 
-`BLOCKED` ya forma parte del modelo de estados y será utilizado por
-primitivas de sincronización como `await` y semáforos.
+`BLOCKED` se utiliza actualmente tanto para `await` como para una
+operación `P(s)` que no puede completarse.
+
+### BlockingReason
+
+El proceso conserva por qué está bloqueado. Actualmente existen al menos
+dos motivos conceptuales:
+
+``` text
+AWAIT(condition)
+SEMAPHORE_P(semaphoreName)
+```
+
+Para `await` se conserva la condición necesaria para reevaluarla.
+
+Para `P` se conserva el nombre del semáforo esperado.
+
+Esta información pertenece al proceso y no implica una cola FIFO dentro
+del recurso.
 
 ### Instruction
 
 `Instruction` representa una instrucción visible del pseudocódigo.
 
-Ejemplos:
+La capa concurrente incluye actualmente instrucciones como:
 
-```text
-x = x + 1;
-if (ready) { ... }
-return value;
+``` text
 atomic { ... }
+await (B);
+await (B) { ... }
+P(mutex);
+V(mutex);
 ```
 
-Una instrucción fuente no constituye necesariamente una única acción
-atómica del simulador.
+`P` y `V` tienen nodos propios del AST (`SEMAPHORE_P` y `SEMAPHORE_V`).
 
-Cuando una instrucción contiene operaciones relevantes para la
-interferencia concurrente puede descomponerse en microoperaciones internas.
+Una instrucción fuente no constituye necesariamente una única acción
+atómica del simulador. Cuando contiene operaciones relevantes para la
+interferencia puede descomponerse en microoperaciones internas.
 
 ### MicroOperation
 
 Una microoperación constituye la unidad mínima de ejecución atómica del
 motor cuando una instrucción requiere descomposición concurrente.
 
-Ejemplo:
+Por ejemplo:
 
-```text
+``` text
 x = x + 1;
 ```
 
 puede ejecutarse conceptualmente como:
 
-```text
+``` text
 SHARED_READ x
 COMPUTE
 SHARED_WRITE x
 ```
 
-Entre dos microoperaciones el scheduler puede seleccionar otro proceso,
-salvo que una región `atomic` activa lo impida.
+Entre microoperaciones el scheduler puede seleccionar otro proceso salvo
+cuando una región de atomicidad activa lo impide.
 
-Por esta razón una instrucción puede comenzar en un step y terminar varios
-steps después.
-
-Las operaciones puramente locales pueden continuar ejecutándose con una
-granularidad mayor cuando no existe una razón semántica o educativa para
-descomponerlas.
+`P` y `V`, en cambio, son operaciones de sincronización atómicas por sí
+mismas y no se modelan como accesos ordinarios a memoria compartida.
 
 ## 6. Runtime de expresiones suspendibles
 
-El evaluador inmediato de expresiones es apropiado para expresiones puras
-como:
+El evaluador inmediato sirve para expresiones puras, pero no para
+llamadas a funciones que pueden requerir múltiples instrucciones y
+steps.
 
-```text
-x + 1
-a < b
-!ready
-```
+Cada proceso mantiene una pila de evaluaciones pendientes.
+Conceptualmente:
 
-pero no para llamadas a funciones que pueden requerir múltiples
-instrucciones y múltiples steps.
-
-Ejemplo:
-
-```text
-result = double(5) + other();
-```
-
-Ejecutar completamente una función dentro de un evaluador síncrono la
-convertiría artificialmente en una operación atómica.
-
-Por eso cada proceso mantiene una pila de evaluaciones pendientes.
-
-Flujo conceptual:
-
-```text
+``` text
 Expression
     ↓
 se detecta FUNCTION_CALL
@@ -223,37 +248,28 @@ la llamada se reemplaza por el valor retornado
 la expresión continúa
 ```
 
-La pila de evaluaciones pendientes permite continuaciones anidadas.
-
-Este mecanismo se utiliza en contextos como:
-
-- declaraciones;
-- asignaciones;
-- `if`;
-- `while`;
-- `repeat / until`;
-- `for`;
-- `foreach`;
-- `return`;
-- argumentos de funciones;
-- índices de arrays;
-- targets de asignación a arrays.
+El mecanismo se utiliza en declaraciones, asignaciones, estructuras de
+control, `return`, argumentos de funciones, `foreach` e índices/targets
+de arrays.
 
 Regla arquitectónica:
 
-> Una expresión que pueda contener una llamada a función no debe evaluarse
-> directamente como una expresión inmediata sin pasar primero por el runtime
-> suspendible.
+> Una expresión que pueda contener una llamada a función no debe
+> evaluarse directamente como expresión inmediata sin pasar por el
+> runtime suspendible.
+
+Las guardas de `await` son una excepción deliberadamente restringida:
+por ahora no admiten llamadas a funciones. Una guarda debe poder
+evaluarse inmediatamente sobre el estado actual y producir un booleano.
 
 ## 7. Runtime de microoperaciones compartidas
 
-Las asignaciones que afectan memoria compartida pueden mantener estado
+Las asignaciones sobre memoria compartida pueden conservar estado
 temporal entre steps.
 
-Actualmente el runtime de asignaciones compartidas conserva información
-conceptualmente equivalente a:
+El runtime mantiene conceptualmente:
 
-```text
+``` text
 SharedAssignmentRuntime
 ├── instruction
 ├── phase
@@ -263,81 +279,36 @@ SharedAssignmentRuntime
 └── targetLocation
 ```
 
-Las fases actuales son:
+Fases actuales:
 
-```text
+``` text
 READ
 COMPUTE
 TARGET_READ
 WRITE
 ```
 
-### READ
+`READ` captura valores observados de memoria compartida. `COMPUTE`
+evalúa la expresión restante. `TARGET_READ` resuelve lecturas
+compartidas necesarias para determinar un target de array. `WRITE`
+utiliza el valor y la ubicación ya resueltos.
 
-Busca una lectura pendiente de memoria compartida dentro de la expresión.
-
-Cuando encuentra una lectura:
-
-1. obtiene el valor actual;
-2. registra una microoperación `SHARED_READ`;
-3. sustituye esa lectura por el valor observado;
-4. conserva la expresión parcialmente evaluada para el siguiente step.
-
-### COMPUTE
-
-Una vez resueltas las lecturas compartidas necesarias del lado derecho, se
-evalúa la expresión restante.
-
-El resultado queda almacenado en el runtime de la instrucción.
-
-### TARGET_READ
-
-Se utiliza cuando el target de la asignación es un elemento de array y su
-índice depende de memoria compartida.
-
-Ejemplo:
-
-```text
-values[i + offset] = 50;
-```
-
-Las lecturas de `i` y `offset` se ejecutan como microoperaciones
-independientes.
-
-Sus valores quedan capturados y se utilizan posteriormente para resolver la
-ubicación exacta del target.
-
-### WRITE
-
-La escritura final utiliza el valor calculado y la ubicación de destino ya
-resuelta.
-
-Esto evita que modificaciones posteriores de las variables utilizadas para
-calcular un índice alteren retroactivamente el destino de una asignación ya
-iniciada.
+Esto permite representar lost updates e interferencias reales sin
+introducir comportamientos especiales para ejemplos concretos.
 
 ## 8. Captura de valores observados
 
-Una lectura de memoria compartida captura el valor observado en ese
-instante.
+Una lectura compartida captura el valor observado en ese instante.
 
-Ejemplo:
+Dos procesos ejecutando:
 
-```text
-shared int x = 0;
-
-process P1 {
-    x = x + 1;
-}
-
-process P2 {
-    x = x + 1;
-}
+``` text
+x = x + 1;
 ```
 
-Un interleaving válido es:
+pueden producir:
 
-```text
+``` text
 P1 SHARED_READ  x = 0
 P2 SHARED_READ  x = 0
 P1 COMPUTE      1
@@ -346,111 +317,77 @@ P1 SHARED_WRITE x = 1
 P2 SHARED_WRITE x = 1
 ```
 
-El hecho de que `x` cambie después de una lectura no modifica el valor ya
-capturado por el proceso.
+El cambio posterior de `x` no modifica el valor ya observado por un
+proceso.
 
 La misma regla se aplica a lecturas utilizadas para resolver targets de
 arrays.
 
 ## 9. MemoryLocation
 
-Los accesos compartidos se representan mediante ubicaciones concretas de
-memoria.
+Los accesos compartidos se representan mediante ubicaciones concretas:
 
-La abstracción `MemoryLocation` distingue actualmente:
-
-```text
+``` text
 VARIABLE(name)
 ARRAY_ELEMENT(arrayName, index)
 ```
 
-Ejemplos:
+Por lo tanto `values[0]` y `values[1]` son ubicaciones diferentes.
 
-```text
-x
-values[0]
-values[1]
-```
+`MemoryLocation` es utilizada por eventos de microoperación, historial
+de accesos, detección y agrupación de conflictos, visualización y
+futuros análisis de sincronización.
 
-`values[0]` y `values[1]` representan ubicaciones diferentes.
+Los semáforos no son `MemoryLocation`: sus operaciones pertenecen al
+subsistema de sincronización.
 
-Esta abstracción es utilizada por:
+## 10. ExecutionState y SimulationSnapshot
 
-- eventos de microoperación;
-- historial de accesos compartidos;
-- detección de conflictos;
-- agrupación de conflictos;
-- visualización de interferencias;
-- futuros análisis de sincronización.
+`ExecutionState` representa el estado global mutable de una simulación e
+incluye conceptualmente:
 
-La comparación de accesos se realiza sobre la ubicación concreta, no solo
-sobre el nombre general de la estructura.
+-   `Program`;
+-   contador global de steps;
+-   historial de instrucciones;
+-   historial de microoperaciones.
 
-## 10. ExecutionState
+El estado de los semáforos reside actualmente dentro de
+`Program.semaphores`.
 
-`ExecutionState` representa el estado global mutable de una simulación.
+El historial de instrucciones fuente y el de microoperaciones permanecen
+separados para ofrecer una vista cercana al código y otra orientada a
+interleavings.
 
-Incluye conceptualmente:
+`SimulationSnapshot` expone una representación segura para la UI.
+Actualmente incluye memoria, procesos, `blockingReason`, call stacks,
+historial de microoperaciones, análisis de conflictos y snapshots de
+semáforos.
 
-- `Program`;
-- contador global de steps;
-- historial de instrucciones;
-- historial de microoperaciones.
-
-El historial de instrucciones fuente y el historial de microoperaciones se
-mantienen separados.
-
-Esto permite ofrecer dos perspectivas:
-
-```text
-Vista fuente
-    x = x + 1;
-
-Vista concurrente
-    SHARED_READ x
-    COMPUTE
-    SHARED_WRITE x
-```
-
-### SimulationSnapshot
-
-La UI no necesita manipular directamente el estado interno del engine.
-
-`SimulationSnapshot` expone una representación segura del estado necesaria
-para visualización y análisis.
-
-Actualmente puede incluir:
-
-- step actual;
-- memoria compartida;
-- procesos;
-- memoria local;
-- call stack;
-- historial de microoperaciones;
-- conflictos de memoria;
-- resúmenes de conflictos.
-
-Las memorias expuestas se clonan para impedir modificaciones accidentales
-desde React.
+Cada `SemaphoreSnapshot` contiene nombre, valor actual y los ids de los
+procesos actualmente bloqueados en `P` sobre ese recurso. Esta última
+información se deriva de `Process.blockingReason`; no se duplica como
+estado mutable dentro del semáforo.
 
 ## 11. Scheduler
 
-El scheduler decide qué proceso `READY` obtiene el próximo paso de
-ejecución.
+El scheduler decide qué proceso `READY` obtiene el próximo step.
 
 Schedulers disponibles:
 
-- First Ready;
-- Round Robin;
-- Random reproducible mediante seed.
+-   First Ready;
+-   Round Robin;
+-   Random reproducible mediante seed.
 
-A futuro podrá existir un scheduler especializado para exploración de
-estados e interleavings.
+En condiciones normales puede cambiar de proceso entre microoperaciones.
 
-En condiciones normales el scheduler puede elegir un proceso diferente
-entre dos microoperaciones.
+Una región `atomic` activa es una excepción: mientras un proceso
+ejecutable mantiene `atomicDepth > 0`, conserva la ejecución.
 
-La excepción actual es la ejecución dentro de una región `atomic`.
+La reactivación de procesos bloqueados permanece separada de la política
+del scheduler. Estar `READY` significa ser elegible para ejecutar; no
+implica haber reservado una condición o recurso.
+
+Esto es fundamental tanto para `await` como para semáforos.
 
 ## 12. SimulationEngine
 
@@ -458,71 +395,60 @@ La excepción actual es la ejecución dentro de una región `atomic`.
 
 API principal:
 
-```ts
+``` ts
 engine.step()
 engine.reset()
 engine.getState()
 engine.getSnapshot()
 ```
 
-`step()` informa si se produjo progreso real.
+`step()` devuelve si hubo progreso real.
+
+Antes de seleccionar el siguiente proceso, el engine puede reevaluar
+procesos bloqueados por mecanismos cuya condición haya cambiado.
 
 Conceptualmente:
 
-```text
-true  -> se ejecutó una transición
-false -> ningún proceso pudo progresar
+``` text
+inicio del step
+    ↓
+reevaluar procesos BLOCKED
+    ↓
+determinar procesos READY
+    ↓
+respetar atomicidad activa si corresponde
+    ↓
+scheduler selecciona proceso
+    ↓
+ejecutar transición
 ```
 
-Esto permite evitar loops infinitos en `Run` cuando ningún proceso puede
-ser seleccionado.
+Un error de runtime no debe dejar un proceso permanentemente en
+`RUNNING`.
 
-Si una instrucción produce un error de runtime, el proceso no debe quedar
-permanentemente en estado `RUNNING`.
+Cuando una instrucción requiere microoperaciones, completar una
+instrucción fuente puede necesitar múltiples llamadas a `step()`.
 
-Cuando una instrucción requiere microoperaciones, completar una instrucción
-fuente puede necesitar múltiples llamadas a `step()`.
+El estado inicial de la simulación se conserva mediante clonación
+estructural, lo que permite que `reset()` restaure también los valores
+iniciales de los semáforos que forman parte del `Program`.
 
 ## 13. Atomicidad explícita
 
 El lenguaje soporta:
 
-```text
+``` text
 atomic {
     ...
 }
 ```
 
-Una región `atomic` representa una región no intercalable.
-
-No convierte todo su cuerpo en una única microoperación.
-
-Ejemplo:
-
-```text
-atomic {
-    x = x + 1;
-}
-```
-
-continúa pudiendo ejecutar:
-
-```text
-SHARED_READ x
-COMPUTE
-SHARED_WRITE x
-```
-
-pero el scheduler no puede ejecutar otro proceso entre esas
+Una región `atomic` es no intercalable, pero no elimina sus
 microoperaciones.
 
-### atomicDepth
+`atomicDepth` representa regiones anidadas:
 
-Cada proceso mantiene `atomicDepth`.
-
-Conceptualmente:
-
-```text
+``` text
 fuera de atomic       0
 atomic exterior       1
 atomic anidado        2
@@ -530,211 +456,314 @@ salida del anidado    1
 salida del exterior   0
 ```
 
-Mientras un proceso `READY` tenga `atomicDepth > 0`, ese proceso conserva
-la ejecución antes de consultar la política normal del scheduler.
+Mientras un proceso ejecutable mantiene `atomicDepth > 0`, conserva la
+ejecución antes de consultar la política normal del scheduler.
 
-Esto permite soportar regiones anidadas.
+El unwind por `return`, `break` y `continue` debe liberar correctamente
+frames `EXIT_ATOMIC`. Las regiones vacías tampoco deben dejar
+profundidad residual.
 
-### Salidas no estructuradas
+## 14. `await`: acción atómica condicional
 
-`return`, `break` y `continue` pueden abandonar frames internos antes de
-que estos completen su flujo normal.
+El lenguaje soporta:
 
-Por eso el unwind del `executionStack` debe detectar frames que representan
-la salida de una región atómica y reducir correctamente `atomicDepth`.
-
-Esto evita que un proceso quede permanentemente marcado como si siguiera
-dentro de una región `atomic`.
-
-Las regiones atómicas vacías también están soportadas y no deben dejar
-estado atómico residual.
-
-## 14. Eventos y análisis de memoria
-
-Cada acceso compartido relevante puede producir un `MicroOperationEvent`.
-
-Un evento registra información como:
-
-- step;
-- proceso;
-- tipo de microoperación;
-- descripción;
-- ubicación de memoria;
-- profundidad atómica.
-
-Los eventos son la base del análisis de interferencias.
-
-### MemoryAccessConflict
-
-Dos accesos se consideran conflictivos cuando:
-
-1. pertenecen a procesos diferentes;
-2. afectan la misma `MemoryLocation`;
-3. al menos uno es una escritura.
-
-Casos relevantes:
-
-```text
-READ  + WRITE
-WRITE + READ
-WRITE + WRITE
+``` text
+await (B);
 ```
 
-Dos lecturas no generan conflicto.
+y:
 
-### Clasificación
+``` text
+await (B) {
+    S
+}
+```
 
-Los conflictos conocidos actualmente pueden clasificarse como:
+Si `B` es falsa:
 
-```text
+``` text
+process.state = BLOCKED
+blockingReason = AWAIT(B)
+programCounter permanece en await
+```
+
+La espera no se implementa mediante busy waiting.
+
+### Reactivación
+
+Antes de una nueva selección del scheduler se pueden reevaluar las
+guardas de procesos bloqueados.
+
+Si una guarda pasa a ser verdadera, el proceso queda `READY`, pero la
+reactivación no reserva la condición.
+
+Si varios procesos quedan habilitados simultáneamente, todos pueden
+quedar `READY`. El scheduler selecciona uno y ese proceso vuelve a
+evaluar la guarda cuando intenta ejecutar el `await`.
+
+Por ello un proceso reactivado puede volver a bloquearse.
+
+### Cuerpo habilitado
+
+Si `B` es verdadera, la comprobación exitosa y `S` forman una acción
+atómica condicional.
+
+El runtime reutiliza la infraestructura de `atomicDepth` para impedir un
+interleaving entre la guarda exitosa y el final del cuerpo, manteniendo
+visibles sus microoperaciones.
+
+Por ahora:
+
+-   la guarda debe producir `bool`;
+-   no se permiten llamadas a funciones dentro de la guarda;
+-   se rechaza `await` dentro de una región `atomic`;
+-   sí pueden existir regiones `atomic` anidadas dentro del cuerpo
+    habilitado.
+
+## 15. Semáforos
+
+La sintaxis escalar actual es:
+
+``` text
+sem mutex = 1;
+sem available = 3;
+
+process P1 {
+    P(mutex);
+    V(mutex);
+}
+```
+
+Los semáforos son generales/contadores. No existe un subtipo binario.
+
+### Operación `P`
+
+Semántica conceptual:
+
+``` text
+P(s): < await (s > 0) s = s - 1; >
+```
+
+Cuando `s > 0`, comprobación y decremento forman una única operación
+atómica y el proceso avanza.
+
+Cuando `s == 0`:
+
+``` text
+process.state = BLOCKED
+blockingReason = SEMAPHORE_P(s)
+programCounter permanece en P(s)
+```
+
+### Operación `V`
+
+Semántica conceptual:
+
+``` text
+V(s): < s = s + 1; >
+```
+
+`V` incrementa atómicamente y nunca bloquea.
+
+Los semáforos generales no modelan ownership. Por ello el engine no
+exige que el proceso que ejecuta `V` sea el mismo que previamente
+ejecutó `P`.
+
+### Reactivación sin reserva
+
+Si `s > 0`, los procesos bloqueados esperando `P(s)` pueden pasar a
+`READY`.
+
+La reactivación no decrementa `s` ni reserva un permiso.
+
+Por ejemplo, si dos procesos esperan un semáforo cuyo valor pasa de `0`
+a `1`, ambos pueden quedar habilitados. El scheduler elige uno; el
+proceso seleccionado reejecuta `P`, consume el recurso y el otro podrá
+volver a bloquearse.
+
+Se separan así tres conceptos:
+
+``` text
+habilitación
+    ↓
+selección por scheduler
+    ↓
+adquisición efectiva mediante P
+```
+
+### Relación con `atomicDepth`
+
+`P` y `V` son operaciones atómicas, pero **no utilizan `atomicDepth`**.
+
+Una sección:
+
+``` text
+P(mutex);
+x = x + 1;
+V(mutex);
+```
+
+no debe convertirse en una única región no intercalable. Otros procesos
+pueden seguir ejecutando; simplemente no pueden atravesar correctamente
+el mismo protocolo de exclusión mientras el recurso no esté disponible.
+
+Utilizar `atomicDepth` desde `P` hasta `V` alteraría la semántica del
+scheduler y sería incorrecto.
+
+### Fairness y waiters
+
+No se asume:
+
+-   FIFO;
+-   fairness débil o fuerte;
+-   ownership;
+-   reserva de permisos.
+
+La UI muestra qué procesos esperan cada semáforo derivando esa
+información de `blockingReason` y aclara que la colección es informativa,
+sin orden FIFO.
+
+### Eventos de semáforos
+
+Los intentos de `P` y las ejecuciones de `V` producen metadata
+estructurada dentro de `ExecutionEvent`:
+
+-   operación `P` o `V`;
+-   nombre del semáforo;
+-   resultado `BLOCKED` o `SUCCEEDED`;
+-   valor anterior y posterior.
+
+Esta metadata permite visualizar `P` bloqueado, `P` exitoso y `V` sin
+interpretar textos descriptivos ni convertir semáforos en accesos a
+`MemoryLocation`.
+
+## 16. Eventos y análisis de memoria
+
+Los accesos compartidos relevantes producen `MicroOperationEvent` con
+datos como step, proceso, tipo, descripción, `MemoryLocation` y
+profundidad atómica.
+
+Dos accesos son conflictivos cuando pertenecen a procesos diferentes,
+afectan la misma ubicación y al menos uno es escritura.
+
+La clasificación actual es:
+
+``` text
 POTENTIAL_RACE
 SYNCHRONIZED
+UNKNOWN
 ```
 
-`POTENTIAL_RACE` representa accesos conflictivos que no están protegidos
-completamente por el mecanismo de atomicidad conocido.
+El criterio reconoce atomicidad explícita:
 
-`SYNCHRONIZED` representa accesos conflictivos donde ambos accesos fueron
-realizados dentro de regiones atómicas.
-
-Ejemplo conceptual:
-
-```text
+``` text
 P1 normal + P2 normal -> POTENTIAL_RACE
 P1 atomic + P2 normal -> POTENTIAL_RACE
 P1 atomic + P2 atomic -> SYNCHRONIZED
 ```
 
-Esta clasificación todavía no constituye una implementación formal
-completa de data race basada en happens-before.
+Esta clasificación no constituye un detector formal de data races basado
+en happens-before.
 
-Cuando existan semáforos, monitores y otros mecanismos de sincronización,
-el análisis deberá evolucionar.
+### Integración con semáforos
 
-### MemoryConflictSummary
+M7.6 agrega un análisis separado de la ejecución. A partir del historial
+estructurado de `P` / `V`, reconstruye para cada microoperación las
+secciones delimitadas por adquisiciones `P` exitosas y liberaciones `V`
+del mismo proceso.
 
-Los conflictos pueden agruparse por `MemoryLocation` para facilitar la
-visualización.
+Un semáforo general se reconoce como mutex únicamente en la ejecución
+observada cuando:
 
-Esto permite mostrar, por ejemplo, qué procesos accedieron
-conflictivamente a una variable o elemento de array y cuántos conflictos
-se observaron durante la ejecución.
+-   su valor inicial es `1`;
+-   las adquisiciones observadas respetan `1 -> 0`;
+-   las liberaciones observadas respetan `0 -> 1`;
+-   el proceso que ejecuta `V` es el que abrió la sección candidata con
+    `P`;
+-   no se observan operaciones incompatibles, como un `V` extra.
 
-## 15. Modelos de comunicación
+Este último criterio es metadata del analizador, no ownership agregado a
+la semántica del semáforo.
 
-No se crearán simuladores independientes para cada paradigma.
+Dos accesos conflictivos protegidos por el mismo candidato válido se
+clasifican como `SYNCHRONIZED` con razón `SEMAPHORE_MUTEX`. La protección
+unilateral sigue siendo `POTENTIAL_RACE`. Si ambos accesos están dentro
+de secciones delimitadas por el mismo semáforo pero el protocolo puede
+ser contador, señalización o uso inválido, la clasificación es
+`UNKNOWN`.
 
-El mismo framework compartirá el núcleo de procesos, scheduling, estados,
-historial y análisis.
+La UI presenta la razón y aclara que se analiza una traza observada. No
+se incrementa `atomicDepth` entre `P` y `V` y no se modifica la elección
+del scheduler.
 
-```text
+## 17. Modelos de comunicación
+
+No se crearán simuladores independientes por paradigma.
+
+El núcleo común mantiene procesos, scheduler, estados, historial y
+análisis:
+
+``` text
 Simulation Engine
 ├── Process / Scheduler
 ├── Shared Memory Subsystem
-└── Message Passing Subsystem
+│   ├── ordinary shared memory
+│   └── synchronization resources
+└── Message Passing Subsystem (futuro)
 ```
 
-### Memoria compartida
+Memoria compartida soporta actualmente:
 
-Actualmente soporta:
+-   variables y arrays compartidos;
+-   microoperaciones;
+-   análisis básico de accesos;
+-   `atomic`;
+-   `await`;
+-   semáforos escalares `P` / `V`.
 
-- variables compartidas;
-- arrays compartidos;
-- interleavings de microoperaciones;
-- análisis de accesos;
-- regiones `atomic`.
+Quedan previstos monitores y variables condición.
 
-Próximamente incorporará:
+Pasaje de mensajes permanece futuro: canales, `send`, `receive`,
+comunicación asincrónica/sincrónica, RPC y Rendezvous.
 
-- `await`;
-- semáforos;
-- monitores;
-- variables condición.
+El modo híbrido podrá existir, aunque la UI educativa podrá restringir
+mecanismos según el paradigma estudiado.
 
-### Pasaje de mensajes
+## 18. Tiempo simulado
 
-Previsto posteriormente:
-
-- memoria local aislada;
-- canales;
-- `send`;
-- `receive`;
-- comunicación asincrónica;
-- comunicación sincrónica;
-- RPC;
-- Rendezvous.
-
-### Modo híbrido
-
-El motor podrá combinar mecanismos, pero la interfaz educativa podrá
-restringirlos para respetar el paradigma que se esté estudiando.
-
-## 16. Tiempo
-
-No se utilizará tiempo real de JavaScript como fundamento de la semántica
+El tiempo real de JavaScript no será fundamento de la semántica
 concurrente.
 
-Cuando se incorpore:
+Cuando exista:
 
-```text
+``` text
 sleep(3)
 ```
 
-representará una cantidad de ticks simulados y no segundos reales del
-navegador.
+representará ticks simulados, no segundos reales.
 
-Esto mantiene las ejecuciones:
+Esto preserva reproducibilidad, independencia de la máquina y análisis
+programático de estados.
 
-- reproducibles;
-- independientes de la velocidad de la máquina;
-- compatibles con análisis programático de estados.
+## 19. Lenguaje y parser actuales
 
-## 17. Lenguaje actual y evolución
-
-La capa secuencial soporta actualmente:
-
-- variables;
-- arrays;
-- asignaciones;
-- expresiones;
-- funciones;
-- llamadas;
-- llamadas dentro de expresiones;
-- `if / else`;
-- `while`;
-- `repeat / until`;
-- `for`;
-- `foreach`;
-- `break`;
-- `continue`;
-- `return`.
+La capa secuencial soporta variables, arrays, asignaciones, expresiones,
+funciones, llamadas suspendibles, estructuras de control y `return`.
 
 La capa concurrente soporta actualmente:
 
-- `process`;
-- memoria compartida;
-- microoperaciones compartidas;
-- `atomic`.
+-   `process`;
+-   memoria compartida;
+-   microoperaciones compartidas;
+-   `atomic`;
+-   `await`;
+-   declaraciones escalares `sem`;
+-   `P`;
+-   `V`.
 
-Próximas extensiones:
+Pipeline vigente:
 
-- `await`;
-- semáforos `P` y `V`;
-- monitores;
-- `wait` / `signal`;
-- canales;
-- `send` / `receive`;
-- `sync_send`;
-- tiempo simulado;
-- otros mecanismos relevantes de la cursada.
-
-## 18. Parser
-
-El parser ya forma parte de la arquitectura vigente.
-
-El flujo actual es:
-
-```text
+``` text
 Texto
     ↓
 Tokenizer
@@ -746,96 +775,82 @@ AST / Program
 SimulationEngine
 ```
 
-El parser soporta la capa secuencial actual y se extiende incrementalmente
-con las nuevas primitivas concurrentes.
+Cada nueva primitiva debe integrarse en este pipeline y en el motor
+general, no crear una ruta paralela.
 
-La implementación conserva información de línea y columna para producir
-errores de sintaxis precisos.
+La validación de declaraciones de semáforos ocurre durante parsing, pero
+la resolución de una referencia utilizada por `P` / `V` ocurre
+actualmente en runtime. Un nombre inexistente produce un error de
+ejecución.
 
-`atomic` ya forma parte del tokenizer, parser y AST.
+Próximas extensiones relevantes incluyen arrays de semáforos cuando sean
+necesarios, monitores, pasaje de mensajes y tiempo simulado.
 
-Las primitivas futuras, comenzando por `await`, deberán integrarse al mismo
-pipeline en lugar de utilizar parsers o rutas de ejecución paralelas.
+## 20. Análisis de errores
 
-## 19. Análisis de errores
-
-El simulador debe detectar problemas que emerjan de la ejecución real del
-programa.
-
-Actualmente existe una primera base de análisis mediante conflictos de
-memoria compartida.
+La base actual detecta conflictos observados sobre memoria compartida.
 
 El objetivo posterior incluye:
 
-- data races con análisis más formal;
-- deadlock;
-- violaciones de exclusión mutua;
-- busy waiting;
-- starvation cuando sea razonablemente detectable;
-- bloqueos por comunicación;
-- estados inválidos.
+-   análisis más preciso de sincronización/data races;
+-   deadlock;
+-   violaciones de exclusión mutua;
+-   busy waiting;
+-   starvation cuando sea razonablemente detectable;
+-   bloqueos por comunicación;
+-   estados inválidos.
 
-La detección de deadlock podrá utilizar grafos de espera cuando existan
-recursos y procesos bloqueados suficientes para construirlos.
+Con semáforos ya existen recursos y procesos bloqueados suficientes para
+comenzar a diseñar análisis de dependencias, pero el detector formal de
+deadlock permanece en M8.
 
-## 20. Exploración de interleavings
+## 21. Exploración de interleavings
 
 Una ejecución correcta no demuestra que un programa concurrente sea
 correcto.
 
-El sistema deberá eventualmente poder explorar elecciones alternativas del
-scheduler y buscar contraejemplos.
+El sistema deberá explorar eventualmente elecciones alternativas del
+scheduler, detectar estados repetidos y producir contraejemplos
+reproducibles.
 
-Ejemplo:
+Las seeds y los historiales detallados existentes son fundamentos para
+esa funcionalidad.
 
-```text
-Ejecución actual:
-finalizó correctamente.
+## 22. Problemas clásicos
 
-Análisis:
-existe otro interleaving que produce deadlock.
-```
+Los problemas clásicos no se codifican como animaciones especiales.
 
-Los contraejemplos deberán poder reproducirse paso a paso en la interfaz.
+Ejemplos:
 
-La reproducibilidad mediante seeds y el historial detallado de ejecución
-son fundamentos para esta funcionalidad futura.
+-   Productor/Consumidor;
+-   Lectores/Escritores;
+-   Filósofos Comensales;
+-   sección crítica;
+-   barreras/señalización.
 
-## 21. Problemas clásicos
+Deben expresarse como programas válidos y ejecutarse mediante el mismo
+motor.
 
-Los problemas clásicos no deben estar codificados como animaciones
-especiales.
+Los casos que necesiten características todavía ausentes ---por ejemplo
+arrays de semáforos--- deben esperar a que el lenguaje pueda
+representarlos fielmente en lugar de introducir excepciones específicas.
 
-Ejemplos previstos:
+## 23. Fuente académica
 
-- Productor/Consumidor;
-- Lectores/Escritores;
-- Filósofos comensales / mesa circular;
-- Sección crítica;
-- Barreras.
-
-Deben expresarse como programas válidos del lenguaje y ser ejecutados por
-el mismo motor general.
-
-## 22. Fuente académica
-
-La semántica de primitivas concurrentes debe seguir prioritariamente el
+La semántica de primitivas concurrentes sigue prioritariamente el
 material de Programación Concurrente de la Facultad de Informática de la
-UNLP utilizado en la cursada actual.
+UNLP utilizado en la cursada.
 
-El material histórico puede utilizarse para anticipar conceptos y diseñar
-extensibilidad, pero debe compararse con el material vigente antes de fijar
-comportamientos específicos.
+El material histórico puede orientar extensibilidad, pero las decisiones
+semánticas concretas deben contrastarse con el enfoque vigente de la
+cátedra.
 
-La próxima primitiva a incorporar es `await`.
+Actualmente `await` está completado y semáforos se encuentra en
+desarrollo.
 
-Su diseño deberá reutilizar la infraestructura existente de:
+El próximo trabajo de M7 es validar la implementación mediante casos
+académicos expresados como programas normales del lenguaje.
 
-- estados de proceso;
-- scheduling;
-- microoperaciones;
-- atomicidad;
-- historial;
-- snapshots;
-
-sin introducir un segundo mecanismo de ejecución paralelo.
+Estos cambios deben reutilizar el núcleo existente de procesos,
+scheduling, bloqueo, historial, snapshots y análisis, sin crear un
+segundo motor de sincronización.
