@@ -42,6 +42,10 @@ violaciones observadas de exclusión mutua, busy waiting conservador,
 riesgo de starvation y un estado separado para ejecuciones que alcanzan
 el límite de pasos sin estar en deadlock.
 
+M9.1 ya comenzó separando la elección del scheduler de la transición del
+motor. El engine puede enumerar procesos habilitados y ejecutar una
+elección explícita sin modificar el comportamiento de `Step` y `Run`.
+
 ------------------------------------------------------------------------
 
 ## ¿Qué permite hacer actualmente?

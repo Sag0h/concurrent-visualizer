@@ -407,12 +407,31 @@ API principal:
 
 ``` ts
 engine.step()
+engine.getEnabledTransitions()
+engine.stepTransition(transition)
 engine.reset()
 engine.getState()
 engine.getSnapshot()
 ```
 
 `step()` devuelve si hubo progreso real.
+
+M9.1 separa selección y ejecución sin cambiar el comportamiento de
+`step()`. `getEnabledTransitions()` enumera de forma no mutante una
+transición `PROCESS_STEP` por cada proceso que podría ejecutar. Una
+transición registra el proceso, si reanudaría un bloqueo ya habilitado y
+si la elección está forzada por atomicidad.
+
+`stepTransition(transition)` valida que la elección siga habilitada,
+reactiva las esperas derivadas y ejecuta exactamente ese proceso sin
+consultar al scheduler. Esto permite construir ramas reproducibles; la
+ejecución interactiva continúa usando la política seleccionada por el
+usuario.
+
+Un proceso bloqueado en `await` o `P` puede aparecer como transición
+lógicamente habilitada sin que la enumeración cambie su estado. Si
+existe una región `atomic` activa y habilitada, sólo se expone su
+transición.
 
 Antes de seleccionar el siguiente proceso, el engine puede reevaluar
 procesos bloqueados por mecanismos cuya condición haya cambiado.
@@ -940,7 +959,7 @@ relevante o incluirlo explícitamente en la equivalencia.
 
 ### Modelo de transición
 
-La API objetivo separará selección y ejecución conceptualmente:
+La primera API de M9 separa selección y ejecución:
 
 ``` ts
 engine.getEnabledTransitions()

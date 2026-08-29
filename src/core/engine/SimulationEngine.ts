@@ -27,6 +27,7 @@ import type {
 import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
 import type { ExecutionDiagnostic } from '../deadlock/DeadlockDiagnostic'
 import { analyzeRuntimeDiagnostics } from '../diagnostics/analyzeRuntimeDiagnostics'
+import type { EnabledTransition } from './EnabledTransition'
 
 export class SimulationEngine {
   private state: ExecutionState
@@ -83,30 +84,98 @@ export class SimulationEngine {
     return this.state.stepCount >= this.maxSteps
   }
 
-step(): boolean {
-  if (this.state.stepCount >= this.maxSteps) {
-    return false
+  step(): boolean {
+    if (this.state.stepCount >= this.maxSteps) {
+      return false
+    }
+
+    this.reevaluateBlockedProcesses()
+
+    const atomicProcess =
+      this.findActiveAtomicProcess()
+
+    const process =
+      atomicProcess
+      ?? this.scheduler.selectNext(
+        this.state.program.processes,
+      )
+
+    if (!process) {
+      return false
+    }
+
+    return this.executeProcessStep(process)
   }
 
-  this.reevaluateBlockedProcesses()
+  getEnabledTransitions(): EnabledTransition[] {
+    if (this.hasReachedStepLimit()) {
+      return []
+    }
 
-  const atomicProcess =
-    this.state.program.processes.find(
-      (candidate) =>
-        candidate.state === 'READY'
-        && candidate.atomicDepth > 0,
+    const enabledProcesses =
+      this.state.program.processes.filter(
+        (process) =>
+          this.isProcessLogicallyEnabled(process),
+      )
+
+    const atomicProcess = enabledProcesses.find(
+      (process) => process.atomicDepth > 0,
     )
+    const selectableProcesses = atomicProcess
+      ? [atomicProcess]
+      : enabledProcesses
 
-  const process =
-    atomicProcess
-    ?? this.scheduler.selectNext(
-      this.state.program.processes,
-    )
-
-  if (!process) {
-    return false
+    return selectableProcesses.map((process) => ({
+      type: 'PROCESS_STEP',
+      processId: process.id,
+      resumesBlockedProcess:
+        process.state === 'BLOCKED',
+      forcedByAtomicity:
+        process.atomicDepth > 0,
+    }))
   }
 
+  stepTransition(
+    transition: EnabledTransition,
+  ): boolean {
+    if (this.hasReachedStepLimit()) {
+      return false
+    }
+
+    const enabledTransition =
+      this.getEnabledTransitions().find(
+        (candidate) =>
+          candidate.type === transition.type
+          && candidate.processId
+            === transition.processId,
+      )
+
+    if (!enabledTransition) {
+      throw new Error(
+        `Transition for process "${transition.processId}" is not enabled`,
+      )
+    }
+
+    this.reevaluateBlockedProcesses()
+
+    const process =
+      this.state.program.processes.find(
+        (candidate) =>
+          candidate.id === transition.processId,
+      )
+
+    if (!process || process.state !== 'READY') {
+      throw new Error(
+        `Process "${transition.processId}" cannot execute the selected transition`,
+      )
+    }
+
+    return this.executeProcessStep(process)
+  }
+
+  private executeProcessStep(
+    process: Process,
+  ): boolean {
   process.state = 'RUNNING'
 
   try {
@@ -3084,36 +3153,54 @@ step(): boolean {
         continue
       }
 
-      switch (process.blockingReason.type) {
-        case 'AWAIT': {
-          const enabled =
-            this.evaluateAwaitCondition(
-              process,
-              process.blockingReason.condition,
-            )
-
-          if (enabled) {
-            process.state = 'READY'
-            process.blockingReason = undefined
-          }
-
-          break
-        }
-
-        case 'SEMAPHORE_P': {
-          const semaphore =
-            this.getSemaphore(
-              process.blockingReason.semaphoreName,
-            )
-
-          if (semaphore.value > 0) {
-            process.state = 'READY'
-            process.blockingReason = undefined
-          }
-
-          break
-        }
+      if (this.isBlockingReasonEnabled(process)) {
+        process.state = 'READY'
+        process.blockingReason = undefined
       }
+    }
+  }
+
+  private findActiveAtomicProcess():
+    Process | undefined {
+    return this.state.program.processes.find(
+      (process) =>
+        process.state === 'READY'
+        && process.atomicDepth > 0,
+    )
+  }
+
+  private isProcessLogicallyEnabled(
+    process: Process,
+  ): boolean {
+    if (process.state === 'READY') {
+      return true
+    }
+
+    return process.state === 'BLOCKED'
+      && Boolean(process.blockingReason)
+      && this.isBlockingReasonEnabled(process)
+  }
+
+  private isBlockingReasonEnabled(
+    process: Process,
+  ): boolean {
+    const reason = process.blockingReason
+
+    if (!reason) {
+      return false
+    }
+
+    switch (reason.type) {
+      case 'AWAIT':
+        return this.evaluateAwaitCondition(
+          process,
+          reason.condition,
+        )
+
+      case 'SEMAPHORE_P':
+        return this.getSemaphore(
+          reason.semaphoreName,
+        ).value > 0
     }
   }
 

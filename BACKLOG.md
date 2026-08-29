@@ -719,12 +719,12 @@ internamente al scheduler y no expone las alternativas habilitadas.
 ### M9.1 --- Modelo de transiciones y estados clonables
 
 -   [ ] Separar estado semántico, metadata de análisis y traza.
--   [ ] Definir `EnabledTransition` con la elección ejecutable de un
+-   [x] Definir `EnabledTransition` con la elección ejecutable de un
     proceso.
--   [ ] Enumerar las transiciones habilitadas sin modificar el estado.
--   [ ] Ejecutar explícitamente una transición seleccionada, sin pedir
+-   [x] Enumerar las transiciones habilitadas sin modificar el estado.
+-   [x] Ejecutar explícitamente una transición seleccionada, sin pedir
     una decisión al scheduler.
--   [ ] Respetar exclusión durante `atomic` y cuerpos habilitados de
+-   [x] Respetar exclusión durante `atomic` y cuerpos habilitados de
     `await`.
 -   [ ] Clonar un estado intermedio completo sin compartir estructuras
     mutables.

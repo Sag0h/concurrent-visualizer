@@ -1627,3 +1627,31 @@ exhaustiva y pruebas de starvation o terminación.
 También se corrigió deriva documental posterior a M7/M8: referencias a
 semáforos todavía en desarrollo, la fase marcada como actual y enlaces
 que apuntaban a un directorio `docs/` inexistente.
+
+### M9.1 --- Primera API de transiciones explícitas
+
+Se agregó `EnabledTransition` con una transición `PROCESS_STEP` por
+proceso elegible. La metadata indica si la ejecución reanuda un proceso
+bloqueado cuya condición ya está habilitada y si una región `atomic`
+fuerza la elección.
+
+`SimulationEngine.getEnabledTransitions()` evalúa las alternativas sin
+mutar el estado origen. Un `await` verdadero o un permiso disponible
+pueden volver elegible a un proceso todavía representado como
+`BLOCKED`; la reactivación efectiva ocurre al ejecutar la transición.
+
+`stepTransition()` valida la elección y ejecuta exactamente el proceso
+pedido sin consultar al scheduler. `step()` reutiliza la misma operación
+interna y mantiene el comportamiento interactivo previo.
+
+Se agregaron pruebas para:
+
+-   enumeración de dos procesos `READY`;
+-   elección explícita distinta de First Ready;
+-   habilitación no mutante de un `await` bloqueado;
+-   continuidad exclusiva dentro de `atomic`;
+-   rechazo de transiciones no habilitadas;
+-   ausencia de transiciones al alcanzar el límite de steps.
+
+La separación del estado semántico y la clonación de estados
+intermedios continúan pendientes dentro de M9.1.
