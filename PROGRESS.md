@@ -5,22 +5,23 @@
 
 ## Estado actual
 
-**Fase:** M7 --- Semáforos.
+**Fase:** M8 --- Detector de errores y diagnósticos.
 
-**Último milestone completado:** M6 --- `await`.
+**Último milestone completado:** M7 --- Semáforos.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
 procesos `BLOCKED`, reactivación sin reserva, reevaluación de guardas,
 historial/visualización de esperas y casos académicos representativos.
 
-**Estado M7:** en progreso. Ya están completadas la semántica de
+**Estado M7:** completado. Están verificadas la semántica de
 semáforos generales/contadores, su modelo y AST, el tokenizer/parser,
 el runtime base de `P` / `V`, su historial/visualización y la integración
-con el análisis de interferencia.
+con el análisis de interferencia, además de nueve casos académicos
+reproducibles.
 
-**Próximo objetivo:** continuar M7.7 con casos académicos reproducibles
-de exclusión mutua, señalización y recursos contados.
+**Próximo objetivo:** iniciar M8 consolidando los diagnósticos de errores
+con la base de interferencias, bloqueos y deadlocks ya disponible.
 
 ------------------------------------------------------------------------
 
@@ -1126,8 +1127,15 @@ ejecutarse; quienes pierdan la competencia pueden volver a bloquearse.
 -   Los accesos protegidos por el mismo candidato válido quedan
     `SYNCHRONIZED` con razón `SEMAPHORE_MUTEX`.
 -   La protección unilateral queda `POTENTIAL_RACE`.
--   Los semáforos contadores, la señalización y los protocolos
-    incompatibles que delimitan ambos accesos quedan `UNKNOWN`.
+-   Un traspaso directo sobre un semáforo inicializado en `0`, con
+    alternancia observada `V: 0 -> 1` / `P: 1 -> 0`, puede ordenar un
+    acceso anterior al `V` respecto de otro posterior al `P`. Se informa
+    como `SYNCHRONIZED` con razón `SEMAPHORE_SIGNALING`.
+-   La regla de señalización es deliberadamente acotada: no reconoce un
+    `V` anterior al acceso productor, contadores mayores que uno ni
+    protocolos que no alternen limpiamente entre `0` y `1`.
+-   Los semáforos contadores y los protocolos incompatibles que delimitan
+    ambos accesos quedan `UNKNOWN`.
 -   Cada conflicto incorpora una razón estructurada y la UI explica la
     clasificación.
 -   La interfaz aclara que el resultado corresponde a la ejecución
@@ -1136,9 +1144,288 @@ ejecutarse; quienes pierdan la competencia pueden volver a bloquearse.
     `V` extra.
 -   Se verificaron visualmente los tres resultados en Round Robin.
 
+### M7.7 --- Primer caso académico: exclusión mutua
+
+Se adaptó el Ejercicio 1 de la explicación práctica de semáforos a una
+ejecución finita compatible con el visualizador. Dos procesos representan
+chicos que toman un caramelo, incrementan el contador compartido `cant`
+bajo `P(mutex)` / `V(mutex)` y realizan el trabajo local de comer fuera de
+la sección crítica.
+
+El test académico verifica:
+
+-   `cant == 2` al terminar;
+-   valor final `mutex == 1`;
+-   ambos procesos finalizados;
+-   existencia de un intento de `P` bloqueado bajo Round Robin;
+-   a lo sumo un proceso entre su `P` exitoso y su `V`;
+-   liberación completa de la sección al finalizar;
+-   clasificación de los conflictos compartidos como `SYNCHRONIZED` con
+    razón `SEMAPHORE_MUTEX`.
+
+La adaptación conserva la enseñanza de la práctica: solamente el acceso
+al recurso compartido pertenece a la sección crítica; el trabajo local se
+mantiene fuera para no reducir innecesariamente la concurrencia.
+
+### M7.7 --- Segundo caso académico: señalización de eventos
+
+Se incorporó una señal unidireccional con `sem inicio = 0`. El proceso
+`Trabajador` intenta primero `P(inicio)` y queda bloqueado; el
+`Coordinador` anuncia el evento mediante `V(inicio)` y el trabajador
+consume posteriormente esa señal con un `P` exitoso.
+
+El test verifica la secuencia estructurada:
+
+``` text
+Trabajador:  P(inicio)  0 -> 0  BLOCKED
+Coordinador: V(inicio)  0 -> 1  SUCCEEDED
+Trabajador:  P(inicio)  1 -> 0  SUCCEEDED
+```
+
+También comprueba que:
+
+-   el trabajador conserva su program counter y motivo de bloqueo;
+-   inmediatamente después de `V`, continúa `BLOCKED` hasta la próxima
+    reevaluación del engine;
+-   la reactivación no reserva el permiso: el `P` seleccionado vuelve a
+    comprobar y decrementar el semáforo;
+-   después del `P` exitoso, el trabajador ejecuta su trabajo local;
+-   el semáforo termina nuevamente en `0`;
+-   el caso no introduce accesos a memoria compartida ni conflictos de
+    interferencia.
+
+Durante el diseño se comprobó además que una operación ejecutada antes
+de `P` puede dar tiempo al coordinador para señalizar primero. En ese
+orden la señal queda almacenada como valor `1` y el `P` posterior no se
+bloquea, comportamiento correcto para un semáforo general.
+
+### M7.7 --- Tercer caso académico: varios waiters
+
+Se agregaron dos trabajadores esperando sobre `sem inicio = 0` y un
+coordinador que ejecuta dos operaciones `V(inicio)`, una por cada proceso
+demorado.
+
+Con Round Robin se verifica la secuencia:
+
+``` text
+Trabajador1: P  0 -> 0  BLOCKED
+Trabajador2: P  0 -> 0  BLOCKED
+Coordinador: V  0 -> 1  SUCCEEDED
+Trabajador1: P  1 -> 0  SUCCEEDED
+Trabajador2: P  0 -> 0  BLOCKED nuevamente
+Coordinador: V  0 -> 1  SUCCEEDED
+Trabajador2: P  1 -> 0  SUCCEEDED
+```
+
+El caso demuestra que:
+
+-   un `V` crea un permiso, no uno por cada waiter;
+-   todos los procesos cuya guarda `s > 0` sea verdadera pueden pasar a
+    `READY` durante la reevaluación;
+-   la reactivación no reserva el permiso;
+-   quien pierde la competencia puede volver a bloquearse;
+-   se necesita un `V` por cada proceso que deba continuar;
+-   el orden observado proviene de Round Robin y no de una cola FIFO del
+    semáforo;
+-   `waitingProcessIds` representa procesos actualmente `BLOCKED`, no una
+    cola ni una lista de permisos pendientes.
+
+### M7.7 --- Cuarto caso académico: contador de recursos
+
+Se incorporó `sem recursos = 2` para representar dos unidades libres de
+un mismo recurso. Tres trabajadores intentan adquirir una unidad con
+`P(recursos)`, realizan trabajo local y la devuelven con `V(recursos)`.
+
+Con Round Robin se verifica la secuencia:
+
+``` text
+Trabajador1: P  2 -> 1  SUCCEEDED
+Trabajador2: P  1 -> 0  SUCCEEDED
+Trabajador3: P  0 -> 0  BLOCKED
+Trabajador1: V  0 -> 1  SUCCEEDED
+Trabajador2: V  1 -> 2  SUCCEEDED
+Trabajador3: P  2 -> 1  SUCCEEDED
+Trabajador3: V  1 -> 2  SUCCEEDED
+```
+
+El test comprueba que:
+
+-   dos procesos pueden conservar simultáneamente una unidad adquirida;
+-   nunca hay más de dos usuarios activos, que es la capacidad inicial;
+-   el tercer proceso se bloquea cuando el contador llega a `0`;
+-   una operación `V` devuelve una unidad y habilita una reevaluación;
+-   las tres unidades adquiridas se devuelven y el valor final vuelve a
+    `2`;
+-   no se introduce memoria compartida: el caso aísla la semántica del
+    contador de recursos.
+
+Este uso no representa exclusión mutua. Un semáforo inicializado en `2`
+permite dos usuarios concurrentes y, por lo tanto, no protege por sí solo
+una sección crítica que requiera un único ejecutor.
+
+### M7.7 --- Quinto caso académico: Productor/Consumidor unitario
+
+Se adaptó el buffer limitado de la Clase 4 a una ejecución finita con un
+único productor, un único consumidor y capacidad `1`:
+
+-   `vacio = 1` cuenta el único lugar inicialmente libre;
+-   `lleno = 0` indica que todavía no existe un dato para retirar;
+-   el consumidor ejecuta primero `P(lleno)` y queda bloqueado;
+-   el productor consume el lugar con `P(vacio)`, deposita `42` y anuncia
+    el dato mediante `V(lleno)`;
+-   el consumidor completa `P(lleno)`, copia el dato y devuelve el lugar
+    con `V(vacio)`.
+
+El resultado final conserva `buffer == 42`, obtiene `consumido == 42` y
+restaura el estado vacío mediante `vacio == 1` y `lleno == 0`.
+
+Este caso también extendió el análisis de interferencia con un traspaso
+directo de señalización. La escritura del productor ocurre antes de
+`V(lleno)` y la lectura del consumidor después del `P(lleno)` que consume
+esa señal; el conflicto observado se explica como `SYNCHRONIZED` con
+razón `SEMAPHORE_SIGNALING`. Un test negativo comprueba que hacer `V`
+antes de escribir no establece ese orden.
+
+La mejora no intenta resolver happens-before general: sólo reconoce
+señalización inicializada en `0`, alternante entre `0` y `1` y con un
+emparejamiento directo no ambiguo en la traza observada.
+
+### M7.7 --- Sexto caso académico: buffer con recursos contados
+
+Se amplió Productor/Consumidor a un buffer de capacidad `2`, representado
+por `shared int[] buffer = [0, 0]`, con tres mensajes finitos para hacer
+visible el bloqueo por falta de espacio.
+
+El caso usa **First Ready** y coloca primero al productor. La ejecución
+observada permite que deposite `10` y `20`, dejando:
+
+``` text
+vacio = 0
+lleno = 2
+buffer = [10, 20]
+```
+
+El tercer `P(vacio)` obtiene `0 -> 0 BLOCKED`. El consumidor retira el
+primer mensaje y ejecuta `V(vacio)`, tras lo cual el productor reevalúa
+su `P`, deposita `30` en la posición liberada y termina. El consumidor
+retira luego los dos mensajes restantes.
+
+El test comprueba:
+
+-   existencia del bloqueo del productor con el buffer lleno;
+-   valores de ambos semáforos siempre comprendidos entre `0` y `2`;
+-   secuencia consumida `[10, 20, 30]`;
+-   estado final `vacio == 2` y `lleno == 0`;
+-   finalización de productor y consumidor;
+-   accesos al buffer clasificados como sincronizados.
+
+Los accesos de depositar y retirar se expresaron como bloques `atomic`
+porque, para un productor y un consumidor, la cátedra permite asumir
+atómicas esas operaciones. Los semáforos continúan cumpliendo otra
+función: controlar cuántas posiciones están libres u ocupadas.
+
+No se generalizó todavía a múltiples productores o consumidores. En ese
+caso los índices compartidos y las operaciones de depósito/retiro pasan
+a ser secciones críticas que requieren exclusión mutua adicional.
+
+### M7.7 --- Séptimo caso académico: barrera de tres procesos
+
+Se adaptó la barrera del Ejercicio 3 de la explicación práctica a tres
+procesos finitos. Cada chico incrementa `contador` dentro de una sección
+protegida por `mutex`. El último en observar `contador == 3` ejecuta tres
+operaciones `V(barrera)`, una por cada proceso que debe atravesarla.
+
+El protocolo mantiene el orden crítico:
+
+``` text
+P(mutex)
+contador = contador + 1
+si contador == 3: V(barrera) tres veces
+V(mutex)
+P(barrera)
+trabajo posterior
+```
+
+El test verifica:
+
+-   `contador == 3` al finalizar;
+-   al menos dos procesos demorados simultáneamente en la barrera;
+-   exactamente tres señales y tres esperas exitosas;
+-   las tres señales emitidas por el proceso que llega último;
+-   ningún proceso ejecuta trabajo posterior antes de que el contador
+    llegue a `3`;
+-   cada proceso libera `mutex` antes de intentar `P(barrera)`;
+-   estado final `mutex == 1` y `barrera == 0`;
+-   conflictos sobre `contador` sincronizados mediante el protocolo
+    `SEMAPHORE_MUTEX`.
+
+Es una barrera de un solo uso. No se supone orden FIFO: los tres permisos
+son equivalentes y el scheduler decide qué proceso consume cada uno.
+
+### M7.7 --- Octavo caso académico: Lectores/Escritores
+
+Se implementó la solución de preferencia a lectores presentada en la
+Clase 4. `mutexR` protege el contador `nr`; el primer lector toma `rw` y
+el último lector lo libera. El escritor necesita adquirir `rw` para
+modificar la base de datos.
+
+La ejecución finita contiene dos lectores y un escritor. El escritor
+realiza preparación local antes de solicitar la base para obtener una
+traza Round Robin reproducible en la que:
+
+-   `nr` alcanza `2`;
+-   ambos lectores ejecutan trabajo de lectura concurrentemente;
+-   el escritor queda bloqueado en `P(rw)`;
+-   ambos lectores observan `baseDatos == 0`;
+-   el último lector ejecuta `V(rw)`;
+-   el escritor continúa con `nr == 0` y actualiza `baseDatos` a `42`.
+
+El test también comprueba que solamente el primer lector ejecuta el
+`P(rw)` exitoso de entrada al grupo y solamente el último ejecuta
+`V(rw)`. El estado final restaura `nr == 0`, `rw == 1` y `mutexR == 1`.
+
+Los accesos a `nr` se reconocen mediante `SEMAPHORE_MUTEX`. Las
+operaciones finitas de lectura y escritura de la base se expresan como
+regiones `atomic`, separando su indivisibilidad del protocolo de acceso
+por clases controlado mediante `rw`.
+
+Esta es la variante con preferencia a lectores y no es fair: una llegada
+continua de nuevos lectores podría postergar indefinidamente a un
+escritor. La simulación finita demuestra seguridad y concurrencia entre
+lectores, no ausencia de starvation.
+
+### M7.7 --- Noveno caso académico: Filósofos Comensales
+
+Se adaptó la solución de exclusión mutua selectiva de la Clase 4 a cinco
+procesos finitos y cinco semáforos generales inicializados en `1`. Como
+el lenguaje todavía no soporta arrays de semáforos, `tenedor0` a
+`tenedor4` representan fielmente las cinco posiciones del arreglo
+académico.
+
+Los filósofos `0` a `3` toman sus dos tenedores en orden ascendente. El
+`Filosofo4` rompe la espera circular tomando primero `tenedor0` y luego
+`tenedor4`. No se agrega un árbitro ni un tipo especial de semáforo: la
+ausencia de deadlock surge únicamente del orden de adquisición.
+
+La traza Round Robin reproducible demuestra que:
+
+-   cada tenedor tiene como máximo un poseedor;
+-   filósofos vecinos nunca comen simultáneamente;
+-   `Filosofo0` y `Filosofo2`, que no comparten tenedores, sí comen a la
+    vez;
+-   aparecen esperas reales en operaciones `P`;
+-   cada filósofo completa exactamente dos `P`, come cuatro bocados y
+    ejecuta dos `V`;
+-   los cinco procesos terminan y todos los tenedores vuelven a `1`.
+
+Las variables locales `espera` y `bocados` extienden la duración visible
+del escenario, pero no participan en el protocolo. No hay memoria
+compartida ordinaria: toda la coordinación ocurre mediante los cinco
+semáforos.
+
 ### Verificación
 
-Al cierre de M7.6 se verificó correctamente:
+Al cierre de M7 se verificó correctamente:
 
 ``` text
 npm test
@@ -1148,6 +1435,7 @@ npm run build
 
 ### Próxima fase
 
--   M7.7 --- casos académicos.
+-   M8 --- detector de errores y diagnósticos.
 
-**Estado:** M7 EN PROGRESO; M7.1 a M7.6 completados.
+**Estado:** M7 COMPLETADO; M7.1 a M7.7 y nueve casos académicos
+reproducibles verificados.

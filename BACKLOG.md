@@ -611,20 +611,20 @@ convierten toda la sección crítica en una única acción atómica.
 Los problemas clásicos deben expresarse como programas normales y su
 comportamiento debe emerger del motor general.
 
--   [ ] Probar exclusión mutua mediante `sem mutex = 1`.
--   [ ] Probar señalización de eventos mediante un semáforo inicializado
+-   [x] Probar exclusión mutua mediante `sem mutex = 1`.
+-   [x] Probar señalización de eventos mediante un semáforo inicializado
     en `0`.
--   [ ] Probar varios procesos esperando el mismo evento/recurso.
--   [ ] Probar un semáforo contador con más de una unidad disponible.
--   [ ] Incorporar Productor/Consumidor con buffer unitario.
--   [ ] Incorporar Productor/Consumidor con recursos contados cuando la
+-   [x] Probar varios procesos esperando el mismo evento/recurso.
+-   [x] Probar un semáforo contador con más de una unidad disponible.
+-   [x] Incorporar Productor/Consumidor con buffer unitario.
+-   [x] Incorporar Productor/Consumidor con recursos contados cuando la
     sintaxis lo permita.
--   [ ] Incorporar un caso de barrera/señalización basado en la cátedra.
--   [ ] Incorporar Lectores/Escritores cuando el lenguaje lo permita
+-   [x] Incorporar un caso de barrera/señalización basado en la cátedra.
+-   [x] Incorporar Lectores/Escritores cuando el lenguaje lo permita
     correctamente.
--   [ ] Incorporar Filósofos Comensales cuando exista soporte suficiente
+-   [x] Incorporar Filósofos Comensales cuando exista soporte suficiente
     para arrays de semáforos o una representación fiel.
--   [ ] Verificar casos académicos con tests reproducibles.
+-   [x] Verificar casos académicos con tests reproducibles.
 
 ### Decisiones diferidas
 
@@ -639,9 +639,9 @@ comportamiento debe emerger del motor general.
 -   Posponer un análisis formal happens-before hasta diseñar una fase
     adecuada.
 
-**Estado:** M7 EN PROGRESO. Semántica, modelo/AST, parser, runtime base,
-historial/visualización e integración con el análisis completados.
-Pendientes los casos académicos de M7.7.
+**Estado:** M7 COMPLETADO. Semántica, modelo/AST, parser, runtime base,
+historial/visualización, integración con el análisis y casos académicos
+completados y verificados.
 
 ------------------------------------------------------------------------
 

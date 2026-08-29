@@ -15,6 +15,24 @@ interface SemaphoreAnalysis {
   readonly activeSections:
     ReadonlyMap<MicroOperationEvent, ReadonlySet<string>>
   readonly validMutexes: ReadonlySet<string>
+  readonly directSignals: readonly DirectSemaphoreSignal[]
+}
+
+interface DirectSemaphoreSignal {
+  readonly semaphoreName: string
+  readonly sourceProcessId: ProcessId
+  readonly targetProcessId: ProcessId
+  readonly releaseStep: number
+  readonly acquireStep: number
+}
+
+interface SignalingCandidate {
+  isValid: boolean
+  pendingSignal?: {
+    readonly processId: ProcessId
+    readonly step: number
+  }
+  readonly signals: DirectSemaphoreSignal[]
 }
 
 function isMemoryAccess(
@@ -104,6 +122,81 @@ function analyzeSemaphoreSections(
     ReadonlySet<string>
   >()
 
+  const signalingCandidates = new Map<
+    string,
+    SignalingCandidate
+  >()
+
+  for (
+    const [name, initialValue]
+    of Object.entries(
+      context.initialSemaphoreValues,
+    )
+  ) {
+    if (initialValue === 0) {
+      signalingCandidates.set(name, {
+        isValid: true,
+        signals: [],
+      })
+    }
+  }
+
+  for (const event of context.executionHistory) {
+    const semaphoreEvent = event.semaphoreEvent
+
+    if (
+      !semaphoreEvent
+      || semaphoreEvent.status !== 'SUCCEEDED'
+    ) {
+      continue
+    }
+
+    const candidate = signalingCandidates.get(
+      semaphoreEvent.semaphoreName,
+    )
+
+    if (!candidate || !candidate.isValid) {
+      continue
+    }
+
+    if (semaphoreEvent.operation === 'V') {
+      if (
+        semaphoreEvent.valueBefore !== 0
+        || semaphoreEvent.valueAfter !== 1
+        || candidate.pendingSignal
+      ) {
+        candidate.isValid = false
+        continue
+      }
+
+      candidate.pendingSignal = {
+        processId: event.processId,
+        step: event.step,
+      }
+      continue
+    }
+
+    if (
+      semaphoreEvent.valueBefore !== 1
+      || semaphoreEvent.valueAfter !== 0
+      || !candidate.pendingSignal
+    ) {
+      candidate.isValid = false
+      continue
+    }
+
+    candidate.signals.push({
+      semaphoreName:
+        semaphoreEvent.semaphoreName,
+      sourceProcessId:
+        candidate.pendingSignal.processId,
+      targetProcessId: event.processId,
+      releaseStep: candidate.pendingSignal.step,
+      acquireStep: event.step,
+    })
+    candidate.pendingSignal = undefined
+  }
+
   const timeline = [
     ...context.executionHistory
       .filter((event) => event.semaphoreEvent)
@@ -191,7 +284,27 @@ function analyzeSemaphoreSections(
         .filter(([, isValid]) => isValid)
         .map(([name]) => name),
     ),
+    directSignals: [
+      ...signalingCandidates.values(),
+    ]
+      .filter((candidate) => candidate.isValid)
+      .flatMap((candidate) => candidate.signals),
   }
+}
+
+function findDirectSemaphoreSignal(
+  first: MicroOperationEvent,
+  second: MicroOperationEvent,
+  analysis: SemaphoreAnalysis,
+): DirectSemaphoreSignal | undefined {
+  return analysis.directSignals.find(
+    (signal) =>
+      signal.sourceProcessId === first.processId
+      && first.step < signal.releaseStep
+      && signal.releaseStep < signal.acquireStep
+      && signal.targetProcessId === second.processId
+      && signal.acquireStep < second.step,
+  )
 }
 
 function findSharedSemaphoreSections(
@@ -285,13 +398,24 @@ export function findMemoryAccessConflicts(
             ),
         )
 
+      const directSemaphoreSignal =
+        semaphoreAnalysis
+          ? findDirectSemaphoreSignal(
+              first,
+              second,
+              semaphoreAnalysis,
+            )
+          : undefined
+
       const classification = bothInsideAtomic
         ? 'SYNCHRONIZED'
         : mutexSemaphore
           ? 'SYNCHRONIZED'
-          : sharedSemaphoreSections.length > 0
-            ? 'UNKNOWN'
-            : 'POTENTIAL_RACE'
+          : directSemaphoreSignal
+            ? 'SYNCHRONIZED'
+            : sharedSemaphoreSections.length > 0
+              ? 'UNKNOWN'
+              : 'POTENTIAL_RACE'
 
       const reason = bothInsideAtomic
         ? { type: 'ATOMIC_REGION' as const }
@@ -300,14 +424,21 @@ export function findMemoryAccessConflicts(
               type: 'SEMAPHORE_MUTEX' as const,
               semaphoreName: mutexSemaphore,
             }
-          : sharedSemaphoreSections.length > 0
+          : directSemaphoreSignal
             ? {
                 type:
-                  'AMBIGUOUS_SEMAPHORE_PROTOCOL' as const,
-                semaphoreNames:
-                  sharedSemaphoreSections,
+                  'SEMAPHORE_SIGNALING' as const,
+                semaphoreName:
+                  directSemaphoreSignal.semaphoreName,
               }
-            : { type: 'UNPROTECTED' as const }
+            : sharedSemaphoreSections.length > 0
+              ? {
+                  type:
+                    'AMBIGUOUS_SEMAPHORE_PROTOCOL' as const,
+                  semaphoreNames:
+                    sharedSemaphoreSections,
+                }
+              : { type: 'UNPROTECTED' as const }
 
       conflicts.push({
         first,

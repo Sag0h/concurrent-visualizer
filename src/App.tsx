@@ -1436,6 +1436,9 @@ function describeConflictReason(
     case 'SEMAPHORE_MUTEX':
       return `Observed mutex protocol with ${conflict.reason.semaphoreName}.`
 
+    case 'SEMAPHORE_SIGNALING':
+      return `Observed direct V(${conflict.reason.semaphoreName}) → P(${conflict.reason.semaphoreName}) handoff orders these accesses.`
+
     case 'AMBIGUOUS_SEMAPHORE_PROTOCOL':
       return `Semaphore use is not a verified mutex protocol: ${conflict.reason.semaphoreNames.join(', ')}.`
 

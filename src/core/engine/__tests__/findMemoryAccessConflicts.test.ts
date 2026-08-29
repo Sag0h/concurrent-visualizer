@@ -437,4 +437,85 @@ describe('findMemoryAccessConflicts', () => {
       ),
     ).toBe(true)
   })
+
+  it('recognizes a direct signaling handoff that orders two accesses', () => {
+    const source = `
+      sem listo = 0;
+      shared int dato = 0;
+      shared int recibido = 0;
+
+      process Productor {
+        dato = 42;
+        V(listo);
+      }
+
+      process Consumidor {
+        P(listo);
+        recibido = dato;
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    const conflicts =
+      engine.getSnapshot().memoryAccessConflicts
+
+    expect(conflicts).toHaveLength(1)
+    expect(conflicts[0]).toMatchObject({
+      classification: 'SYNCHRONIZED',
+      reason: {
+        type: 'SEMAPHORE_SIGNALING',
+        semaphoreName: 'listo',
+      },
+    })
+  })
+
+  it('does not infer ordering when the signal occurs before the write', () => {
+    const source = `
+      sem listo = 0;
+      shared int dato = 0;
+      shared int recibido = 0;
+
+      process Productor {
+        V(listo);
+        dato = 42;
+      }
+
+      process Consumidor {
+        P(listo);
+        recibido = dato;
+      }
+    `
+
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(source)),
+      new RoundRobinScheduler(),
+    )
+
+    while (!engine.isFinished()) {
+      if (!engine.step()) {
+        break
+      }
+    }
+
+    expect(
+      engine.getSnapshot().memoryAccessConflicts,
+    ).toEqual([
+      expect.objectContaining({
+        classification: 'POTENTIAL_RACE',
+        reason: {
+          type: 'UNPROTECTED',
+        },
+      }),
+    ])
+  })
 })

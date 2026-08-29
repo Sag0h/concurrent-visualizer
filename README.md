@@ -16,17 +16,19 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M7 --- **Semáforos**.
+**Milestone actual:** M8 --- **Detector de errores y diagnósticos**.
 
-**Último milestone completado:** M6 --- **`await`**.
+**Último milestone completado:** M7 --- **Semáforos**.
 
-Actualmente están completadas las primeras cinco fases de M7:
+M7 está completado en sus siete fases:
 
 -   **M7.1:** semántica de semáforos generales/contadores;
 -   **M7.2:** modelo y AST;
 -   **M7.3:** tokenizer, sintaxis y parser;
--   **M7.4:** runtime base de `P` / `V`.
--   **M7.5:** historial y visualización de semáforos.
+-   **M7.4:** runtime base de `P` / `V`;
+-   **M7.5:** historial y visualización de semáforos;
+-   **M7.6:** integración con el análisis de interferencia;
+-   **M7.7:** nueve casos académicos reproducibles.
 
 El simulador ya dispone de lenguaje ejecutable, parser, procesos,
 estructuras de control, funciones, scheduling reproducible, memoria
@@ -34,8 +36,8 @@ compartida, microoperaciones intercalables, análisis básico de
 interferencias, regiones `atomic`, acciones atómicas condicionales
 mediante `await` y semáforos escalares.
 
-Las próximas fases de M7 incorporan la integración con el análisis de
-interferencia y casos académicos.
+La próxima fase profundiza los diagnósticos de errores a partir de la
+base de interferencias, bloqueos y deadlocks ya disponible.
 
 ------------------------------------------------------------------------
 
@@ -328,12 +330,99 @@ No se asume:
 El análisis de memoria puede reconocer un semáforo general inicializado
 en `1` cuando la ejecución observada respeta un protocolo mutex correcto.
 La protección por el mismo mutex se muestra como `SYNCHRONIZED`; la
-protección unilateral como `POTENTIAL_RACE`; y un contador, señalización
-o protocolo ambiguo como `UNKNOWN`.
+protección unilateral como `POTENTIAL_RACE`; y un contador o protocolo
+ambiguo como `UNKNOWN`. También se reconoce como `SYNCHRONIZED` un
+traspaso directo y no ambiguo `V(s) -> P(s)` sobre un semáforo de
+señalización inicializado en `0`, siempre que el primer acceso ocurra
+antes del `V` y el segundo después del `P`.
 
 Esta clasificación no crea un tipo binario ni agrega ownership al
 runtime. Tampoco demuestra el comportamiento para todos los
 interleavings: explica únicamente la traza ejecutada.
+
+El primer caso académico de M7.7 adapta el ejercicio práctico de los
+chicos y la bolsa de caramelos. El incremento compartido se protege con
+`sem mutex = 1`, mientras el trabajo local queda fuera de la sección
+crítica para maximizar la concurrencia. Un test reproducible comprueba el
+contador final, los bloqueos observados y que nunca haya más de un
+proceso dentro de la sección protegida.
+
+El segundo caso utiliza `sem inicio = 0` para señalización. Un trabajador
+se bloquea en `P(inicio)`, un coordinador anuncia el evento con
+`V(inicio)` y el trabajador reevalúa y consume la señal antes de
+continuar. Este uso sincroniza por condición y no representa exclusión
+mutua.
+
+El tercer caso coloca dos trabajadores sobre el mismo semáforo de
+señalización. Un solo `V` crea un solo permiso: ambos pueden ser
+reactivados, pero uno consume el recurso y el otro puede volver a
+bloquearse. Un segundo `V` permite continuar al restante. El orden lo
+decide el scheduler; no existe una cola FIFO dentro del semáforo.
+
+El cuarto caso usa `sem recursos = 2` como contador de unidades libres.
+Dos trabajadores pueden adquirir una unidad antes de que ocurra ningún
+`V`; un tercero se bloquea al encontrar el valor `0` y continúa cuando se
+devuelve una unidad. El test comprueba una concurrencia máxima de dos
+usuarios y que el semáforo recupere su valor inicial al terminar. Este
+protocolo modela capacidad y no exclusión mutua.
+
+El quinto caso adapta Productor/Consumidor a un buffer unitario. `vacio`
+empieza en `1` y cuenta el lugar libre; `lleno` empieza en `0` y obliga al
+consumidor a esperar un dato. El productor deposita `42`, ejecuta
+`V(lleno)` y el consumidor consume esa señal antes de leer el buffer. Al
+terminar, el dato fue transferido, `vacio` vuelve a `1` y `lleno` a `0`.
+
+Para explicar correctamente ese acceso, el análisis reconoce el orden
+directo escritura - `V(lleno)` - `P(lleno)` - lectura como
+`SEMAPHORE_SIGNALING`. La regla es intencionalmente estrecha: no reemplaza
+un análisis formal completo de happens-before ni generaliza señales o
+contadores ambiguos.
+
+El sexto caso amplía el buffer a dos posiciones y produce tres mensajes.
+Con **First Ready**, el productor deposita `10` y `20`, consume las dos
+unidades de `vacio` y queda bloqueado al intentar un tercer `P(vacio)`.
+El consumidor libera una posición, el productor deposita `30` y la
+ejecución termina con `consumidos = [10, 20, 30]`, `vacio = 2` y
+`lleno = 0`.
+
+Los depósitos y retiros están dentro de bloques `atomic`, siguiendo la
+suposición académica válida para un único productor y un único
+consumidor. `atomic` hace indivisible cada acceso al buffer; `vacio` y
+`lleno` administran la capacidad. El caso no incorpora todavía múltiples
+productores o consumidores, que requerirían mutex adicionales para sus
+índices compartidos.
+
+El séptimo caso implementa una barrera de un solo uso para tres procesos.
+Cada uno incrementa un contador protegido por `mutex`; el último genera
+tres permisos mediante `V(barrera)` y todos consumen uno antes de
+continuar. El test exige que nadie cruce antes de `contador == 3` y que
+cada proceso libere el mutex antes de bloquearse en la barrera.
+
+La barrera usa `sem barrera = 0` como señalización, no como exclusión
+mutua. Se emite un permiso por proceso y no se infiere ningún orden FIFO.
+
+El octavo caso adapta Lectores/Escritores con preferencia a lectores.
+`mutexR` protege `nr`; el primer lector toma `rw` y el último lo libera.
+Dos lectores pueden mantener `nr = 2` y leer concurrentemente, mientras
+el escritor permanece bloqueado hasta que el grupo lector abandona la
+base de datos.
+
+La preparación local del escritor y el trabajo local de los lectores
+sólo hacen visible ese interleaving con Round Robin. No modifican el
+protocolo. Esta solución no es fair: una sucesión continua de lectores
+puede causar starvation del escritor.
+
+El noveno caso adapta Filósofos Comensales sin requerir arrays de
+semáforos: cinco semáforos generales `tenedor0` a `tenedor4` representan
+los tenedores. Los filósofos `0` a `3` los toman en orden ascendente y el
+`Filosofo4` toma primero `tenedor0` y después `tenedor4`, rompiendo la
+espera circular.
+
+Con Round Robin, `Filosofo0` y `Filosofo2` pueden comer simultáneamente
+porque no son vecinos, mientras los procesos que compiten por alguno de
+sus tenedores quedan bloqueados. El test exige exclusividad por tenedor,
+prohíbe que vecinos coman juntos y comprueba que los cinco filósofos
+terminen devolviendo todos los semáforos a `1`.
 
 ------------------------------------------------------------------------
 
@@ -520,7 +609,7 @@ Pasaje de mensajes
 Visualización y análisis avanzado
 ```
 
-### Milestone actual --- M7: Semáforos
+### Último milestone completado --- M7: Semáforos
 
 Completado:
 
@@ -530,16 +619,19 @@ M7.2  Modelo y AST
 M7.3  Lenguaje, tokenizer y parser
 M7.4  Runtime P / V
 M7.5  Historial y visualización
+M7.6  Integración con el análisis de interferencia
+M7.7  Casos académicos reproducibles
 ```
 
-Pendiente:
+Próximo:
 
 ``` text
-M7.7  Casos académicos
+M8  Detector de errores y diagnósticos
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
-observados sin alterar la semántica real de ejecución.
+observados sin alterar la semántica real de ejecución. M7.7 cerró el
+milestone con nueve casos académicos ejecutados por el motor general.
 
 El roadmap completo está en **[BACKLOG.md](BACKLOG.md)**.
 

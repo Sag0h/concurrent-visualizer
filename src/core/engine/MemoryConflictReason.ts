@@ -10,6 +10,10 @@ export type MemoryConflictReason =
       readonly semaphoreName: string
     }
   | {
+      readonly type: 'SEMAPHORE_SIGNALING'
+      readonly semaphoreName: string
+    }
+  | {
       readonly type: 'AMBIGUOUS_SEMAPHORE_PROTOCOL'
       readonly semaphoreNames: string[]
     }
