@@ -21,6 +21,45 @@ function createEngine(source: string): SimulationEngine {
 }
 
 describe('exploreExecution', () => {
+  it('explores each expanded parameterized process independently', () => {
+    const engine = createEngine(`
+      process Worker[i:0..2] {
+        int copy = i;
+      }
+    `)
+    const property: ExplorationProperty<
+      'INDEXED_PROCESS_FINISHED',
+      { readonly processId: string }
+    > = {
+      kind: 'INDEXED_PROCESS_FINISHED',
+      evaluate(state) {
+        const process = state.program.processes.find(
+          (candidate) => candidate.id === 'Worker[2]',
+        )
+
+        return process?.state === 'FINISHED'
+          ? { processId: process.id }
+          : undefined
+      },
+    }
+
+    const result = exploreExecution(
+      engine,
+      { maxDepth: 2, maxStates: 20 },
+      property,
+    )
+
+    expect(result.status).toBe('FOUND')
+    expect(result.counterexample).toEqual(
+      expect.objectContaining({
+        depth: 1,
+        processChoices: ['Worker[2]'],
+        diagnostic: { processId: 'Worker[2]' },
+      }),
+    )
+    expect(engine.getState().stepCount).toBe(0)
+  })
+
   it('explores stack contents as semantic state', () => {
     const engine = createEngine(`
       shared stack<int> values = stack[1];

@@ -760,6 +760,35 @@ process P1 {
 }
 ```
 
+También puede declararse una familia de procesos mediante un rango
+inclusivo:
+
+``` text
+process Controlador[i:0..3] {
+    int identificador = i;
+}
+```
+
+El parser genera cuatro procesos independientes:
+
+``` text
+Controlador[0]
+Controlador[1]
+Controlador[2]
+Controlador[3]
+```
+
+Cada proceso comienza con su propia variable local `i`. El rango también
+puede ser descendente: `process Worker[i:3..0]` genera los índices `3`,
+`2`, `1` y `0`. Los extremos negativos son válidos.
+
+Para evitar expansiones accidentales que bloqueen el navegador, una sola
+declaración puede generar como máximo 1000 procesos.
+
+La expansión ocurre durante el parseo. Para el scheduler, los snapshots,
+los forks y la exploración, cada instancia es un proceso ordinario y una
+transición independiente.
+
 Cada proceso mantiene su propio estado de ejecución, incluyendo:
 
 -   memoria local;

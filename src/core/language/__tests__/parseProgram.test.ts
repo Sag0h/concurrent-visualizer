@@ -2,6 +2,55 @@ import { describe, expect, it } from 'vitest'
 import { parseProgram } from '../parseProgram'
 
 describe('parseProgram', () => {
+  it('expands inclusive ascending and descending process ranges', () => {
+    const program = parseProgram(`
+      process Ascending[i:0..2] {
+        int copy = i;
+      }
+
+      process Descending[j:1..-1] {
+        int copy = j;
+      }
+    `)
+
+    expect(program.processes.map((process) => process.id)).toEqual([
+      'Ascending[0]',
+      'Ascending[1]',
+      'Ascending[2]',
+      'Descending[1]',
+      'Descending[0]',
+      'Descending[-1]',
+    ])
+    expect(program.processes.map(
+      (process) => process.localMemory,
+    )).toEqual([
+      { i: 0 },
+      { i: 1 },
+      { i: 2 },
+      { j: 1 },
+      { j: 0 },
+      { j: -1 },
+    ])
+    expect(program.processes[0].instructions).not.toBe(
+      program.processes[1].instructions,
+    )
+  })
+
+  it('rejects duplicated expanded process identifiers', () => {
+    expect(() => parseProgram(`
+      process Worker[i:0..1] { }
+      process Worker[j:1..2] { }
+    `)).toThrow('Process "Worker[1]" is already defined')
+  })
+
+  it('rejects process ranges that would expand excessively', () => {
+    expect(() => parseProgram(`
+      process Worker[i:0..1000] { }
+    `)).toThrow(
+      'Process range expands to 1001 instances; maximum is 1000',
+    )
+  })
+
   it('parses shared and local stacks with all operations', () => {
     const program = parseProgram(`
       shared stack<int> values = stack[10, 20];

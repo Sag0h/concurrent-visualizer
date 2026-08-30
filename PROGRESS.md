@@ -5,9 +5,9 @@
 
 ## Estado actual
 
-**Fase:** M10.1 --- Estructuras de datos académicas.
+**Fase:** M10.2 --- Registros, objetos y operaciones educativas simuladas.
 
-**Último milestone completado:** M9 --- Exploración de ejecuciones.
+**Último milestone completado:** M10.1 --- Estructuras de datos académicas.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -25,9 +25,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** completar M10.1 con procesos parametrizados o por
-rango, por ejemplo `process Controlador[i:0..3]`. Las colas FIFO, colas de
-prioridad estables y pilas ya están implementadas. Las assertions
+**Próximo objetivo:** comenzar M10.2 con una representación mínima de
+registros y acceso a campos. Las colas FIFO, colas de prioridad estables,
+pilas y procesos parametrizados ya están implementados. Las assertions
 explícitas se evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
@@ -1948,10 +1948,28 @@ La integración incluye visualización, historial, snapshots, forks,
 claves canónicas y exploración. La suite completa quedó en 247 tests,
 con lint y build correctos.
 
-### Pendiente inmediato de M10.1
+## 2026-08-30 --- M10.1: procesos parametrizados
 
-1.  Incorporar procesos parametrizados o por rango, por ejemplo
-    `process Controlador[i:0..3]`.
+Se incorporó la sintaxis `process Nombre[i:inicio..fin]` con extremos
+inclusivos, rangos ascendentes o descendentes y valores negativos. El
+parser expande la familia en procesos ordinarios con identificadores como
+`Nombre[0]` y una variable índice independiente en memoria local.
+Cada declaración se limita a 1000 instancias para evitar expansiones
+accidentales que bloqueen la interfaz.
 
-Después se podrá avanzar con M10.2: registros/campos, métodos educativos
+El cuerpo se clona para evitar estado mutable compartido entre
+instancias. Los procesos generados participan sin casos especiales en
+scheduling, historial, snapshots, forks, claves canónicas y exploración
+de M9.
+
+Las pruebas verifican tokenizer/parser, expansión, rangos descendentes,
+identificadores duplicados, memoria local, escrituras indexadas,
+transiciones, forks y exploración. La prueba visual generó cuatro tarjetas
+`Controller[0]` a `Controller[3]` y produjo el array compartido
+`[10, 11, 12, 13]`. La suite completa quedó en 254 tests, con lint, build
+y consola del navegador sin errores.
+
+**Estado:** M10.1 COMPLETADO.
+
+El siguiente objetivo es M10.2: registros/campos, métodos educativos
 simples y operaciones simuladas como `print(...)`.

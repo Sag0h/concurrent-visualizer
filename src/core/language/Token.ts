@@ -20,6 +20,7 @@ export type TokenType =
   | 'SEMICOLON'
   | 'COMMA'
   | 'DOT'
+  | 'COLON'
   | 'ASSIGN'
   | 'PLUS'
   | 'MINUS'

@@ -841,12 +841,15 @@ excepciones específicas del ejemplo.
 -   [x] Incorporar colas de prioridad como estructura separada.
 -   [x] Definir que el mayor número representa mayor prioridad.
 -   [x] Resolver empates de prioridad preservando orden FIFO.
--   [ ] Incorporar procesos parametrizados o rangos de procesos para
+-   [x] Incorporar procesos parametrizados o rangos de procesos para
     expresar declaraciones como `process controlador[i:0..3]`.
+
+**Estado:** M10.1 COMPLETADO.
 
 ### M10.2 --- Registros, objetos y operaciones educativas simuladas
 
-Mejora futura que no bloquea la incorporación de colas.
+Siguiente evolución del lenguaje después de completar las estructuras de
+datos primitivas y los procesos parametrizados de M10.1.
 
 -   [ ] Evaluar registros/estructuras con campos como representación
     mínima de datos compuestos.

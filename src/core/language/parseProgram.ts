@@ -58,6 +58,8 @@ interface ParsedType {
   readonly primitiveType: PrimitiveType
 }
 
+const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
+
 export function parseProgram(
   source: string,
 ): Program {
@@ -116,7 +118,20 @@ class Parser {
       }
 
       if (this.match('PROCESS')) {
-        processes.push(this.parseProcess())
+        const parsedProcesses = this.parseProcess()
+
+        for (const process of parsedProcesses) {
+          if (processes.some(
+            (existing) => existing.id === process.id,
+          )) {
+            throw this.error(
+              this.previous(),
+              `Process "${process.id}" is already defined`,
+            )
+          }
+
+          processes.push(process)
+        }
         continue
       }
 
@@ -207,11 +222,60 @@ class Parser {
     }
   }
 
-  private parseProcess(): Process {
+  private parseProcess(): Process[] {
     const name = this.consume(
       'IDENTIFIER',
       'Expected process name',
     )
+
+    let range: {
+      readonly indexName: string
+      readonly start: number
+      readonly end: number
+    } | undefined
+
+    if (this.match('LEFT_BRACKET')) {
+      const indexName = this.consume(
+        'IDENTIFIER',
+        'Expected process range index name',
+      )
+      this.consume(
+        'COLON',
+        'Expected ":" after process range index',
+      )
+      const start = this.parseSignedInteger(
+        'Expected process range start',
+      )
+      this.consume(
+        'DOT',
+        'Expected ".." in process range',
+      )
+      this.consume(
+        'DOT',
+        'Expected ".." in process range',
+      )
+      const end = this.parseSignedInteger(
+        'Expected process range end',
+      )
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after process range',
+      )
+      range = {
+        indexName: indexName.lexeme,
+        start,
+        end,
+      }
+
+      const processCount = Math.abs(end - start) + 1
+
+      if (processCount > MAX_PARAMETERIZED_PROCESS_COUNT) {
+        throw this.error(
+          this.previous(),
+          `Process range expands to ${processCount} instances; maximum is ${MAX_PARAMETERIZED_PROCESS_COUNT}`,
+        )
+      }
+    }
 
     this.consume(
       'LEFT_BRACE',
@@ -234,18 +298,49 @@ class Parser {
       'Expected "}" after process body',
     )
 
-    return {
-      id: name.lexeme,
+    const createProcess = (
+      id: string,
+      localMemory: Process['localMemory'],
+    ): Process => ({
+      id,
       state: 'READY',
       programCounter: 0,
-      instructions,
-      localMemory: {},
+      instructions: structuredClone(instructions),
+      localMemory,
       executionStack: [],
       callStack: [],
       expressionRuntimeStatus: 'IDLE',
       pendingEvaluations: [],
       atomicDepth: 0,
+    })
+
+    if (!range) {
+      return [createProcess(name.lexeme, {})]
     }
+
+    const processes: Process[] = []
+    const step = range.start <= range.end ? 1 : -1
+
+    for (
+      let index = range.start;
+      step > 0 ? index <= range.end : index >= range.end;
+      index += step
+    ) {
+      const process = createProcess(
+        `${name.lexeme}[${index}]`,
+        { [range.indexName]: index },
+      )
+      processes.push(process)
+    }
+
+    return processes
+  }
+
+  private parseSignedInteger(message: string): number {
+    const sign = this.match('MINUS') ? -1 : 1
+    const value = this.consume('NUMBER', message)
+
+    return sign * Number(value.lexeme)
   }
 
   private parseProcessInstruction(): Instruction {

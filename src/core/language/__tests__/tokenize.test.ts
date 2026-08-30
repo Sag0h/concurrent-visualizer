@@ -2,6 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { tokenize } from '../tokenize'
 
 describe('tokenize', () => {
+  it('tokenizes parameterized process ranges', () => {
+    const tokens = tokenize(
+      'process Worker[i:-1..2] { }',
+    )
+
+    expect(tokens.map((token) => token.type)).toEqual([
+      'PROCESS',
+      'IDENTIFIER',
+      'LEFT_BRACKET',
+      'IDENTIFIER',
+      'COLON',
+      'MINUS',
+      'NUMBER',
+      'DOT',
+      'DOT',
+      'NUMBER',
+      'RIGHT_BRACKET',
+      'LEFT_BRACE',
+      'RIGHT_BRACE',
+      'EOF',
+    ])
+  })
+
   it('tokenizes stack types, literals and method calls', () => {
     const tokens = tokenize(
       'shared stack<int> values = stack[1]; values.push(2);',

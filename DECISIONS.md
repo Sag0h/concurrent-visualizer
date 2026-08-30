@@ -1131,3 +1131,32 @@ step explícita.
 
 **Motivo:** aumentar fidelidad académica sin convertir el simulador en
 un runtime de propósito general.
+
+------------------------------------------------------------------------
+
+## ADR-031 --- Expansión temprana de procesos parametrizados
+
+**Estado:** Aceptada
+
+**Contexto:** los ejercicios académicos suelen declarar familias como
+`process Controlador[i:0..3]`. Duplicar manualmente el cuerpo de cada
+instancia deforma el pseudocódigo y facilita divergencias accidentales.
+
+**Decisión:** el parser expande cada rango inclusivo en procesos
+ordinarios identificados como `Controlador[0]`, `Controlador[1]`, etc. El
+índice se inicializa en la memoria local de cada proceso. Se admiten
+rangos ascendentes, descendentes y extremos negativos.
+
+Una declaración puede expandirse como máximo a 1000 instancias, evitando
+que un error de escritura bloquee el parser o la interfaz.
+
+El cuerpo se parsea una sola vez y se clona estructuralmente para cada
+instancia. El runtime, los schedulers y M9 no incorporan lógica especial
+para grupos parametrizados.
+
+**Consecuencia:** cada instancia tiene program counter, stacks, memoria,
+bloqueo y transiciones independientes. La identidad expandida forma parte
+natural del estado semántico y de los contraejemplos.
+
+**Motivo:** mantener la sintaxis cercana a la cátedra reutilizando por
+completo el modelo concurrente existente.

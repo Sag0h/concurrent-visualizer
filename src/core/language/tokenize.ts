@@ -136,6 +136,10 @@ export function tokenize(source: string): Token[] {
         addToken('DOT', character, tokenLine, tokenColumn)
         continue
 
+      case ':':
+        addToken('COLON', character, tokenLine, tokenColumn)
+        continue
+
       case '+':
         addToken('PLUS', character, tokenLine, tokenColumn)
         continue

@@ -161,6 +161,17 @@ FINISHED
 `BLOCKED` se utiliza actualmente tanto para `await` como para una
 operación `P(s)` que no puede completarse.
 
+Las declaraciones parametrizadas `process Name[i:start..end]` se
+expanden en el parser. Los extremos son inclusivos y pueden formar rangos
+ascendentes o descendentes. Cada instancia recibe un identificador como
+`Name[2]`, una copia estructural independiente del cuerpo y el índice
+inicial en su memoria local.
+
+El engine no necesita una clase especial para estas familias: después del
+parseo son procesos ordinarios. Por eso schedulers, snapshots, forks,
+claves canónicas y exploración los tratan automáticamente como unidades
+independientes.
+
 ### BlockingReason
 
 El proceso conserva por qué está bloqueado. Actualmente existen al menos

@@ -16,9 +16,9 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M10 --- **Evolución del lenguaje**.
+**Milestone actual:** M10.2 --- **Registros y operaciones educativas**.
 
-**Último milestone completado:** M9 --- **Exploración de ejecuciones**.
+**Último milestone completado:** M10.1 --- **Estructuras académicas**.
 
 M7 está completado en sus siete fases:
 
@@ -82,6 +82,11 @@ empates conservan FIFO. Las pilas ofrecen `push`, `pop`, `top`, `size` e
 `isEmpty`, con orden LIFO. Cada operación es un paso atómico, queda
 registrada en el historial y sus contenidos participan en snapshots,
 forks y exploración.
+
+Los procesos parametrizados permiten declarar familias mediante rangos
+inclusivos, por ejemplo `process Worker[i:0..3]`. El parser los expande
+en procesos independientes con identificadores `Worker[0]` a `Worker[3]`
+y una copia local del índice.
 
 ------------------------------------------------------------------------
 
@@ -673,10 +678,12 @@ código.
 
 ## Extensiones de lenguaje previstas
 
-Las colas FIFO, las colas de prioridad estables y las pilas ya permiten expresar
+Las colas FIFO, las colas de prioridad estables y las pilas ya permiten
+expresar
 directamente estructuras utilizadas en ejercicios académicos, sin
-adaptarlas artificialmente con arrays e índices. El próximo objetivo del
-lenguaje son los procesos parametrizados.
+adaptarlas artificialmente con arrays e índices. Los procesos
+parametrizados completan M10.1; el próximo objetivo es M10.2 sobre
+registros, campos y operaciones educativas simuladas.
 
 Como evolución posterior se evaluarán registros/estructuras u objetos
 educativos con campos y métodos simples, además de operaciones simuladas
@@ -719,7 +726,7 @@ Pasaje de mensajes
 Visualización y análisis avanzado
 ```
 
-### Último milestone completado --- M9: Exploración de ejecuciones
+### Último milestone completado --- M10.1: Estructuras académicas
 
 Completado:
 
@@ -733,16 +740,13 @@ M7.6  Integración con el análisis de interferencia
 M7.7  Casos académicos reproducibles
 M8    Detector de errores y diagnósticos
 M9    Exploración de ejecuciones
+M10.1 Colas FIFO, colas de prioridad, pilas y procesos parametrizados
 ```
 
-En curso:
+Próximo:
 
 ``` text
-M10.1  Estructuras de datos académicas
-       ✓ Colas FIFO
-       ✓ Colas de prioridad estables
-       ✓ Pilas
-       → Procesos parametrizados
+M10.2  Registros, objetos y operaciones educativas simuladas
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
