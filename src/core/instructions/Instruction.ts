@@ -118,6 +118,7 @@ export interface QueueOperationInstruction {
   readonly queueName: string
   readonly operation: QueueOperation
   readonly argument?: Expression
+  readonly priorityArgument?: Expression
   readonly resultTarget?: QueueResultTarget
 }
 

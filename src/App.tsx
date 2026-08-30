@@ -5,6 +5,7 @@ import { SimulationEngine } from './core/engine/SimulationEngine'
 import type { SimulationSnapshot } from './core/engine/SimulationSnapshot'
 import { parseProgram } from './core/language/parseProgram'
 import {
+  isPriorityQueueValue,
   isQueueValue,
   type RuntimeValue,
 } from './core/memory/RuntimeValue'
@@ -1533,7 +1534,7 @@ function App() {
                                   ) : entry.queueEvent ? (
                                     <span className="queue-operation-status">
                                       {entry.queueEvent.scope}
-                                      {' · ATOMIC'}
+                                      {` · ${entry.queueEvent.queueKind} · ATOMIC`}
                                     </span>
                                   ) : (
                                     '—'
@@ -2011,6 +2012,16 @@ function formatValue(
     }
 
     return `queue<${value.elementType}> [front → ${value.items.join(', ')} ← back]`
+  }
+
+  if (isPriorityQueueValue(value)) {
+    if (value.items.length === 0) {
+      return `priority_queue<${value.elementType}> [empty]`
+    }
+
+    return `priority_queue<${value.elementType}> [highest → ${value.items
+      .map((item) => `${String(item.value)} (p=${item.priority})`)
+      .join(', ')} ← lowest]`
   }
 
   if (Array.isArray(value)) {

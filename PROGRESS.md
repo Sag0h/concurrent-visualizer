@@ -25,9 +25,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** completar M10.1 sobre la base de las colas FIFO ya
-implementadas: colas de prioridad y pilas. Las assertions explícitas se
-evaluaron y quedaron como extensión futura del lenguaje.
+**Próximo objetivo:** completar M10.1 sobre la base de las colas FIFO y
+colas de prioridad estables ya implementadas: pilas. Las assertions
+explícitas se evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -1914,5 +1914,10 @@ canónica utilizada por M9. La exploración puede distinguir contenidos y
 Las pruebas cubren tokenizer/parser, orden FIFO, colas locales aisladas,
 dequeue compartido atómico, errores por vacío o tipo incompatible,
 snapshots, forks y exploración. El próximo paso de M10.1 es definir e
-implementar la cola de prioridad estable y luego reutilizar la misma base
-para pilas.
+implementar pilas reutilizando la misma base.
+
+Las colas de prioridad se representan mediante `PriorityQueueValue` y
+la sintaxis `priority_queue<T>`. Cada entrada contiene valor y prioridad
+entera; el número más alto se atiende primero y los empates conservan el
+orden FIFO de inserción. Las operaciones comparten la atomicidad, los
+eventos, snapshots, forks y exploración de las colas FIFO.

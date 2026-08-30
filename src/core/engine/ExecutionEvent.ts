@@ -32,10 +32,12 @@ export interface QueueExecutionEvent {
     | 'IS_EMPTY'
     | 'SIZE'
   readonly queueName: string
+  readonly queueKind: 'FIFO' | 'PRIORITY'
   readonly scope: 'LOCAL' | 'SHARED'
   readonly sizeBefore: number
   readonly sizeAfter: number
   readonly value?: PrimitiveValue
+  readonly priority?: number
 }
 
 export interface ExecutionEvent {

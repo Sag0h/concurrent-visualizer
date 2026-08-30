@@ -3,7 +3,10 @@ import { createExecutionState } from '../../engine/createExecutionState'
 import { SimulationEngine } from '../../engine/SimulationEngine'
 import { parseProgram } from '../../language/parseProgram'
 import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
-import { isQueueValue } from '../../memory/RuntimeValue'
+import {
+  isPriorityQueueValue,
+  isQueueValue,
+} from '../../memory/RuntimeValue'
 import type { ExplorationProperty } from '../ExplorationProperty'
 import { createSemanticStateKey } from '../createSemanticStateKey'
 import { exploreExecution } from '../exploreExecution'
@@ -17,6 +20,50 @@ function createEngine(source: string): SimulationEngine {
 }
 
 describe('exploreExecution', () => {
+  it('explores priority queue contents as semantic state', () => {
+    const engine = createEngine(`
+      shared priority_queue<int> jobs = priority_queue[(1, 4)];
+
+      process Consumer {
+        int value = jobs.dequeue();
+      }
+
+      process Observer {
+        bool untouched = true;
+      }
+    `)
+    const property: ExplorationProperty<
+      'PRIORITY_QUEUE_EMPTY',
+      { readonly queueName: string }
+    > = {
+      kind: 'PRIORITY_QUEUE_EMPTY',
+      evaluate(state) {
+        const queue = state.program.sharedMemory.jobs
+
+        return isPriorityQueueValue(queue)
+          && queue.items.length === 0
+          ? { queueName: 'jobs' }
+          : undefined
+      },
+    }
+
+    const result = exploreExecution(
+      engine,
+      { maxDepth: 3, maxStates: 10 },
+      property,
+    )
+
+    expect(result.status).toBe('FOUND')
+    expect(result.counterexample).toEqual(
+      expect.objectContaining({
+        depth: 1,
+        processChoices: ['Consumer'],
+        diagnostic: { queueName: 'jobs' },
+      }),
+    )
+    expect(engine.getState().stepCount).toBe(0)
+  })
+
   it('explores FIFO queue contents as semantic state', () => {
     const engine = createEngine(`
       shared queue<int> jobs = queue[1];

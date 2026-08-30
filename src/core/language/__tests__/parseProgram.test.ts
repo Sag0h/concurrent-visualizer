@@ -2,6 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { parseProgram } from '../parseProgram'
 
 describe('parseProgram', () => {
+  it('parses stable priority queues and their enqueue priority', () => {
+    const program = parseProgram(`
+      shared priority_queue<string> jobs =
+        priority_queue[("low", 1), ("first-high", 3)];
+
+      process Worker {
+        jobs.enqueue("second-high", 3);
+      }
+    `)
+
+    expect(program.sharedMemory.jobs).toEqual({
+      kind: 'PRIORITY_QUEUE',
+      elementType: 'string',
+      items: [
+        { value: 'first-high', priority: 3 },
+        { value: 'low', priority: 1 },
+      ],
+    })
+    expect(program.processes[0].instructions[0]).toMatchObject({
+      type: 'QUEUE_OPERATION',
+      operation: 'ENQUEUE',
+      argument: {
+        type: 'LITERAL',
+        value: 'second-high',
+      },
+      priorityArgument: {
+        type: 'LITERAL',
+        value: 3,
+      },
+    })
+  })
+
   it('parses shared and local FIFO queues', () => {
     const program = parseProgram(`
       shared queue<int> jobs = queue[10, 20];

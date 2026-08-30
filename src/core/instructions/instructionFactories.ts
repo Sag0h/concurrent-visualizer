@@ -219,6 +219,7 @@ export function queueOperationInstruction(
   operation: QueueOperation,
   options: {
     readonly argument?: Expression
+    readonly priorityArgument?: Expression
     readonly resultTarget?: QueueResultTarget
   } = {},
 ): QueueOperationInstruction {
@@ -227,6 +228,7 @@ export function queueOperationInstruction(
     queueName,
     operation,
     argument: options.argument,
+    priorityArgument: options.priorityArgument,
     resultTarget: options.resultTarget,
   }
 }

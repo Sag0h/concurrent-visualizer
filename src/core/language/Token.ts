@@ -9,6 +9,7 @@ export type TokenType =
   | 'BOOL'
   | 'STRING_TYPE'
   | 'QUEUE'
+  | 'PRIORITY_QUEUE'
   | 'LEFT_BRACE'
   | 'RIGHT_BRACE'
   | 'LEFT_BRACKET'

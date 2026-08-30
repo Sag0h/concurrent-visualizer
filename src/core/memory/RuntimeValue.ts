@@ -14,10 +14,22 @@ export interface QueueValue {
   readonly items: PrimitiveValue[]
 }
 
+export interface PriorityQueueItem {
+  readonly value: PrimitiveValue
+  readonly priority: number
+}
+
+export interface PriorityQueueValue {
+  readonly kind: 'PRIORITY_QUEUE'
+  readonly elementType: PrimitiveType
+  readonly items: PriorityQueueItem[]
+}
+
 export type RuntimeValue =
   | PrimitiveValue
   | PrimitiveValue[]
   | QueueValue
+  | PriorityQueueValue
 
 export function createQueueValue(
   elementType: PrimitiveType,
@@ -32,6 +44,32 @@ export function createQueueValue(
     elementType,
     items: structuredClone(items),
   }
+}
+
+export function createPriorityQueueValue(
+  elementType: PrimitiveType,
+  items: PriorityQueueItem[] = [],
+): PriorityQueueValue {
+  items.forEach((item) => {
+    assertPrimitiveType(
+      item.value,
+      elementType,
+      'PriorityQueue',
+    )
+    assertPriority(item.priority)
+  })
+
+  const queue: PriorityQueueValue = {
+    kind: 'PRIORITY_QUEUE',
+    elementType,
+    items: [],
+  }
+
+  items.forEach((item) => {
+    enqueuePriorityItem(queue, item)
+  })
+
+  return queue
 }
 
 export function isQueueValue(
@@ -53,9 +91,70 @@ export function isQueueValue(
   )
 }
 
+export function isPriorityQueueValue(
+  value: unknown,
+): value is PriorityQueueValue {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'kind' in value
+    && value.kind === 'PRIORITY_QUEUE'
+    && 'elementType' in value
+    && (
+      value.elementType === 'int'
+      || value.elementType === 'bool'
+      || value.elementType === 'string'
+    )
+    && 'items' in value
+    && Array.isArray(value.items)
+  )
+}
+
+export function isAnyQueueValue(
+  value: unknown,
+): value is QueueValue | PriorityQueueValue {
+  return isQueueValue(value) || isPriorityQueueValue(value)
+}
+
+export function enqueuePriorityItem(
+  queue: PriorityQueueValue,
+  item: PriorityQueueItem,
+): void {
+  assertPrimitiveType(
+    item.value,
+    queue.elementType,
+    'PriorityQueue',
+  )
+  assertPriority(item.priority)
+
+  const insertionIndex = queue.items.findIndex(
+    (existing) => existing.priority < item.priority,
+  )
+  const detachedItem = structuredClone(item)
+
+  if (insertionIndex === -1) {
+    queue.items.push(detachedItem)
+    return
+  }
+
+  queue.items.splice(insertionIndex, 0, detachedItem)
+}
+
+export function assertPriority(
+  priority: RuntimeValue,
+): asserts priority is number {
+  if (
+    typeof priority !== 'number'
+    || !Number.isInteger(priority)
+  ) {
+    throw new Error('Priority must be an integer')
+  }
+}
+
 export function assertPrimitiveType(
   value: RuntimeValue,
   expectedType: PrimitiveType,
+  containerName = 'Queue',
 ): asserts value is PrimitiveValue {
   const matches =
     (expectedType === 'int' && typeof value === 'number')
@@ -64,7 +163,7 @@ export function assertPrimitiveType(
 
   if (!matches) {
     throw new Error(
-      `Queue<${expectedType}> cannot store ${describeRuntimeType(value)}`,
+      `${containerName}<${expectedType}> cannot store ${describeRuntimeType(value)}`,
     )
   }
 }
@@ -78,6 +177,10 @@ export function describeRuntimeType(
 
   if (isQueueValue(value)) {
     return `queue<${value.elementType}>`
+  }
+
+  if (isPriorityQueueValue(value)) {
+    return `priority_queue<${value.elementType}>`
   }
 
   if (typeof value === 'number') {

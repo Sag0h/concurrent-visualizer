@@ -2,7 +2,10 @@ import type { Expression } from './Expression'
 import type {
   RuntimeValue,
 } from '../memory/RuntimeValue'
-import { isQueueValue } from '../memory/RuntimeValue'
+import {
+  isPriorityQueueValue,
+  isQueueValue,
+} from '../memory/RuntimeValue'
 
 export function formatExpression(
   expression: Expression,
@@ -48,6 +51,12 @@ function formatRuntimeValue(
   if (isQueueValue(value)) {
     return `queue[${value.items
       .map(formatRuntimeValue)
+      .join(', ')}]`
+  }
+
+  if (isPriorityQueueValue(value)) {
+    return `priority_queue[${value.items
+      .map((item) => `(${formatRuntimeValue(item.value)}, ${item.priority})`)
       .join(', ')}]`
   }
 

@@ -1081,8 +1081,9 @@ quedan fuera del alcance inicial.
 
 El lenguaje representa las estructuras usadas en ejercicios académicos
 sin convertirlas en casos especiales del visualizador. La primera
-extensión implementada es una cola FIFO de valores primitivos; las colas
-de prioridad y pilas seguirán el mismo modelo general.
+extensión implementada fue una cola FIFO de valores primitivos. Las colas
+de prioridad estables reutilizan el mismo modelo; las pilas serán la
+próxima estructura.
 
 Una cola local pertenece al estado privado del proceso. Si es compartida,
 sus contenidos y orden forman parte del estado semántico global: se
@@ -1097,6 +1098,12 @@ de elemento y un array ordenado desde frente hacia fondo. Esto permite
 que memoria, snapshots, `structuredClone` y la serialización canónica lo
 traten como estado ordinario del programa. `dequeue` y `front` sobre una
 cola vacía producen un error explícito; no introducen bloqueo implícito.
+
+`PriorityQueueValue` almacena pares `{ value, priority }` ordenados por
+prioridad numérica descendente. La inserción se ubica después de todos
+los elementos con igual prioridad, de modo que el desempate es FIFO sin
+necesitar un contador auxiliar. El orden y las prioridades forman parte
+del estado canónico y se clonan en snapshots y forks.
 
 Los resultados se escriben inicialmente sólo en memoria local y los
 argumentos de `enqueue` no leen memoria compartida directamente. Esta

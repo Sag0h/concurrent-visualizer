@@ -1100,6 +1100,14 @@ una variable local. Esta frontera permite introducir el ADT sin ocultar
 accesos al análisis de interferencia ni mezclar todavía efectos mutables
 con el evaluador general de expresiones suspendibles.
 
+La segunda vertical incorpora `PriorityQueueValue` y sintaxis
+`priority_queue<T>`. El mayor entero representa mayor prioridad. Cada
+inserción se coloca detrás de los elementos que ya tienen la misma
+prioridad, preservando FIFO en empates. No se guarda un contador de
+inserción: el propio orden de los pares `{ value, priority }` contiene
+toda la información observable y evita inflar innecesariamente la clave
+semántica de M9.
+
 Las acciones externas necesarias sólo para expresar el algoritmo podrán
 ser operaciones simuladas. Por ejemplo, `print(valor)` podrá registrar
 que la acción ocurrió sin producir I/O real. Deberán ser deterministas y

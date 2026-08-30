@@ -7,8 +7,12 @@ import type { Process } from '../process/Process'
 import type { CallInstruction, ForeachInstruction, IfInstruction, Instruction, QueueOperationInstruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import {
+  assertPriority,
   assertPrimitiveType,
-  isQueueValue,
+  enqueuePriorityItem,
+  isAnyQueueValue,
+  isPriorityQueueValue,
+  type PriorityQueueValue,
   type PrimitiveValue,
   type QueueValue,
   type RuntimeValue,
@@ -2948,7 +2952,7 @@ export class SimulationEngine {
 
     if (
       Array.isArray(value)
-      || isQueueValue(value)
+      || isAnyQueueValue(value)
     ) {
       throw new Error(
         'Nested collection values are not supported yet',
@@ -3167,7 +3171,7 @@ export class SimulationEngine {
 
     if (
       Array.isArray(value)
-      || isQueueValue(value)
+      || isAnyQueueValue(value)
     ) {
       throw new Error(
         'Nested collection values are not supported yet',
@@ -3290,6 +3294,7 @@ export class SimulationEngine {
 
     const sizeBefore = resolved.queue.items.length
     let value: PrimitiveValue
+    let priority: number | undefined
 
     switch (instruction.operation) {
       case 'ENQUEUE': {
@@ -3333,10 +3338,65 @@ export class SimulationEngine {
         assertPrimitiveType(
           evaluated,
           resolved.queue.elementType,
+          isPriorityQueueValue(resolved.queue)
+            ? 'PriorityQueue'
+            : 'Queue',
         )
 
         value = evaluated
-        resolved.queue.items.push(value)
+
+        if (isPriorityQueueValue(resolved.queue)) {
+          if (!instruction.priorityArgument) {
+            throw new Error(
+              'priority_queue.enqueue() requires a value and an integer priority',
+            )
+          }
+
+          if (
+            this.containsFunctionCall(
+              instruction.priorityArgument,
+            )
+          ) {
+            throw new Error(
+              'Function calls inside enqueue() are not supported yet',
+            )
+          }
+
+          if (
+            this.findNextSharedMemoryRead(
+              process,
+              instruction.priorityArgument,
+            )
+          ) {
+            throw new Error(
+              'Shared-memory reads inside enqueue() are not supported yet; copy the value to local memory first',
+            )
+          }
+
+          const evaluatedPriority = evaluateExpression(
+            instruction.priorityArgument,
+            {
+              localMemory:
+                this.getActiveLocalMemory(process),
+              sharedMemory:
+                this.state.program.sharedMemory,
+            },
+          )
+          assertPriority(evaluatedPriority)
+          priority = evaluatedPriority
+          enqueuePriorityItem(resolved.queue, {
+            value,
+            priority,
+          })
+        } else {
+          if (instruction.priorityArgument) {
+            throw new Error(
+              'queue.enqueue() accepts only one value; priorities require priority_queue',
+            )
+          }
+
+          resolved.queue.items.push(value)
+        }
         this.advanceProcess(process)
         break
       }
@@ -3402,13 +3462,17 @@ export class SimulationEngine {
       event: {
         operation: instruction.operation,
         queueName: instruction.queueName,
+        queueKind: isPriorityQueueValue(resolved.queue)
+          ? 'PRIORITY'
+          : 'FIFO',
         scope: resolved.scope,
         sizeBefore,
         sizeAfter,
         value,
+        priority,
       },
       description: instruction.operation === 'ENQUEUE'
-        ? `${instruction.queueName}.${method}(${renderedValue}): size ${sizeBefore} -> ${sizeAfter}`
+        ? `${instruction.queueName}.${method}(${renderedValue}${priority === undefined ? '' : `, ${priority}`}): size ${sizeBefore} -> ${sizeAfter}`
         : `${instruction.queueName}.${method}() = ${renderedValue}: size ${sizeBefore} -> ${sizeAfter}`,
     }
   }
@@ -3417,7 +3481,7 @@ export class SimulationEngine {
     process: Process,
     queueName: string,
   ): {
-    readonly queue: QueueValue
+    readonly queue: QueueValue | PriorityQueueValue
     readonly scope: 'LOCAL' | 'SHARED'
   } {
     const localMemory =
@@ -3426,7 +3490,7 @@ export class SimulationEngine {
     if (queueName in localMemory) {
       const value = localMemory[queueName]
 
-      if (!isQueueValue(value)) {
+      if (!isAnyQueueValue(value)) {
         throw new Error(
           `Variable "${queueName}" is not a queue`,
         )
@@ -3447,7 +3511,7 @@ export class SimulationEngine {
       )
     }
 
-    if (!isQueueValue(value)) {
+    if (!isAnyQueueValue(value)) {
       throw new Error(
         `Variable "${queueName}" is not a queue`,
       )
@@ -3461,9 +3525,21 @@ export class SimulationEngine {
 
   private requireQueueFront(
     queueName: string,
-    queue: QueueValue,
+    queue: QueueValue | PriorityQueueValue,
     method: 'dequeue' | 'front',
   ): PrimitiveValue {
+    if (isPriorityQueueValue(queue)) {
+      const item = queue.items[0]
+
+      if (item === undefined) {
+        throw new Error(
+          `Queue "${queueName}" is empty; ${method}() cannot continue`,
+        )
+      }
+
+      return item.value
+    }
+
     const value = queue.items[0]
 
     if (value === undefined) {

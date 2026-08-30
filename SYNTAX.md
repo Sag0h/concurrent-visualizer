@@ -407,8 +407,44 @@ El protocolo sigue siendo necesario cuando varias operaciones y
 variables forman un mismo invariante. `dequeue()` y `front()` sobre una
 cola vacía producen un error de runtime; no bloquean automáticamente.
 
-Las colas de prioridad, las pilas y las colas de registros/objetos todavía
-no están soportadas.
+### Colas de prioridad estables
+
+Las colas de prioridad son una estructura separada. Cada elemento tiene
+un valor primitivo y una prioridad entera:
+
+``` text
+shared priority_queue<string> fallos =
+    priority_queue[("F1", 2), ("F2", 3)];
+
+process Controlador {
+    fallos.enqueue("F3", 3);
+    string siguiente = fallos.dequeue();
+}
+```
+
+El número más alto representa mayor prioridad. En el ejemplo, `F2` sale
+antes que `F3`: ambos tienen prioridad `3`, pero `F2` fue insertado
+primero. Por lo tanto, la estructura es estable y conserva FIFO entre
+elementos empatados.
+
+La declaración vacía es:
+
+``` text
+priority_queue<int> pendientes = priority_queue[];
+```
+
+Una inserción requiere valor y prioridad:
+
+``` text
+pendientes.enqueue(42, 5);
+```
+
+`dequeue`, `front`, `size` e `isEmpty` se utilizan igual que en una cola
+FIFO y retornan el valor, no la prioridad. Todas las operaciones siguen
+siendo atómicas individualmente y admiten las mismas restricciones sobre
+resultados locales, llamadas a funciones y lecturas compartidas.
+
+Las pilas y las colas de registros/objetos todavía no están soportadas.
 
 ------------------------------------------------------------------------
 
@@ -989,13 +1025,13 @@ También permanecen fuera del alcance actual:
 -   fairness formal/FIFO para semáforos;
 -   sintaxis especial como `i++`;
 -   arrays anidados;
--   colas de prioridad y pilas;
+-   pilas;
 -   registros/estructuras u objetos con campos;
 -   métodos como `fallo.getNivel()`;
 -   operaciones educativas simuladas como `print(...)`.
 
-Las colas FIFO primitivas ya están implementadas. Las colas de prioridad
-y las pilas seguirán el mismo modelo general.
+Las colas FIFO primitivas y las colas de prioridad estables ya están
+implementadas. Las pilas seguirán el mismo modelo general.
 
 Los registros/objetos y métodos quedan como mejora posterior y todavía
 no tienen sintaxis definitiva. Las operaciones como `print(...)` podrán

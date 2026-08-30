@@ -2,6 +2,31 @@ import { describe, expect, it } from 'vitest'
 import { tokenize } from '../tokenize'
 
 describe('tokenize', () => {
+  it('tokenizes priority queue types and literals', () => {
+    const tokens = tokenize(
+      'priority_queue<string> jobs = priority_queue[("A", 3)];',
+    )
+
+    expect(tokens.map((token) => token.type)).toEqual([
+      'PRIORITY_QUEUE',
+      'LESS',
+      'STRING_TYPE',
+      'GREATER',
+      'IDENTIFIER',
+      'ASSIGN',
+      'PRIORITY_QUEUE',
+      'LEFT_BRACKET',
+      'LEFT_PAREN',
+      'STRING',
+      'COMMA',
+      'NUMBER',
+      'RIGHT_PAREN',
+      'RIGHT_BRACKET',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
+
   it('tokenizes queue types, literals and method calls', () => {
     const tokens = tokenize(
       'shared queue<int> jobs = queue[1]; jobs.enqueue(2);',

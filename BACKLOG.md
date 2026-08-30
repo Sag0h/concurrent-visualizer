@@ -838,9 +838,9 @@ excepciones específicas del ejemplo.
 -   [ ] Agregar tests equivalentes para pilas.
 -   [x] Priorizar colas: ya son necesarias para representar ejercicios
     académicos sin deformar el pseudocódigo.
--   [ ] Incorporar colas de prioridad como estructura separada.
--   [ ] Definir si el menor o mayor número representa mayor prioridad.
--   [ ] Resolver empates de prioridad preservando orden FIFO.
+-   [x] Incorporar colas de prioridad como estructura separada.
+-   [x] Definir que el mayor número representa mayor prioridad.
+-   [x] Resolver empates de prioridad preservando orden FIFO.
 -   [ ] Incorporar procesos parametrizados o rangos de procesos para
     expresar declaraciones como `process controlador[i:0..3]`.
 

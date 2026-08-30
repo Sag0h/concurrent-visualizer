@@ -220,6 +220,31 @@ describe('semantic exploration state', () => {
     )
   })
 
+  it('includes priority queue priorities and stable order in the semantic key', () => {
+    const first = createEngine(`
+      shared priority_queue<int> jobs =
+        priority_queue[(1, 3), (2, 2)];
+      process Worker { }
+    `)
+    const second = createEngine(`
+      shared priority_queue<int> jobs =
+        priority_queue[(1, 2), (2, 3)];
+      process Worker { }
+    `)
+    const third = createEngine(`
+      shared priority_queue<int> jobs =
+        priority_queue[(2, 3), (1, 2)];
+      process Worker { }
+    `)
+
+    expect(createSemanticStateKey(first.getState())).not.toBe(
+      createSemanticStateKey(second.getState()),
+    )
+    expect(createSemanticStateKey(second.getState())).toBe(
+      createSemanticStateKey(third.getState()),
+    )
+  })
+
   it('detects a repeated semantic state independently of its trace', () => {
     const engine = createEngine(`
       process Spinner {

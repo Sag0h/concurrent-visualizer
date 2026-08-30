@@ -74,10 +74,13 @@ contexto. La búsqueda de exclusión mutua sólo acepta solapamientos
 observados con mutex incompatibles; una advertencia `POTENTIAL_RACE` por
 sí sola no se presenta como infracción demostrada.
 
-M10 comenzó con colas FIFO de valores primitivos. Pueden declararse como
-memoria local o compartida y ofrecen `enqueue`, `dequeue`, `front`,
-`size` e `isEmpty`. Cada operación es un paso atómico, queda registrada en el
-historial y sus contenidos participan en snapshots, forks y exploración.
+M10 incluye colas FIFO y colas de prioridad estables de valores
+primitivos. Pueden declararse como memoria local o compartida y ofrecen
+`enqueue`, `dequeue`, `front`, `size` e `isEmpty`. En una
+`priority_queue<T>`, el número más alto tiene mayor prioridad y los
+empates conservan FIFO. Cada operación es un paso atómico, queda
+registrada en el historial y sus contenidos participan en snapshots,
+forks y exploración.
 
 ------------------------------------------------------------------------
 

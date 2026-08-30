@@ -5,7 +5,10 @@ import { RoundRobinScheduler } from '../../scheduler/RoundRobinScheduler'
 import type { Scheduler } from '../../scheduler/Scheduler'
 import { createExecutionState } from '../createExecutionState'
 import { SimulationEngine } from '../SimulationEngine'
-import { isQueueValue } from '../../memory/RuntimeValue'
+import {
+  isPriorityQueueValue,
+  isQueueValue,
+} from '../../memory/RuntimeValue'
 
 function createEngine(
   source: string,
@@ -56,6 +59,38 @@ function runExplicitly(
 }
 
 describe('SimulationEngine fork', () => {
+  it('clones shared priority queues without sharing their entries', () => {
+    const engine = createEngine(`
+      shared priority_queue<int> jobs = priority_queue[(1, 1)];
+
+      process Producer {
+        jobs.enqueue(2, 3);
+      }
+    `)
+    const fork = engine.fork()
+
+    executeSelected(fork, 'Producer')
+
+    const originalQueue = engine.getState().program.sharedMemory.jobs
+    const forkQueue = fork.getState().program.sharedMemory.jobs
+
+    if (
+      !isPriorityQueueValue(originalQueue)
+      || !isPriorityQueueValue(forkQueue)
+    ) {
+      throw new Error('Expected jobs to be a priority queue')
+    }
+
+    expect(originalQueue.items).toEqual([
+      { value: 1, priority: 1 },
+    ])
+    expect(forkQueue.items).toEqual([
+      { value: 2, priority: 3 },
+      { value: 1, priority: 1 },
+    ])
+    expect(originalQueue.items).not.toBe(forkQueue.items)
+  })
+
   it('clones shared FIFO queues without sharing their items', () => {
     const engine = createEngine(`
       shared queue<int> jobs = queue[1];

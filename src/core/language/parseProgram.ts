@@ -29,7 +29,9 @@ import {
   queueOperationInstruction,
 } from '../instructions/instructionFactories'
 import {
+  createPriorityQueueValue,
   createQueueValue,
+  type PriorityQueueItem,
   type PrimitiveType,
   type PrimitiveValue,
   type RuntimeValue,
@@ -46,7 +48,11 @@ import { tokenize } from './tokenize'
 import type { FunctionDefinition } from './FunctionDefinition'
 
 interface ParsedType {
-  readonly container: 'SCALAR' | 'ARRAY' | 'QUEUE'
+  readonly container:
+    | 'SCALAR'
+    | 'ARRAY'
+    | 'QUEUE'
+    | 'PRIORITY_QUEUE'
   readonly primitiveType: PrimitiveType
 }
 
@@ -145,6 +151,10 @@ class Parser {
       ? this.parseQueueLiteral(
           declaredType.primitiveType,
         )
+      : declaredType.container === 'PRIORITY_QUEUE'
+        ? this.parsePriorityQueueLiteral(
+            declaredType.primitiveType,
+          )
       : this.parseLiteralOrArrayValue()
 
     this.consume(
@@ -372,6 +382,12 @@ class Parser {
               declaredType.primitiveType,
             ),
           )
+        : declaredType.container === 'PRIORITY_QUEUE'
+          ? literal(
+              this.parsePriorityQueueLiteral(
+                declaredType.primitiveType,
+              ),
+            )
         : this.parseExpression()
 
     this.consume(
@@ -808,7 +824,101 @@ class Parser {
     )
   }
 
+  private parsePriorityQueueLiteral(
+    elementType: PrimitiveType,
+  ): RuntimeValue {
+    this.consume(
+      'PRIORITY_QUEUE',
+      'Expected priority queue literal',
+    )
+    this.consume(
+      'LEFT_BRACKET',
+      'Expected "[" after "priority_queue"',
+    )
+
+    const items: PriorityQueueItem[] = []
+
+    if (!this.check('RIGHT_BRACKET')) {
+      do {
+        this.consume(
+          'LEFT_PAREN',
+          'Expected "(" before priority queue item',
+        )
+
+        const token = this.peek()
+        let value: PrimitiveValue
+
+        if (this.match('NUMBER')) {
+          value = Number(this.previous().lexeme)
+        } else if (this.match('STRING')) {
+          value = this.previous().lexeme
+        } else if (this.match('BOOLEAN')) {
+          value = this.previous().lexeme === 'true'
+        } else {
+          throw this.error(
+            token,
+            'Expected primitive priority queue item',
+          )
+        }
+
+        if (!matchesPrimitiveType(value, elementType)) {
+          throw this.error(
+            token,
+            `PriorityQueue<${elementType}> item has the wrong type`,
+          )
+        }
+
+        this.consume(
+          'COMMA',
+          'Expected "," before item priority',
+        )
+
+        const sign = this.match('MINUS') ? -1 : 1
+        const priority = sign * Number(this.consume(
+          'NUMBER',
+          'Expected integer item priority',
+        ).lexeme)
+
+        this.consume(
+          'RIGHT_PAREN',
+          'Expected ")" after priority queue item',
+        )
+        items.push({ value, priority })
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_BRACKET',
+      'Expected "]" after priority queue literal',
+    )
+
+    return createPriorityQueueValue(
+      elementType,
+      items,
+    )
+  }
+
   private parseType(): ParsedType {
+    if (this.match('PRIORITY_QUEUE')) {
+      this.consume(
+        'LESS',
+        'Expected "<" after "priority_queue"',
+      )
+
+      const primitiveType =
+        this.parsePrimitiveType()
+
+      this.consume(
+        'GREATER',
+        'Expected ">" after priority queue element type',
+      )
+
+      return {
+        container: 'PRIORITY_QUEUE',
+        primitiveType,
+      }
+    }
+
     if (this.match('QUEUE')) {
       this.consume(
         'LESS',
@@ -877,6 +987,7 @@ class Parser {
       || type === 'BOOL'
       || type === 'STRING_TYPE'
       || type === 'QUEUE'
+      || type === 'PRIORITY_QUEUE'
     )
   }
 
@@ -1192,6 +1303,8 @@ class Parser {
       operation.operation,
       {
         argument: operation.argument,
+        priorityArgument:
+          operation.priorityArgument,
       },
     )
   }
@@ -1219,6 +1332,7 @@ class Parser {
     readonly queueName: string
     readonly operation: QueueOperation
     readonly argument?: Expression
+    readonly priorityArgument?: Expression
   } {
     const queueName = this.consume(
       'IDENTIFIER',
@@ -1248,9 +1362,14 @@ class Parser {
     )
 
     let argument: Expression | undefined
+    let priorityArgument: Expression | undefined
 
     if (operation === 'ENQUEUE') {
       argument = this.parseExpression()
+
+      if (this.match('COMMA')) {
+        priorityArgument = this.parseExpression()
+      }
     } else if (!this.check('RIGHT_PAREN')) {
       throw this.error(
         this.peek(),
@@ -1267,6 +1386,7 @@ class Parser {
       queueName: queueName.lexeme,
       operation,
       argument,
+      priorityArgument,
     }
   }
 
