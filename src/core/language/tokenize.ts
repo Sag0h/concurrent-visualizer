@@ -7,6 +7,7 @@ const keywords: Record<string, TokenType> = {
   int: 'INT',
   bool: 'BOOL',
   string: 'STRING_TYPE',
+  queue: 'QUEUE',
   true: 'BOOLEAN',
   false: 'BOOLEAN',
   if: 'IF',
@@ -127,6 +128,10 @@ export function tokenize(source: string): Token[] {
 
       case ',':
         addToken('COMMA', character, tokenLine, tokenColumn)
+        continue
+
+      case '.':
+        addToken('DOT', character, tokenLine, tokenColumn)
         continue
 
       case '+':

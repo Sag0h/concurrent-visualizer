@@ -2,6 +2,111 @@ import { describe, expect, it } from 'vitest'
 import { parseProgram } from '../parseProgram'
 
 describe('parseProgram', () => {
+  it('parses shared and local FIFO queues', () => {
+    const program = parseProgram(`
+      shared queue<int> jobs = queue[10, 20];
+
+      process Worker {
+        queue<string> messages = queue["first"];
+      }
+    `)
+
+    expect(program.sharedMemory.jobs).toEqual({
+      kind: 'QUEUE',
+      elementType: 'int',
+      items: [10, 20],
+    })
+
+    expect(
+      program.processes[0].instructions[0],
+    ).toMatchObject({
+      type: 'DECLARE',
+      initialValue: {
+        type: 'LITERAL',
+        value: {
+          kind: 'QUEUE',
+          elementType: 'string',
+          items: ['first'],
+        },
+      },
+    })
+  })
+
+  it('parses queue operations and direct result assignments', () => {
+    const program = parseProgram(`
+      process Worker {
+        queue<int> jobs = queue[1];
+        jobs.enqueue(2);
+        int first = jobs.front();
+        first = jobs.dequeue();
+        bool empty = jobs.isEmpty();
+        int size = jobs.size();
+      }
+    `)
+
+    expect(
+      program.processes[0].instructions.slice(1),
+    ).toMatchObject([
+      {
+        type: 'QUEUE_OPERATION',
+        queueName: 'jobs',
+        operation: 'ENQUEUE',
+      },
+      {
+        type: 'QUEUE_OPERATION',
+        operation: 'FRONT',
+        resultTarget: {
+          type: 'DECLARE',
+          name: 'first',
+        },
+      },
+      {
+        type: 'QUEUE_OPERATION',
+        operation: 'DEQUEUE',
+        resultTarget: {
+          type: 'ASSIGN',
+        },
+      },
+      {
+        type: 'QUEUE_OPERATION',
+        operation: 'IS_EMPTY',
+        resultTarget: {
+          type: 'DECLARE',
+          name: 'empty',
+        },
+      },
+      {
+        type: 'QUEUE_OPERATION',
+        operation: 'SIZE',
+        resultTarget: {
+          type: 'DECLARE',
+          name: 'size',
+        },
+      },
+    ])
+  })
+
+  it('rejects queue literals with incompatible primitive values', () => {
+    expect(() => parseProgram(`
+      shared queue<int> jobs = queue[1, "wrong"];
+      process Worker { }
+    `)).toThrow(
+      'Queue<int> item has the wrong type',
+    )
+  })
+
+  it('requires scalar declarations for queue operation results', () => {
+    expect(() => parseProgram(`
+      process Worker {
+        queue<int> jobs = queue[1];
+        queue<int> invalid = jobs.dequeue();
+      }
+    `)).toThrow(
+      'Queue operation results require a primitive scalar declaration',
+    )
+  })
+
+
   it('parses shared variables', () => {
     const program = parseProgram(`
       shared int counter = 0;

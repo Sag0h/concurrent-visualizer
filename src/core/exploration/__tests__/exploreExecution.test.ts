@@ -3,6 +3,7 @@ import { createExecutionState } from '../../engine/createExecutionState'
 import { SimulationEngine } from '../../engine/SimulationEngine'
 import { parseProgram } from '../../language/parseProgram'
 import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
+import { isQueueValue } from '../../memory/RuntimeValue'
 import type { ExplorationProperty } from '../ExplorationProperty'
 import { createSemanticStateKey } from '../createSemanticStateKey'
 import { exploreExecution } from '../exploreExecution'
@@ -16,6 +17,53 @@ function createEngine(source: string): SimulationEngine {
 }
 
 describe('exploreExecution', () => {
+  it('explores FIFO queue contents as semantic state', () => {
+    const engine = createEngine(`
+      shared queue<int> jobs = queue[1];
+
+      process Consumer {
+        int value = jobs.dequeue();
+      }
+
+      process Observer {
+        bool untouched = true;
+      }
+    `)
+    const property: ExplorationProperty<
+      'QUEUE_EMPTY',
+      { readonly queueName: string }
+    > = {
+      kind: 'QUEUE_EMPTY',
+      evaluate(state) {
+        const queue = state.program.sharedMemory.jobs
+
+        return isQueueValue(queue)
+          && queue.items.length === 0
+          ? { queueName: 'jobs' }
+          : undefined
+      },
+    }
+
+    const result = exploreExecution(
+      engine,
+      {
+        maxDepth: 3,
+        maxStates: 10,
+      },
+      property,
+    )
+
+    expect(result.status).toBe('FOUND')
+    expect(result.counterexample).toEqual(
+      expect.objectContaining({
+        depth: 1,
+        processChoices: ['Consumer'],
+        diagnostic: { queueName: 'jobs' },
+      }),
+    )
+    expect(engine.getState().stepCount).toBe(0)
+  })
+
   it('finds a shortest counterexample for a custom property', () => {
     const engine = createEngine(`
       process P1 {

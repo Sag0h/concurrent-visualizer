@@ -763,7 +763,7 @@ scheduler.
 -   [x] Definir una interfaz extensible para propiedades de exploración.
 -   [x] Integrar violaciones observadas de exclusión mutua cuando el
     estado de análisis pueda clonarse y compararse correctamente.
--   [ ] Evaluar assertions explícitas sobre estados finales como
+-   [x] Evaluar assertions explícitas sobre estados finales como
     extensión futura del lenguaje.
 -   [x] Mantener `POTENTIAL_RACE` como observación educativa y no como
     violación formal.
@@ -819,21 +819,30 @@ Las estructuras necesarias para expresar fielmente ejercicios de la
 cátedra forman parte del lenguaje general y no deben reemplazarse por
 excepciones específicas del ejemplo.
 
--   [ ] Incorporar colas utilizables como variables locales o
+-   [x] Incorporar colas FIFO utilizables como variables locales o
     compartidas.
--   [ ] Definir operaciones mínimas de cola: insertar, extraer,
-    consultar frente y consultar vacío.
+-   [x] Definir operaciones mínimas de cola: insertar, extraer,
+    consultar frente, tamaño y consultar vacío.
 -   [ ] Incorporar pilas utilizables como variables locales o
     compartidas.
 -   [ ] Definir operaciones mínimas de pila: `push`, `pop`, `top` y
     vacío.
--   [ ] Definir la granularidad atómica de operaciones sobre estructuras
+-   [x] Definir la granularidad atómica de operaciones sobre estructuras
     compartidas.
--   [ ] Integrar colas y pilas con `RuntimeValue`, snapshots, clonación,
+-   [x] Integrar colas FIFO con `RuntimeValue`, snapshots, clonación,
     claves canónicas y exploración de M9.
--   [ ] Agregar tests de parser, runtime, clonación e interleavings.
--   [ ] Priorizar colas: ya son necesarias para representar ejercicios
+-   [ ] Integrar pilas con `RuntimeValue`, snapshots, clonación, claves
+    canónicas y exploración de M9.
+-   [x] Agregar tests de colas para parser, runtime, snapshots, clonación
+    e interleavings.
+-   [ ] Agregar tests equivalentes para pilas.
+-   [x] Priorizar colas: ya son necesarias para representar ejercicios
     académicos sin deformar el pseudocódigo.
+-   [ ] Incorporar colas de prioridad como estructura separada.
+-   [ ] Definir si el menor o mayor número representa mayor prioridad.
+-   [ ] Resolver empates de prioridad preservando orden FIFO.
+-   [ ] Incorporar procesos parametrizados o rangos de procesos para
+    expresar declaraciones como `process controlador[i:0..3]`.
 
 ### M10.2 --- Registros, objetos y operaciones educativas simuladas
 

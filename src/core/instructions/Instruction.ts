@@ -95,6 +95,32 @@ export interface SemaphoreVInstruction {
   readonly semaphoreName: string
 }
 
+export type QueueOperation =
+  | 'ENQUEUE'
+  | 'DEQUEUE'
+  | 'FRONT'
+  | 'IS_EMPTY'
+  | 'SIZE'
+
+export type QueueResultTarget =
+  | {
+      readonly type: 'DECLARE'
+      readonly scope: 'LOCAL'
+      readonly name: string
+    }
+  | {
+      readonly type: 'ASSIGN'
+      readonly target: AssignmentTarget
+    }
+
+export interface QueueOperationInstruction {
+  readonly type: 'QUEUE_OPERATION'
+  readonly queueName: string
+  readonly operation: QueueOperation
+  readonly argument?: Expression
+  readonly resultTarget?: QueueResultTarget
+}
+
 export type Instruction =
   | NoOpInstruction
   | FinishInstruction
@@ -113,3 +139,4 @@ export type Instruction =
   | AwaitInstruction
   | SemaphorePInstruction
   | SemaphoreVInstruction
+  | QueueOperationInstruction

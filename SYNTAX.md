@@ -2,14 +2,13 @@
 
 ## Versión
 
-**Sintaxis V2**
+**Sintaxis V3**
 
 Esta versión documenta las características actualmente soportadas por el
 lenguaje y el motor al cierre de M6 y durante M7.5.
 
-Además de la capa secuencial y `atomic`, la sintaxis incorpora
-actualmente `await`, declaraciones escalares de semáforos y operaciones
-`P` / `V`.
+Además de la capa secuencial, `atomic`, `await` y semáforos, la sintaxis
+incorpora colas FIFO primitivas locales y compartidas.
 
 La sintaxis crecerá junto con el simulador. Las nuevas primitivas
 concurrentes se incorporarán siguiendo prioritariamente la terminología
@@ -313,6 +312,103 @@ El motor captura los valores observados durante las lecturas de `i` y
 `offset`. La ubicación concreta de destino se determina utilizando esos
 valores y no se modifica retroactivamente si otro proceso cambia las
 variables antes del `WRITE`.
+
+------------------------------------------------------------------------
+
+## Colas FIFO
+
+Las colas almacenan valores primitivos de un único tipo y pueden ser
+locales o compartidas:
+
+``` text
+shared queue<int> trabajos = queue[10, 20];
+
+process Worker {
+    queue<string> mensajes = queue["inicio"];
+}
+```
+
+Tipos de elemento disponibles:
+
+``` text
+queue<int>
+queue<bool>
+queue<string>
+```
+
+La notación `queue[...]` enumera los elementos desde el frente hacia el
+fondo. Una cola vacía se declara con `queue[]`.
+
+### `enqueue`
+
+Inserta un valor al fondo:
+
+``` text
+trabajos.enqueue(30);
+```
+
+El valor debe coincidir con el tipo de elemento declarado.
+
+### `dequeue`
+
+Extrae y retorna el elemento del frente:
+
+``` text
+int trabajo = trabajos.dequeue();
+trabajo = trabajos.dequeue();
+```
+
+### `front`
+
+Retorna el elemento del frente sin extraerlo:
+
+``` text
+int siguiente = trabajos.front();
+```
+
+### `isEmpty`
+
+Indica si la cola no contiene elementos:
+
+``` text
+bool vacia = trabajos.isEmpty();
+```
+
+### `size`
+
+Retorna la cantidad actual de elementos sin modificar la cola:
+
+``` text
+int cantidad = trabajos.size();
+```
+
+En esta primera versión, los métodos que retornan valores deben aparecer
+directamente a la derecha de una declaración o asignación **local**.
+Todavía no se admiten como parte de expresiones compuestas, condiciones o
+escrituras directas a otra variable compartida.
+
+El argumento de `enqueue` puede usar literales y memoria local. Una
+lectura compartida debe hacerse primero mediante una asignación normal y
+después insertar el valor local, para que la lectura siga apareciendo en
+las microoperaciones y el análisis de interferencia.
+
+Cada método constituye una operación atómica de un step. Esto evita un
+estado estructural intermedio de la cola, pero no vuelve atómica una
+secuencia completa:
+
+``` text
+P(mutex);
+bool vacia = trabajos.isEmpty();
+int trabajo = trabajos.dequeue();
+V(mutex);
+```
+
+El protocolo sigue siendo necesario cuando varias operaciones y
+variables forman un mismo invariante. `dequeue()` y `front()` sobre una
+cola vacía producen un error de runtime; no bloquean automáticamente.
+
+Las colas de prioridad, las pilas y las colas de registros/objetos todavía
+no están soportadas.
 
 ------------------------------------------------------------------------
 
@@ -893,14 +989,13 @@ También permanecen fuera del alcance actual:
 -   fairness formal/FIFO para semáforos;
 -   sintaxis especial como `i++`;
 -   arrays anidados;
--   colas y pilas;
+-   colas de prioridad y pilas;
 -   registros/estructuras u objetos con campos;
 -   métodos como `fallo.getNivel()`;
 -   operaciones educativas simuladas como `print(...)`.
 
-Las colas tienen prioridad entre estas extensiones porque ya son
-necesarias para expresar fielmente ejercicios académicos. Las pilas
-seguirán el mismo modelo general.
+Las colas FIFO primitivas ya están implementadas. Las colas de prioridad
+y las pilas seguirán el mismo modelo general.
 
 Los registros/objetos y métodos quedan como mejora posterior y todavía
 no tienen sintaxis definitiva. Las operaciones como `print(...)` podrán

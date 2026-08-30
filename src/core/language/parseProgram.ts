@@ -26,14 +26,29 @@ import {
   awaitInstruction,
   semaphoreVInstruction,
   semaphorePInstruction,
+  queueOperationInstruction,
 } from '../instructions/instructionFactories'
-import type { RuntimeValue } from '../memory/RuntimeValue'
+import {
+  createQueueValue,
+  type PrimitiveType,
+  type PrimitiveValue,
+  type RuntimeValue,
+} from '../memory/RuntimeValue'
+import type {
+  QueueOperation,
+  QueueResultTarget,
+} from '../instructions/Instruction'
 import type { Process } from '../process/Process'
 import type { Program } from '../engine/Program'
 import type { Token, TokenType } from './Token'
 import { ParserError } from './ParserError'
 import { tokenize } from './tokenize'
 import type { FunctionDefinition } from './FunctionDefinition'
+
+interface ParsedType {
+  readonly container: 'SCALAR' | 'ARRAY' | 'QUEUE'
+  readonly primitiveType: PrimitiveType
+}
 
 export function parseProgram(
   source: string,
@@ -114,7 +129,7 @@ class Parser {
   private parseSharedDeclaration(
     sharedMemory: Program['sharedMemory'],
   ): void {
-    this.parseType()
+    const declaredType = this.parseType()
 
     const name = this.consume(
       'IDENTIFIER',
@@ -126,7 +141,11 @@ class Parser {
       'Expected "=" after variable name',
     )
 
-    const value = this.parseLiteralOrArrayValue()
+    const value = declaredType.container === 'QUEUE'
+      ? this.parseQueueLiteral(
+          declaredType.primitiveType,
+        )
+      : this.parseLiteralOrArrayValue()
 
     this.consume(
       'SEMICOLON',
@@ -276,6 +295,13 @@ class Parser {
 
     if (
       this.check('IDENTIFIER')
+      && this.checkNext('DOT')
+    ) {
+      return this.parseQueueOperationStatement()
+    }
+
+    if (
+      this.check('IDENTIFIER')
       && this.checkNext('LEFT_PAREN')
     ) {
       return this.parseFunctionCall()
@@ -292,7 +318,7 @@ class Parser {
   }
 
   private parseLocalDeclaration(): Instruction {
-    this.parseType()
+    const declaredType = this.parseType()
 
     const name = this.consume(
       'IDENTIFIER',
@@ -304,7 +330,49 @@ class Parser {
       'Expected "=" after variable name',
     )
 
-    const initialValue = this.parseExpression()
+    if (this.isQueueOperationCallStart()) {
+      if (declaredType.container !== 'SCALAR') {
+        throw this.error(
+          this.peek(),
+          'Queue operation results require a primitive scalar declaration',
+        )
+      }
+
+      const operation = this.parseQueueOperationCall()
+
+      if (operation.operation === 'ENQUEUE') {
+        throw this.error(
+          this.previous(),
+          'enqueue() does not return a value',
+        )
+      }
+
+      this.consume(
+        'SEMICOLON',
+        'Expected ";" after queue operation',
+      )
+
+      return queueOperationInstruction(
+        operation.queueName,
+        operation.operation,
+        {
+          resultTarget: {
+            type: 'DECLARE',
+            scope: 'LOCAL',
+            name: name.lexeme,
+          },
+        },
+      )
+    }
+
+    const initialValue =
+      declaredType.container === 'QUEUE'
+        ? literal(
+            this.parseQueueLiteral(
+              declaredType.primitiveType,
+            ),
+          )
+        : this.parseExpression()
 
     this.consume(
       'SEMICOLON',
@@ -685,26 +753,120 @@ class Parser {
     )
   }
 
-  private parseType(): void {
-    if (
-      !this.match(
-        'INT',
-        'BOOL',
-        'STRING_TYPE',
-      )
-    ) {
-      throw this.error(
-        this.peek(),
-        'Expected type',
-      )
+  private parseQueueLiteral(
+    elementType: PrimitiveType,
+  ): RuntimeValue {
+    this.consume(
+      'QUEUE',
+      'Expected queue literal',
+    )
+
+    this.consume(
+      'LEFT_BRACKET',
+      'Expected "[" after "queue"',
+    )
+
+    const items: PrimitiveValue[] = []
+
+    if (!this.check('RIGHT_BRACKET')) {
+      do {
+        const token = this.peek()
+        let value: PrimitiveValue
+
+        if (this.match('NUMBER')) {
+          value = Number(this.previous().lexeme)
+        } else if (this.match('STRING')) {
+          value = this.previous().lexeme
+        } else if (this.match('BOOLEAN')) {
+          value = this.previous().lexeme === 'true'
+        } else {
+          throw this.error(
+            token,
+            'Expected primitive queue item',
+          )
+        }
+
+        if (!matchesPrimitiveType(value, elementType)) {
+          throw this.error(
+            token,
+            `Queue<${elementType}> item has the wrong type`,
+          )
+        }
+
+        items.push(value)
+      } while (this.match('COMMA'))
     }
+
+    this.consume(
+      'RIGHT_BRACKET',
+      'Expected "]" after queue literal',
+    )
+
+    return createQueueValue(
+      elementType,
+      items,
+    )
+  }
+
+  private parseType(): ParsedType {
+    if (this.match('QUEUE')) {
+      this.consume(
+        'LESS',
+        'Expected "<" after "queue"',
+      )
+
+      const primitiveType =
+        this.parsePrimitiveType()
+
+      this.consume(
+        'GREATER',
+        'Expected ">" after queue element type',
+      )
+
+      return {
+        container: 'QUEUE',
+        primitiveType,
+      }
+    }
+
+    const primitiveType =
+      this.parsePrimitiveType()
 
     if (this.match('LEFT_BRACKET')) {
       this.consume(
         'RIGHT_BRACKET',
         'Expected "]" in array type',
       )
+
+      return {
+        container: 'ARRAY',
+        primitiveType,
+      }
     }
+
+    return {
+      container: 'SCALAR',
+      primitiveType,
+    }
+  }
+
+  private parsePrimitiveType(): PrimitiveType {
+    if (this.match('INT')) {
+      return 'int'
+    }
+
+    if (this.match('BOOL')) {
+      return 'bool'
+    }
+
+    if (this.match('STRING_TYPE')) {
+      return 'string'
+    }
+
+    throw this.error(
+      this.peek(),
+      'Expected primitive type',
+    )
   }
 
   private isTypeToken(
@@ -714,6 +876,7 @@ class Parser {
       type === 'INT'
       || type === 'BOOL'
       || type === 'STRING_TYPE'
+      || type === 'QUEUE'
     )
   }
 
@@ -968,6 +1131,18 @@ class Parser {
         'Expected "=" after assignment target',
       )
 
+      if (this.isQueueOperationCallStart()) {
+        return this.parseQueueResultInstruction(
+          {
+            type: 'ASSIGN',
+            target: arrayTarget(
+              name.lexeme,
+              index,
+            ),
+          },
+        )
+      }
+
       return assign(
         arrayTarget(
           name.lexeme,
@@ -982,9 +1157,123 @@ class Parser {
       'Expected "=" after assignment target',
     )
 
+    if (this.isQueueOperationCallStart()) {
+      return this.parseQueueResultInstruction(
+        {
+          type: 'ASSIGN',
+          target: variableTarget(name.lexeme),
+        },
+      )
+    }
+
     return assign(
       variableTarget(name.lexeme),
       this.parseExpression(),
+    )
+  }
+
+  private parseQueueOperationStatement(): Instruction {
+    const operation = this.parseQueueOperationCall()
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after queue operation',
+    )
+
+    if (operation.operation !== 'ENQUEUE') {
+      throw this.error(
+        this.previous(),
+        `${queueMethodName(operation.operation)}() must be assigned to a variable`,
+      )
+    }
+
+    return queueOperationInstruction(
+      operation.queueName,
+      operation.operation,
+      {
+        argument: operation.argument,
+      },
+    )
+  }
+
+  private parseQueueResultInstruction(
+    resultTarget: QueueResultTarget,
+  ): Instruction {
+    const operation = this.parseQueueOperationCall()
+
+    if (operation.operation === 'ENQUEUE') {
+      throw this.error(
+        this.previous(),
+        'enqueue() does not return a value',
+      )
+    }
+
+    return queueOperationInstruction(
+      operation.queueName,
+      operation.operation,
+      { resultTarget },
+    )
+  }
+
+  private parseQueueOperationCall(): {
+    readonly queueName: string
+    readonly operation: QueueOperation
+    readonly argument?: Expression
+  } {
+    const queueName = this.consume(
+      'IDENTIFIER',
+      'Expected queue name',
+    )
+
+    this.consume(
+      'DOT',
+      'Expected "." after queue name',
+    )
+
+    const method = this.consume(
+      'IDENTIFIER',
+      'Expected queue method name',
+    )
+    const operation = parseQueueOperationName(
+      method.lexeme,
+      () => this.error(
+        method,
+        `Unknown queue method "${method.lexeme}"`,
+      ),
+    )
+
+    this.consume(
+      'LEFT_PAREN',
+      `Expected "(" after "${method.lexeme}"`,
+    )
+
+    let argument: Expression | undefined
+
+    if (operation === 'ENQUEUE') {
+      argument = this.parseExpression()
+    } else if (!this.check('RIGHT_PAREN')) {
+      throw this.error(
+        this.peek(),
+        `${method.lexeme}() does not accept arguments`,
+      )
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      `Expected ")" after "${method.lexeme}"`,
+    )
+
+    return {
+      queueName: queueName.lexeme,
+      operation,
+      argument,
+    }
+  }
+
+  private isQueueOperationCallStart(): boolean {
+    return (
+      this.check('IDENTIFIER')
+      && this.checkNext('DOT')
     )
   }
 
@@ -1194,5 +1483,53 @@ class Parser {
     return operation === 'P'
       ? semaphorePInstruction(semaphore.lexeme)
       : semaphoreVInstruction(semaphore.lexeme)
+  }
+}
+
+function matchesPrimitiveType(
+  value: PrimitiveValue,
+  type: PrimitiveType,
+): boolean {
+  return (
+    (type === 'int' && typeof value === 'number')
+    || (type === 'bool' && typeof value === 'boolean')
+    || (type === 'string' && typeof value === 'string')
+  )
+}
+
+function parseQueueOperationName(
+  methodName: string,
+  createError: () => Error,
+): QueueOperation {
+  switch (methodName) {
+    case 'enqueue':
+      return 'ENQUEUE'
+    case 'dequeue':
+      return 'DEQUEUE'
+    case 'front':
+      return 'FRONT'
+    case 'isEmpty':
+      return 'IS_EMPTY'
+    case 'size':
+      return 'SIZE'
+    default:
+      throw createError()
+  }
+}
+
+function queueMethodName(
+  operation: QueueOperation,
+): string {
+  switch (operation) {
+    case 'ENQUEUE':
+      return 'enqueue'
+    case 'DEQUEUE':
+      return 'dequeue'
+    case 'FRONT':
+      return 'front'
+    case 'IS_EMPTY':
+      return 'isEmpty'
+    case 'SIZE':
+      return 'size'
   }
 }

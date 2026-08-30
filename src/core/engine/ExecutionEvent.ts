@@ -1,4 +1,5 @@
 import type { ProcessId } from '../process/ProcessId'
+import type { PrimitiveValue } from '../memory/RuntimeValue'
 
 export type AwaitEventStatus =
   | 'BLOCKED'
@@ -23,6 +24,20 @@ export interface LoopConditionExecutionEvent {
   readonly bodyIsEmpty: boolean
 }
 
+export interface QueueExecutionEvent {
+  readonly operation:
+    | 'ENQUEUE'
+    | 'DEQUEUE'
+    | 'FRONT'
+    | 'IS_EMPTY'
+    | 'SIZE'
+  readonly queueName: string
+  readonly scope: 'LOCAL' | 'SHARED'
+  readonly sizeBefore: number
+  readonly sizeAfter: number
+  readonly value?: PrimitiveValue
+}
+
 export interface ExecutionEvent {
   readonly step: number
   readonly processId: ProcessId
@@ -31,4 +46,5 @@ export interface ExecutionEvent {
   readonly awaitStatus?: AwaitEventStatus
   readonly semaphoreEvent?: SemaphoreExecutionEvent
   readonly loopConditionEvent?: LoopConditionExecutionEvent
+  readonly queueEvent?: QueueExecutionEvent
 }

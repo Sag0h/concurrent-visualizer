@@ -2,6 +2,37 @@ import { describe, expect, it } from 'vitest'
 import { tokenize } from '../tokenize'
 
 describe('tokenize', () => {
+  it('tokenizes queue types, literals and method calls', () => {
+    const tokens = tokenize(
+      'shared queue<int> jobs = queue[1]; jobs.enqueue(2);',
+    )
+
+    expect(
+      tokens.map((token) => token.type),
+    ).toEqual([
+      'SHARED',
+      'QUEUE',
+      'LESS',
+      'INT',
+      'GREATER',
+      'IDENTIFIER',
+      'ASSIGN',
+      'QUEUE',
+      'LEFT_BRACKET',
+      'NUMBER',
+      'RIGHT_BRACKET',
+      'SEMICOLON',
+      'IDENTIFIER',
+      'DOT',
+      'IDENTIFIER',
+      'LEFT_PAREN',
+      'NUMBER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
+
   it('tokenizes a shared variable declaration', () => {
     const tokens = tokenize(
       'shared int counter = 0;',

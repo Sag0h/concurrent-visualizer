@@ -1077,18 +1077,32 @@ extensión del lenguaje. La prueba de starvation/terminación,
 happens-before, partial-order reduction y el grafo visual completo
 quedan fuera del alcance inicial.
 
-## 21.1. Estructuras de datos y operaciones educativas futuras
+## 21.1. Estructuras de datos académicas
 
-El lenguaje deberá representar estructuras usadas en ejercicios
-académicos sin convertirlas en casos especiales del visualizador. Las
-colas pasan a ser una extensión prioritaria; las pilas seguirán el mismo
-modelo general.
+El lenguaje representa las estructuras usadas en ejercicios académicos
+sin convertirlas en casos especiales del visualizador. La primera
+extensión implementada es una cola FIFO de valores primitivos; las colas
+de prioridad y pilas seguirán el mismo modelo general.
 
-Una cola o pila local pertenece al estado privado del proceso. Si es
-compartida, sus contenidos y orden forman parte del estado semántico
-global: deben clonarse de forma independiente y participar en la
-identidad canónica utilizada por M9. Antes de implementarlas deberá
-definirse la atomicidad de cada operación compartida.
+Una cola local pertenece al estado privado del proceso. Si es compartida,
+sus contenidos y orden forman parte del estado semántico global: se
+clonan de forma independiente y participan en la identidad canónica de
+M9. `enqueue`, `dequeue`, `front`, `size` e `isEmpty` son operaciones atómicas de
+un step y generan un `QueueExecutionEvent`. Esa atomicidad no se extiende
+a secuencias compuestas de consultas, extracciones y otras variables;
+esas invariantes siguen requiriendo `P` / `V` u otro protocolo.
+
+`QueueValue` es un valor etiquetado de `RuntimeValue`, con tipo primitivo
+de elemento y un array ordenado desde frente hacia fondo. Esto permite
+que memoria, snapshots, `structuredClone` y la serialización canónica lo
+traten como estado ordinario del programa. `dequeue` y `front` sobre una
+cola vacía producen un error explícito; no introducen bloqueo implícito.
+
+Los resultados se escriben inicialmente sólo en memoria local y los
+argumentos de `enqueue` no leen memoria compartida directamente. Esta
+restricción evita que una operación de alto nivel oculte accesos que hoy
+deben descomponerse como microoperaciones para el análisis de
+interferencia.
 
 Como mejora posterior se evaluarán registros/estructuras u objetos
 educativos con campos. El objetivo es representar datos como un `Fallo`

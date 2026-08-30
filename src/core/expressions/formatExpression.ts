@@ -2,6 +2,7 @@ import type { Expression } from './Expression'
 import type {
   RuntimeValue,
 } from '../memory/RuntimeValue'
+import { isQueueValue } from '../memory/RuntimeValue'
 
 export function formatExpression(
   expression: Expression,
@@ -44,6 +45,12 @@ export function formatExpression(
 function formatRuntimeValue(
   value: RuntimeValue,
 ): string {
+  if (isQueueValue(value)) {
+    return `queue[${value.items
+      .map(formatRuntimeValue)
+      .join(', ')}]`
+  }
+
   if (typeof value === 'string') {
     return `"${value}"`
   }

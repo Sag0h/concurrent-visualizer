@@ -4,9 +4,15 @@ import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
-import type { CallInstruction, ForeachInstruction, IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
+import type { CallInstruction, ForeachInstruction, IfInstruction, Instruction, QueueOperationInstruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
-import type { RuntimeValue } from '../memory/RuntimeValue'
+import {
+  assertPrimitiveType,
+  isQueueValue,
+  type PrimitiveValue,
+  type QueueValue,
+  type RuntimeValue,
+} from '../memory/RuntimeValue'
 import type { PendingInstruction } from '../process/PendingInstruction'
 
 import type {
@@ -23,6 +29,7 @@ import { summarizeMemoryAccessConflicts } from './summarizeMemoryAccessConflicts
 import type {
   ExecutionEvent,
   LoopConditionExecutionEvent,
+  QueueExecutionEvent,
   SemaphoreExecutionEvent,
 } from './ExecutionEvent'
 import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
@@ -217,6 +224,9 @@ export class SimulationEngine {
 
     let loopConditionEvent:
       LoopConditionExecutionEvent | undefined
+
+    let queueEvent:
+      QueueExecutionEvent | undefined
 
     switch (instruction.type) {
       case 'NO_OP':
@@ -762,6 +772,20 @@ export class SimulationEngine {
         break
       }
 
+      case 'QUEUE_OPERATION': {
+        const result =
+          this.executeQueueOperation(
+            process,
+            instruction,
+          )
+
+        queueEvent = result.event
+        executionDescription =
+          result.description
+
+        break
+      }
+
     }
 
     const executionEvent: ExecutionEvent = {
@@ -771,6 +795,7 @@ export class SimulationEngine {
       awaitStatus,
       semaphoreEvent,
       loopConditionEvent,
+      queueEvent,
       description: executionDescription,
     }
 
@@ -2921,9 +2946,12 @@ export class SimulationEngine {
       )
     }
 
-    if (Array.isArray(value)) {
+    if (
+      Array.isArray(value)
+      || isQueueValue(value)
+    ) {
       throw new Error(
-        'Nested arrays are not supported yet',
+        'Nested collection values are not supported yet',
       )
     }
 
@@ -3137,9 +3165,12 @@ export class SimulationEngine {
       )
     }
 
-    if (Array.isArray(value)) {
+    if (
+      Array.isArray(value)
+      || isQueueValue(value)
+    ) {
       throw new Error(
-        'Nested arrays are not supported yet',
+        'Nested collection values are not supported yet',
       )
     }
 
@@ -3238,6 +3269,263 @@ export class SimulationEngine {
     }
   }
 
+  private executeQueueOperation(
+    process: Process,
+    instruction: QueueOperationInstruction,
+  ): {
+    readonly event: QueueExecutionEvent
+    readonly description: string
+  } {
+    const resolved = this.resolveQueue(
+      process,
+      instruction.queueName,
+    )
+
+    if (instruction.operation !== 'ENQUEUE') {
+      this.validateQueueResultTarget(
+        process,
+        instruction,
+      )
+    }
+
+    const sizeBefore = resolved.queue.items.length
+    let value: PrimitiveValue
+
+    switch (instruction.operation) {
+      case 'ENQUEUE': {
+        if (!instruction.argument) {
+          throw new Error(
+            'enqueue() requires one argument',
+          )
+        }
+
+        if (
+          this.containsFunctionCall(
+            instruction.argument,
+          )
+        ) {
+          throw new Error(
+            'Function calls inside enqueue() are not supported yet',
+          )
+        }
+
+        if (
+          this.findNextSharedMemoryRead(
+            process,
+            instruction.argument,
+          )
+        ) {
+          throw new Error(
+            'Shared-memory reads inside enqueue() are not supported yet; copy the value to local memory first',
+          )
+        }
+
+        const evaluated = evaluateExpression(
+          instruction.argument,
+          {
+            localMemory:
+              this.getActiveLocalMemory(process),
+            sharedMemory:
+              this.state.program.sharedMemory,
+          },
+        )
+
+        assertPrimitiveType(
+          evaluated,
+          resolved.queue.elementType,
+        )
+
+        value = evaluated
+        resolved.queue.items.push(value)
+        this.advanceProcess(process)
+        break
+      }
+
+      case 'DEQUEUE': {
+        value = this.requireQueueFront(
+          instruction.queueName,
+          resolved.queue,
+          'dequeue',
+        )
+        resolved.queue.items.shift()
+        this.completeQueueResult(
+          process,
+          instruction,
+          value,
+        )
+        break
+      }
+
+      case 'FRONT': {
+        value = this.requireQueueFront(
+          instruction.queueName,
+          resolved.queue,
+          'front',
+        )
+        this.completeQueueResult(
+          process,
+          instruction,
+          value,
+        )
+        break
+      }
+
+      case 'IS_EMPTY': {
+        value = resolved.queue.items.length === 0
+        this.completeQueueResult(
+          process,
+          instruction,
+          value,
+        )
+        break
+      }
+
+      case 'SIZE': {
+        value = resolved.queue.items.length
+        this.completeQueueResult(
+          process,
+          instruction,
+          value,
+        )
+        break
+      }
+    }
+
+    const sizeAfter = resolved.queue.items.length
+    const method = queueMethodName(
+      instruction.operation,
+    )
+    const renderedValue =
+      JSON.stringify(value)
+
+    return {
+      event: {
+        operation: instruction.operation,
+        queueName: instruction.queueName,
+        scope: resolved.scope,
+        sizeBefore,
+        sizeAfter,
+        value,
+      },
+      description: instruction.operation === 'ENQUEUE'
+        ? `${instruction.queueName}.${method}(${renderedValue}): size ${sizeBefore} -> ${sizeAfter}`
+        : `${instruction.queueName}.${method}() = ${renderedValue}: size ${sizeBefore} -> ${sizeAfter}`,
+    }
+  }
+
+  private resolveQueue(
+    process: Process,
+    queueName: string,
+  ): {
+    readonly queue: QueueValue
+    readonly scope: 'LOCAL' | 'SHARED'
+  } {
+    const localMemory =
+      this.getActiveLocalMemory(process)
+
+    if (queueName in localMemory) {
+      const value = localMemory[queueName]
+
+      if (!isQueueValue(value)) {
+        throw new Error(
+          `Variable "${queueName}" is not a queue`,
+        )
+      }
+
+      return {
+        queue: value,
+        scope: 'LOCAL',
+      }
+    }
+
+    const value =
+      this.state.program.sharedMemory[queueName]
+
+    if (value === undefined) {
+      throw new Error(
+        `Queue "${queueName}" is not defined`,
+      )
+    }
+
+    if (!isQueueValue(value)) {
+      throw new Error(
+        `Variable "${queueName}" is not a queue`,
+      )
+    }
+
+    return {
+      queue: value,
+      scope: 'SHARED',
+    }
+  }
+
+  private requireQueueFront(
+    queueName: string,
+    queue: QueueValue,
+    method: 'dequeue' | 'front',
+  ): PrimitiveValue {
+    const value = queue.items[0]
+
+    if (value === undefined) {
+      throw new Error(
+        `Queue "${queueName}" is empty; ${method}() cannot continue`,
+      )
+    }
+
+    return value
+  }
+
+  private completeQueueResult(
+    process: Process,
+    instruction: QueueOperationInstruction,
+    value: PrimitiveValue,
+  ): void {
+    const target = instruction.resultTarget
+
+    if (!target) {
+      throw new Error('Missing validated queue result target')
+    }
+
+    if (target.type === 'DECLARE') {
+      this.getActiveLocalMemory(process)[
+        target.name
+      ] = structuredClone(value)
+      this.advanceProcess(process)
+      return
+    }
+
+    this.completeAssignmentValue(
+      process,
+      target.target,
+      structuredClone(value),
+    )
+  }
+
+  private validateQueueResultTarget(
+    process: Process,
+    instruction: QueueOperationInstruction,
+  ): void {
+    const target = instruction.resultTarget
+
+    if (!target) {
+      throw new Error(
+        `${queueMethodName(instruction.operation)}() result must be assigned`,
+      )
+    }
+
+    if (
+      target.type === 'ASSIGN'
+      && this.isSharedAssignmentTarget(
+        process,
+        target.target,
+      )
+    ) {
+      throw new Error(
+        'Queue operation results must be assigned to local memory',
+      )
+    }
+  }
+
   private getSemaphore(
     semaphoreName: string,
   ) {
@@ -3253,5 +3541,22 @@ export class SimulationEngine {
     }
 
     return semaphore
+  }
+}
+
+function queueMethodName(
+  operation: QueueOperationInstruction['operation'],
+): string {
+  switch (operation) {
+    case 'ENQUEUE':
+      return 'enqueue'
+    case 'DEQUEUE':
+      return 'dequeue'
+    case 'FRONT':
+      return 'front'
+    case 'IS_EMPTY':
+      return 'isEmpty'
+    case 'SIZE':
+      return 'size'
   }
 }

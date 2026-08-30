@@ -16,6 +16,9 @@ import type {
   AtomicInstruction,
   SemaphoreVInstruction,
   SemaphorePInstruction,
+  QueueOperationInstruction,
+  QueueOperation,
+  QueueResultTarget,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -208,5 +211,22 @@ export function semaphoreVInstruction(
   return {
     type: 'SEMAPHORE_V',
     semaphoreName,
+  }
+}
+
+export function queueOperationInstruction(
+  queueName: string,
+  operation: QueueOperation,
+  options: {
+    readonly argument?: Expression
+    readonly resultTarget?: QueueResultTarget
+  } = {},
+): QueueOperationInstruction {
+  return {
+    type: 'QUEUE_OPERATION',
+    queueName,
+    operation,
+    argument: options.argument,
+    resultTarget: options.resultTarget,
   }
 }

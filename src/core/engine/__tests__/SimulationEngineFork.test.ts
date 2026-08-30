@@ -5,6 +5,7 @@ import { RoundRobinScheduler } from '../../scheduler/RoundRobinScheduler'
 import type { Scheduler } from '../../scheduler/Scheduler'
 import { createExecutionState } from '../createExecutionState'
 import { SimulationEngine } from '../SimulationEngine'
+import { isQueueValue } from '../../memory/RuntimeValue'
 
 function createEngine(
   source: string,
@@ -55,6 +56,37 @@ function runExplicitly(
 }
 
 describe('SimulationEngine fork', () => {
+  it('clones shared FIFO queues without sharing their items', () => {
+    const engine = createEngine(`
+      shared queue<int> jobs = queue[1];
+
+      process Producer {
+        jobs.enqueue(2);
+      }
+    `)
+    const fork = engine.fork()
+
+    executeSelected(fork, 'Producer')
+
+    const originalQueue =
+      engine.getState().program.sharedMemory.jobs
+    const forkQueue =
+      fork.getState().program.sharedMemory.jobs
+
+    if (
+      !isQueueValue(originalQueue)
+      || !isQueueValue(forkQueue)
+    ) {
+      throw new Error('Expected jobs to be a queue')
+    }
+
+    expect(originalQueue.items).toEqual([1])
+    expect(forkQueue.items).toEqual([1, 2])
+    expect(originalQueue.items).not.toBe(
+      forkQueue.items,
+    )
+  })
+
   it('clones an in-progress shared-memory micro-operation independently', () => {
     const engine = createEngine(`
       shared int x = 0;

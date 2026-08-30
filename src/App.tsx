@@ -4,7 +4,10 @@ import { createExecutionState } from './core/engine/createExecutionState'
 import { SimulationEngine } from './core/engine/SimulationEngine'
 import type { SimulationSnapshot } from './core/engine/SimulationSnapshot'
 import { parseProgram } from './core/language/parseProgram'
-import type { RuntimeValue } from './core/memory/RuntimeValue'
+import {
+  isQueueValue,
+  type RuntimeValue,
+} from './core/memory/RuntimeValue'
 import { createScheduler } from './core/scheduler/createScheduler'
 import type { SchedulerType } from './core/scheduler/SchedulerType'
 import { formatExpression } from './core/expressions/formatExpression'
@@ -1527,6 +1530,11 @@ function App() {
                                     >
                                       {entry.awaitStatus}
                                     </span>
+                                  ) : entry.queueEvent ? (
+                                    <span className="queue-operation-status">
+                                      {entry.queueEvent.scope}
+                                      {' · ATOMIC'}
+                                    </span>
                                   ) : (
                                     '—'
                                   )}
@@ -1997,6 +2005,14 @@ function MemoryTable({
 function formatValue(
   value: RuntimeValue,
 ): string {
+  if (isQueueValue(value)) {
+    if (value.items.length === 0) {
+      return `queue<${value.elementType}> [empty]`
+    }
+
+    return `queue<${value.elementType}> [front → ${value.items.join(', ')} ← back]`
+  }
+
   if (Array.isArray(value)) {
     return `[${value.join(', ')}]`
   }

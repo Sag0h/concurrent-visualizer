@@ -16,10 +16,9 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M9 --- **Exploración de ejecuciones**.
+**Milestone actual:** M10 --- **Evolución del lenguaje**.
 
-**Último milestone completado:** M8 --- **Detector de errores y
-diagnósticos**.
+**Último milestone completado:** M9 --- **Exploración de ejecuciones**.
 
 M7 está completado en sus siete fases:
 
@@ -74,6 +73,11 @@ rama y ofrece una clave analizada para propiedades que dependan de ese
 contexto. La búsqueda de exclusión mutua sólo acepta solapamientos
 observados con mutex incompatibles; una advertencia `POTENTIAL_RACE` por
 sí sola no se presenta como infracción demostrada.
+
+M10 comenzó con colas FIFO de valores primitivos. Pueden declararse como
+memoria local o compartida y ofrecen `enqueue`, `dequeue`, `front`,
+`size` e `isEmpty`. Cada operación es un paso atómico, queda registrada en el
+historial y sus contenidos participan en snapshots, forks y exploración.
 
 ------------------------------------------------------------------------
 
@@ -700,7 +704,9 @@ Semáforos P / V
         ↓
 Análisis y errores
         ↓
-Exploración acotada  ← actual
+Exploración acotada
+        ↓
+Estructuras de datos académicas  ← actual
         ↓
 Monitores
         ↓
@@ -709,7 +715,7 @@ Pasaje de mensajes
 Visualización y análisis avanzado
 ```
 
-### Último milestone completado --- M8: Detector de errores y diagnósticos
+### Último milestone completado --- M9: Exploración de ejecuciones
 
 Completado:
 
@@ -722,12 +728,13 @@ M7.5  Historial y visualización
 M7.6  Integración con el análisis de interferencia
 M7.7  Casos académicos reproducibles
 M8    Detector de errores y diagnósticos
+M9    Exploración de ejecuciones
 ```
 
-Próximo:
+En curso:
 
 ``` text
-M9  Exploración de ejecuciones
+M10.1  Estructuras de datos académicas
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

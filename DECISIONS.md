@@ -1085,6 +1085,21 @@ posterior. Servirán para agrupar campos y eventualmente ofrecer métodos
 simples o azúcar sintáctica, sin asumir un sistema orientado a objetos
 completo.
 
+La primera vertical utiliza `QueueValue` etiquetado dentro de
+`RuntimeValue` y sintaxis `queue<T>`. Cada `enqueue`, `dequeue`, `front`,
+`size` e `isEmpty` es una operación atómica de un step y produce un evento
+estructurado. No se garantiza atomicidad entre dos métodos consecutivos
+ni entre una operación de cola y otra variable; esos invariantes siguen
+requiriendo sincronización explícita. Una extracción o consulta de frente
+sobre una cola vacía es error de runtime, no una espera implícita.
+
+Los métodos que retornan valores se limitan inicialmente a una
+declaración o asignación local directa. `enqueue` tampoco lee memoria
+compartida dentro de su argumento: esa lectura debe capturarse primero en
+una variable local. Esta frontera permite introducir el ADT sin ocultar
+accesos al análisis de interferencia ni mezclar todavía efectos mutables
+con el evaluador general de expresiones suspendibles.
+
 Las acciones externas necesarias sólo para expresar el algoritmo podrán
 ser operaciones simuladas. Por ejemplo, `print(valor)` podrá registrar
 que la acción ocurrió sin producir I/O real. Deberán ser deterministas y

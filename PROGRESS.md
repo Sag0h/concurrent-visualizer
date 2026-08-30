@@ -5,10 +5,9 @@
 
 ## Estado actual
 
-**Fase:** M9 --- Exploración de ejecuciones.
+**Fase:** M10.1 --- Estructuras de datos académicas.
 
-**Último milestone completado:** M8 --- Detector de errores y
-diagnósticos.
+**Último milestone completado:** M9 --- Exploración de ejecuciones.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -26,10 +25,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** evaluar si las assertions explícitas sobre estados
-finales deben entrar en M9.4 o quedar como extensión futura del
-lenguaje; el resto de las propiedades previstas para M9 ya está
-implementado.
+**Próximo objetivo:** completar M10.1 sobre la base de las colas FIFO ya
+implementadas: colas de prioridad y pilas. Las assertions explícitas se
+evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -1885,3 +1883,36 @@ evidencia en la traza, pero no realizarán I/O real.
 
 **Prioridad:** colas primero; pilas bajo el mismo modelo; registros,
 objetos, métodos y operaciones simuladas como evolución posterior.
+
+## 2026-08-30 --- M10.1: primera vertical de colas FIFO
+
+Se incorporaron colas FIFO de valores `int`, `bool` o `string` como
+valores etiquetados de `RuntimeValue`. La sintaxis permite declararlas en
+memoria compartida o local:
+
+``` text
+shared queue<int> trabajos = queue[10, 20];
+queue<string> mensajes = queue[];
+```
+
+El parser reconoce `enqueue`, `dequeue`, `front`, `size` e `isEmpty`. Las
+cuatro operaciones con resultado pueden utilizarse directamente en una
+declaración o asignación. Los métodos anidados dentro de expresiones se
+posponen para no introducir efectos mutables inadvertidos en el evaluador
+general.
+
+Cada operación de cola consume un step atómico y registra un
+`QueueExecutionEvent` con cola, scope, valor y tamaños anterior/posterior.
+La UI muestra el contenido ordenado desde `front` hacia `back` y distingue
+estas operaciones en el historial.
+
+Al vivir dentro de la memoria ordinaria, las colas se clonan con los
+forks, aparecen desconectadas en snapshots y forman parte de la clave
+canónica utilizada por M9. La exploración puede distinguir contenidos y
+órdenes FIFO diferentes sin una integración paralela especial.
+
+Las pruebas cubren tokenizer/parser, orden FIFO, colas locales aisladas,
+dequeue compartido atómico, errores por vacío o tipo incompatible,
+snapshots, forks y exploración. El próximo paso de M10.1 es definir e
+implementar la cola de prioridad estable y luego reutilizar la misma base
+para pilas.

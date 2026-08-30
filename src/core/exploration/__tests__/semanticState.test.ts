@@ -194,6 +194,32 @@ describe('semantic exploration state', () => {
     )
   })
 
+  it('includes FIFO queue contents and order in the semantic key', () => {
+    const first = createEngine(`
+      shared queue<int> jobs = queue[1, 2];
+      process Worker { }
+    `)
+    const second = createEngine(`
+      shared queue<int> jobs = queue[2, 1];
+      process Worker { }
+    `)
+    const third = createEngine(`
+      shared queue<int> jobs = queue[1];
+      process Worker { }
+    `)
+
+    expect(
+      createSemanticStateKey(first.getState()),
+    ).not.toBe(
+      createSemanticStateKey(second.getState()),
+    )
+    expect(
+      createSemanticStateKey(first.getState()),
+    ).not.toBe(
+      createSemanticStateKey(third.getState()),
+    )
+  })
+
   it('detects a repeated semantic state independently of its trace', () => {
     const engine = createEngine(`
       process Spinner {
