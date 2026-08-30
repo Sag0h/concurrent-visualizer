@@ -5,6 +5,7 @@ import type {
 import {
   isPriorityQueueValue,
   isQueueValue,
+  isStackValue,
 } from '../memory/RuntimeValue'
 
 export function formatExpression(
@@ -57,6 +58,12 @@ function formatRuntimeValue(
   if (isPriorityQueueValue(value)) {
     return `priority_queue[${value.items
       .map((item) => `(${formatRuntimeValue(item.value)}, ${item.priority})`)
+      .join(', ')}]`
+  }
+
+  if (isStackValue(value)) {
+    return `stack[${value.items
+      .map(formatRuntimeValue)
       .join(', ')}]`
   }
 

@@ -74,24 +74,25 @@ describe('FIFO queue operations', () => {
     expect(queue.items).toEqual([])
 
     const events = engine.getState().history
-      .filter((event) => event.queueEvent)
+      .filter((event) => event.dataStructureEvent)
 
     expect(events).toHaveLength(7)
-    expect(events[0].queueEvent).toMatchObject({
+    expect(events[0].dataStructureEvent).toMatchObject({
       operation: 'ENQUEUE',
-      queueName: 'jobs',
+      structureName: 'jobs',
+      structureKind: 'FIFO_QUEUE',
       scope: 'SHARED',
       sizeBefore: 2,
       sizeAfter: 3,
       value: 30,
     })
-    expect(events.at(-2)?.queueEvent).toMatchObject({
+    expect(events.at(-2)?.dataStructureEvent).toMatchObject({
       operation: 'SIZE',
       value: 0,
       sizeBefore: 0,
       sizeAfter: 0,
     })
-    expect(events.at(-1)?.queueEvent).toMatchObject({
+    expect(events.at(-1)?.dataStructureEvent).toMatchObject({
       operation: 'IS_EMPTY',
       value: true,
     })
@@ -223,7 +224,7 @@ describe('FIFO queue operations', () => {
     `)
 
     expect(() => engine.step()).toThrow(
-      'Queue operation results must be assigned to local memory',
+      'Data structure operation results must be assigned to local memory',
     )
 
     const queue =

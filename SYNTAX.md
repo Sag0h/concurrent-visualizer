@@ -444,7 +444,33 @@ FIFO y retornan el valor, no la prioridad. Todas las operaciones siguen
 siendo atómicas individualmente y admiten las mismas restricciones sobre
 resultados locales, llamadas a funciones y lecturas compartidas.
 
-Las pilas y las colas de registros/objetos todavía no están soportadas.
+### Pilas
+
+Las pilas almacenan valores primitivos en orden LIFO. La notación
+literal enumera los elementos desde el fondo hacia la cima:
+
+``` text
+shared stack<int> valores = stack[10, 20];
+
+process Worker {
+    valores.push(30);
+    int cima = valores.top();
+    int extraido = valores.pop();
+    int cantidad = valores.size();
+    bool vacia = valores.isEmpty();
+}
+```
+
+En este ejemplo, tanto `top()` como `pop()` retornan `30`, pero sólo
+`pop()` lo elimina. Después de ambas operaciones, `20` vuelve a quedar en
+la cima. Una pila vacía se declara con `stack[]`.
+
+Las pilas pueden ser locales o compartidas. Cada método consume un step
+atómico y sigue las mismas restricciones que las colas: los resultados
+se escriben directamente en memoria local y `push` no admite llamadas a
+funciones ni lecturas compartidas dentro de su argumento.
+
+Las pilas de registros/objetos todavía no están soportadas.
 
 ------------------------------------------------------------------------
 
@@ -1025,13 +1051,12 @@ También permanecen fuera del alcance actual:
 -   fairness formal/FIFO para semáforos;
 -   sintaxis especial como `i++`;
 -   arrays anidados;
--   pilas;
 -   registros/estructuras u objetos con campos;
 -   métodos como `fallo.getNivel()`;
 -   operaciones educativas simuladas como `print(...)`.
 
-Las colas FIFO primitivas y las colas de prioridad estables ya están
-implementadas. Las pilas seguirán el mismo modelo general.
+Las colas FIFO primitivas, las colas de prioridad estables y las pilas ya
+están implementadas bajo el mismo modelo general.
 
 Los registros/objetos y métodos quedan como mejora posterior y todavía
 no tienen sintaxis definitiva. Las operaciones como `print(...)` podrán

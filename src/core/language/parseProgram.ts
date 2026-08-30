@@ -26,19 +26,20 @@ import {
   awaitInstruction,
   semaphoreVInstruction,
   semaphorePInstruction,
-  queueOperationInstruction,
+  dataStructureOperationInstruction,
 } from '../instructions/instructionFactories'
 import {
   createPriorityQueueValue,
   createQueueValue,
+  createStackValue,
   type PriorityQueueItem,
   type PrimitiveType,
   type PrimitiveValue,
   type RuntimeValue,
 } from '../memory/RuntimeValue'
 import type {
-  QueueOperation,
-  QueueResultTarget,
+  DataStructureOperation,
+  DataStructureResultTarget,
 } from '../instructions/Instruction'
 import type { Process } from '../process/Process'
 import type { Program } from '../engine/Program'
@@ -53,6 +54,7 @@ interface ParsedType {
     | 'ARRAY'
     | 'QUEUE'
     | 'PRIORITY_QUEUE'
+    | 'STACK'
   readonly primitiveType: PrimitiveType
 }
 
@@ -155,6 +157,10 @@ class Parser {
         ? this.parsePriorityQueueLiteral(
             declaredType.primitiveType,
           )
+        : declaredType.container === 'STACK'
+          ? this.parseStackLiteral(
+              declaredType.primitiveType,
+            )
       : this.parseLiteralOrArrayValue()
 
     this.consume(
@@ -307,7 +313,7 @@ class Parser {
       this.check('IDENTIFIER')
       && this.checkNext('DOT')
     ) {
-      return this.parseQueueOperationStatement()
+      return this.parseDataStructureOperationStatement()
     }
 
     if (
@@ -340,30 +346,31 @@ class Parser {
       'Expected "=" after variable name',
     )
 
-    if (this.isQueueOperationCallStart()) {
+    if (this.isDataStructureOperationCallStart()) {
       if (declaredType.container !== 'SCALAR') {
         throw this.error(
           this.peek(),
-          'Queue operation results require a primitive scalar declaration',
+          'Data structure operation results require a primitive scalar declaration',
         )
       }
 
-      const operation = this.parseQueueOperationCall()
+      const operation = this.parseDataStructureOperationCall()
 
-      if (operation.operation === 'ENQUEUE') {
+      if (operation.operation === 'ENQUEUE'
+        || operation.operation === 'PUSH') {
         throw this.error(
           this.previous(),
-          'enqueue() does not return a value',
+          `${dataStructureMethodName(operation.operation)}() does not return a value`,
         )
       }
 
       this.consume(
         'SEMICOLON',
-        'Expected ";" after queue operation',
+        'Expected ";" after data structure operation',
       )
 
-      return queueOperationInstruction(
-        operation.queueName,
+      return dataStructureOperationInstruction(
+        operation.structureName,
         operation.operation,
         {
           resultTarget: {
@@ -388,6 +395,12 @@ class Parser {
                 declaredType.primitiveType,
               ),
             )
+          : declaredType.container === 'STACK'
+            ? literal(
+                this.parseStackLiteral(
+                  declaredType.primitiveType,
+                ),
+              )
         : this.parseExpression()
 
     this.consume(
@@ -898,7 +911,77 @@ class Parser {
     )
   }
 
+  private parseStackLiteral(
+    elementType: PrimitiveType,
+  ): RuntimeValue {
+    this.consume(
+      'STACK',
+      'Expected stack literal',
+    )
+    this.consume(
+      'LEFT_BRACKET',
+      'Expected "[" after "stack"',
+    )
+
+    const items: PrimitiveValue[] = []
+
+    if (!this.check('RIGHT_BRACKET')) {
+      do {
+        const token = this.peek()
+        let value: PrimitiveValue
+
+        if (this.match('NUMBER')) {
+          value = Number(this.previous().lexeme)
+        } else if (this.match('STRING')) {
+          value = this.previous().lexeme
+        } else if (this.match('BOOLEAN')) {
+          value = this.previous().lexeme === 'true'
+        } else {
+          throw this.error(
+            token,
+            'Expected primitive stack item',
+          )
+        }
+
+        if (!matchesPrimitiveType(value, elementType)) {
+          throw this.error(
+            token,
+            `Stack<${elementType}> item has the wrong type`,
+          )
+        }
+
+        items.push(value)
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_BRACKET',
+      'Expected "]" after stack literal',
+    )
+
+    return createStackValue(elementType, items)
+  }
+
   private parseType(): ParsedType {
+    if (this.match('STACK')) {
+      this.consume(
+        'LESS',
+        'Expected "<" after "stack"',
+      )
+
+      const primitiveType = this.parsePrimitiveType()
+
+      this.consume(
+        'GREATER',
+        'Expected ">" after stack element type',
+      )
+
+      return {
+        container: 'STACK',
+        primitiveType,
+      }
+    }
+
     if (this.match('PRIORITY_QUEUE')) {
       this.consume(
         'LESS',
@@ -988,6 +1071,7 @@ class Parser {
       || type === 'STRING_TYPE'
       || type === 'QUEUE'
       || type === 'PRIORITY_QUEUE'
+      || type === 'STACK'
     )
   }
 
@@ -1242,8 +1326,8 @@ class Parser {
         'Expected "=" after assignment target',
       )
 
-      if (this.isQueueOperationCallStart()) {
-        return this.parseQueueResultInstruction(
+      if (this.isDataStructureOperationCallStart()) {
+        return this.parseDataStructureResultInstruction(
           {
             type: 'ASSIGN',
             target: arrayTarget(
@@ -1268,8 +1352,8 @@ class Parser {
       'Expected "=" after assignment target',
     )
 
-    if (this.isQueueOperationCallStart()) {
-      return this.parseQueueResultInstruction(
+    if (this.isDataStructureOperationCallStart()) {
+      return this.parseDataStructureResultInstruction(
         {
           type: 'ASSIGN',
           target: variableTarget(name.lexeme),
@@ -1283,23 +1367,26 @@ class Parser {
     )
   }
 
-  private parseQueueOperationStatement(): Instruction {
-    const operation = this.parseQueueOperationCall()
+  private parseDataStructureOperationStatement(): Instruction {
+    const operation = this.parseDataStructureOperationCall()
 
     this.consume(
       'SEMICOLON',
-      'Expected ";" after queue operation',
+      'Expected ";" after data structure operation',
     )
 
-    if (operation.operation !== 'ENQUEUE') {
+    if (
+      operation.operation !== 'ENQUEUE'
+      && operation.operation !== 'PUSH'
+    ) {
       throw this.error(
         this.previous(),
-        `${queueMethodName(operation.operation)}() must be assigned to a variable`,
+        `${dataStructureMethodName(operation.operation)}() must be assigned to a variable`,
       )
     }
 
-    return queueOperationInstruction(
-      operation.queueName,
+    return dataStructureOperationInstruction(
+      operation.structureName,
       operation.operation,
       {
         argument: operation.argument,
@@ -1309,50 +1396,53 @@ class Parser {
     )
   }
 
-  private parseQueueResultInstruction(
-    resultTarget: QueueResultTarget,
+  private parseDataStructureResultInstruction(
+    resultTarget: DataStructureResultTarget,
   ): Instruction {
-    const operation = this.parseQueueOperationCall()
+    const operation = this.parseDataStructureOperationCall()
 
-    if (operation.operation === 'ENQUEUE') {
+    if (
+      operation.operation === 'ENQUEUE'
+      || operation.operation === 'PUSH'
+    ) {
       throw this.error(
         this.previous(),
-        'enqueue() does not return a value',
+        `${dataStructureMethodName(operation.operation)}() does not return a value`,
       )
     }
 
-    return queueOperationInstruction(
-      operation.queueName,
+    return dataStructureOperationInstruction(
+      operation.structureName,
       operation.operation,
       { resultTarget },
     )
   }
 
-  private parseQueueOperationCall(): {
-    readonly queueName: string
-    readonly operation: QueueOperation
+  private parseDataStructureOperationCall(): {
+    readonly structureName: string
+    readonly operation: DataStructureOperation
     readonly argument?: Expression
     readonly priorityArgument?: Expression
   } {
-    const queueName = this.consume(
+    const structureName = this.consume(
       'IDENTIFIER',
-      'Expected queue name',
+      'Expected data structure name',
     )
 
     this.consume(
       'DOT',
-      'Expected "." after queue name',
+      'Expected "." after data structure name',
     )
 
     const method = this.consume(
       'IDENTIFIER',
-      'Expected queue method name',
+      'Expected data structure method name',
     )
-    const operation = parseQueueOperationName(
+    const operation = parseDataStructureOperationName(
       method.lexeme,
       () => this.error(
         method,
-        `Unknown queue method "${method.lexeme}"`,
+        `Unknown data structure method "${method.lexeme}"`,
       ),
     )
 
@@ -1364,10 +1454,16 @@ class Parser {
     let argument: Expression | undefined
     let priorityArgument: Expression | undefined
 
-    if (operation === 'ENQUEUE') {
+    if (
+      operation === 'ENQUEUE'
+      || operation === 'PUSH'
+    ) {
       argument = this.parseExpression()
 
-      if (this.match('COMMA')) {
+      if (
+        operation === 'ENQUEUE'
+        && this.match('COMMA')
+      ) {
         priorityArgument = this.parseExpression()
       }
     } else if (!this.check('RIGHT_PAREN')) {
@@ -1383,14 +1479,14 @@ class Parser {
     )
 
     return {
-      queueName: queueName.lexeme,
+      structureName: structureName.lexeme,
       operation,
       argument,
       priorityArgument,
     }
   }
 
-  private isQueueOperationCallStart(): boolean {
+  private isDataStructureOperationCallStart(): boolean {
     return (
       this.check('IDENTIFIER')
       && this.checkNext('DOT')
@@ -1617,10 +1713,10 @@ function matchesPrimitiveType(
   )
 }
 
-function parseQueueOperationName(
+function parseDataStructureOperationName(
   methodName: string,
   createError: () => Error,
-): QueueOperation {
+): DataStructureOperation {
   switch (methodName) {
     case 'enqueue':
       return 'ENQUEUE'
@@ -1628,6 +1724,12 @@ function parseQueueOperationName(
       return 'DEQUEUE'
     case 'front':
       return 'FRONT'
+    case 'push':
+      return 'PUSH'
+    case 'pop':
+      return 'POP'
+    case 'top':
+      return 'TOP'
     case 'isEmpty':
       return 'IS_EMPTY'
     case 'size':
@@ -1637,8 +1739,8 @@ function parseQueueOperationName(
   }
 }
 
-function queueMethodName(
-  operation: QueueOperation,
+function dataStructureMethodName(
+  operation: DataStructureOperation,
 ): string {
   switch (operation) {
     case 'ENQUEUE':
@@ -1647,6 +1749,12 @@ function queueMethodName(
       return 'dequeue'
     case 'FRONT':
       return 'front'
+    case 'PUSH':
+      return 'push'
+    case 'POP':
+      return 'pop'
+    case 'TOP':
+      return 'top'
     case 'IS_EMPTY':
       return 'isEmpty'
     case 'SIZE':

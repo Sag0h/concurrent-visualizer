@@ -823,19 +823,19 @@ excepciones específicas del ejemplo.
     compartidas.
 -   [x] Definir operaciones mínimas de cola: insertar, extraer,
     consultar frente, tamaño y consultar vacío.
--   [ ] Incorporar pilas utilizables como variables locales o
+-   [x] Incorporar pilas utilizables como variables locales o
     compartidas.
--   [ ] Definir operaciones mínimas de pila: `push`, `pop`, `top`,
+-   [x] Definir operaciones mínimas de pila: `push`, `pop`, `top`,
     tamaño y consultar vacío.
 -   [x] Definir la granularidad atómica de operaciones sobre estructuras
     compartidas.
 -   [x] Integrar colas FIFO y de prioridad con `RuntimeValue`,
     snapshots, clonación, claves canónicas y exploración de M9.
--   [ ] Integrar pilas con `RuntimeValue`, snapshots, clonación, claves
+-   [x] Integrar pilas con `RuntimeValue`, snapshots, clonación, claves
     canónicas y exploración de M9.
 -   [x] Agregar tests de colas FIFO y de prioridad para parser, runtime,
     snapshots, clonación e interleavings.
--   [ ] Agregar tests equivalentes para pilas.
+-   [x] Agregar tests equivalentes para pilas.
 -   [x] Priorizar colas: ya son necesarias para representar ejercicios
     académicos sin deformar el pseudocódigo.
 -   [x] Incorporar colas de prioridad como estructura separada.

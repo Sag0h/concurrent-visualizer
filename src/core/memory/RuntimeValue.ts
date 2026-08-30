@@ -25,11 +25,18 @@ export interface PriorityQueueValue {
   readonly items: PriorityQueueItem[]
 }
 
+export interface StackValue {
+  readonly kind: 'STACK'
+  readonly elementType: PrimitiveType
+  readonly items: PrimitiveValue[]
+}
+
 export type RuntimeValue =
   | PrimitiveValue
   | PrimitiveValue[]
   | QueueValue
   | PriorityQueueValue
+  | StackValue
 
 export function createQueueValue(
   elementType: PrimitiveType,
@@ -72,6 +79,21 @@ export function createPriorityQueueValue(
   return queue
 }
 
+export function createStackValue(
+  elementType: PrimitiveType,
+  items: PrimitiveValue[] = [],
+): StackValue {
+  items.forEach((item) => {
+    assertPrimitiveType(item, elementType, 'Stack')
+  })
+
+  return {
+    kind: 'STACK',
+    elementType,
+    items: structuredClone(items),
+  }
+}
+
 export function isQueueValue(
   value: unknown,
 ): value is QueueValue {
@@ -110,10 +132,35 @@ export function isPriorityQueueValue(
   )
 }
 
+export function isStackValue(
+  value: unknown,
+): value is StackValue {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'kind' in value
+    && value.kind === 'STACK'
+    && 'elementType' in value
+    && (
+      value.elementType === 'int'
+      || value.elementType === 'bool'
+      || value.elementType === 'string'
+    )
+    && 'items' in value
+    && Array.isArray(value.items)
+  )
+}
+
 export function isAnyQueueValue(
   value: unknown,
 ): value is QueueValue | PriorityQueueValue {
   return isQueueValue(value) || isPriorityQueueValue(value)
+}
+
+export function isDataStructureValue(
+  value: unknown,
+): value is QueueValue | PriorityQueueValue | StackValue {
+  return isAnyQueueValue(value) || isStackValue(value)
 }
 
 export function enqueuePriorityItem(
@@ -181,6 +228,10 @@ export function describeRuntimeType(
 
   if (isPriorityQueueValue(value)) {
     return `priority_queue<${value.elementType}>`
+  }
+
+  if (isStackValue(value)) {
+    return `stack<${value.elementType}>`
   }
 
   if (typeof value === 'number') {

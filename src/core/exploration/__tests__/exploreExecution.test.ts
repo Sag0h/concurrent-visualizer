@@ -6,6 +6,7 @@ import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
 import {
   isPriorityQueueValue,
   isQueueValue,
+  isStackValue,
 } from '../../memory/RuntimeValue'
 import type { ExplorationProperty } from '../ExplorationProperty'
 import { createSemanticStateKey } from '../createSemanticStateKey'
@@ -20,6 +21,50 @@ function createEngine(source: string): SimulationEngine {
 }
 
 describe('exploreExecution', () => {
+  it('explores stack contents as semantic state', () => {
+    const engine = createEngine(`
+      shared stack<int> values = stack[1];
+
+      process Consumer {
+        int value = values.pop();
+      }
+
+      process Observer {
+        bool untouched = true;
+      }
+    `)
+    const property: ExplorationProperty<
+      'STACK_EMPTY',
+      { readonly stackName: string }
+    > = {
+      kind: 'STACK_EMPTY',
+      evaluate(state) {
+        const stack = state.program.sharedMemory.values
+
+        return isStackValue(stack)
+          && stack.items.length === 0
+          ? { stackName: 'values' }
+          : undefined
+      },
+    }
+
+    const result = exploreExecution(
+      engine,
+      { maxDepth: 3, maxStates: 10 },
+      property,
+    )
+
+    expect(result.status).toBe('FOUND')
+    expect(result.counterexample).toEqual(
+      expect.objectContaining({
+        depth: 1,
+        processChoices: ['Consumer'],
+        diagnostic: { stackName: 'values' },
+      }),
+    )
+    expect(engine.getState().stepCount).toBe(0)
+  })
+
   it('explores priority queue contents as semantic state', () => {
     const engine = createEngine(`
       shared priority_queue<int> jobs = priority_queue[(1, 4)];

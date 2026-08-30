@@ -2,6 +2,61 @@ import { describe, expect, it } from 'vitest'
 import { parseProgram } from '../parseProgram'
 
 describe('parseProgram', () => {
+  it('parses shared and local stacks with all operations', () => {
+    const program = parseProgram(`
+      shared stack<int> values = stack[10, 20];
+
+      process Worker {
+        stack<string> local = stack["bottom"];
+        values.push(30);
+        int observed = values.top();
+        observed = values.pop();
+        int size = values.size();
+        bool empty = values.isEmpty();
+      }
+    `)
+
+    expect(program.sharedMemory.values).toEqual({
+      kind: 'STACK',
+      elementType: 'int',
+      items: [10, 20],
+    })
+    expect(program.processes[0].instructions[0]).toMatchObject({
+      type: 'DECLARE',
+      initialValue: {
+        type: 'LITERAL',
+        value: {
+          kind: 'STACK',
+          elementType: 'string',
+          items: ['bottom'],
+        },
+      },
+    })
+    expect(program.processes[0].instructions.slice(1)).toMatchObject([
+      {
+        type: 'DATA_STRUCTURE_OPERATION',
+        structureName: 'values',
+        operation: 'PUSH',
+      },
+      {
+        type: 'DATA_STRUCTURE_OPERATION',
+        operation: 'TOP',
+      },
+      {
+        type: 'DATA_STRUCTURE_OPERATION',
+        operation: 'POP',
+      },
+      {
+        type: 'DATA_STRUCTURE_OPERATION',
+        operation: 'SIZE',
+      },
+      {
+        type: 'DATA_STRUCTURE_OPERATION',
+        operation: 'IS_EMPTY',
+      },
+    ])
+  })
+
   it('parses stable priority queues and their enqueue priority', () => {
     const program = parseProgram(`
       shared priority_queue<string> jobs =
@@ -21,7 +76,7 @@ describe('parseProgram', () => {
       ],
     })
     expect(program.processes[0].instructions[0]).toMatchObject({
-      type: 'QUEUE_OPERATION',
+      type: 'DATA_STRUCTURE_OPERATION',
       operation: 'ENQUEUE',
       argument: {
         type: 'LITERAL',
@@ -80,12 +135,12 @@ describe('parseProgram', () => {
       program.processes[0].instructions.slice(1),
     ).toMatchObject([
       {
-        type: 'QUEUE_OPERATION',
-        queueName: 'jobs',
+        type: 'DATA_STRUCTURE_OPERATION',
+        structureName: 'jobs',
         operation: 'ENQUEUE',
       },
       {
-        type: 'QUEUE_OPERATION',
+        type: 'DATA_STRUCTURE_OPERATION',
         operation: 'FRONT',
         resultTarget: {
           type: 'DECLARE',
@@ -93,14 +148,14 @@ describe('parseProgram', () => {
         },
       },
       {
-        type: 'QUEUE_OPERATION',
+        type: 'DATA_STRUCTURE_OPERATION',
         operation: 'DEQUEUE',
         resultTarget: {
           type: 'ASSIGN',
         },
       },
       {
-        type: 'QUEUE_OPERATION',
+        type: 'DATA_STRUCTURE_OPERATION',
         operation: 'IS_EMPTY',
         resultTarget: {
           type: 'DECLARE',
@@ -108,7 +163,7 @@ describe('parseProgram', () => {
         },
       },
       {
-        type: 'QUEUE_OPERATION',
+        type: 'DATA_STRUCTURE_OPERATION',
         operation: 'SIZE',
         resultTarget: {
           type: 'DECLARE',
@@ -127,14 +182,14 @@ describe('parseProgram', () => {
     )
   })
 
-  it('requires scalar declarations for queue operation results', () => {
+  it('requires scalar declarations for data structure operation results', () => {
     expect(() => parseProgram(`
       process Worker {
         queue<int> jobs = queue[1];
         queue<int> invalid = jobs.dequeue();
       }
     `)).toThrow(
-      'Queue operation results require a primitive scalar declaration',
+      'Data structure operation results require a primitive scalar declaration',
     )
   })
 

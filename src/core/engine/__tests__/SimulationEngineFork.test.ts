@@ -8,6 +8,7 @@ import { SimulationEngine } from '../SimulationEngine'
 import {
   isPriorityQueueValue,
   isQueueValue,
+  isStackValue,
 } from '../../memory/RuntimeValue'
 
 function createEngine(
@@ -59,6 +60,33 @@ function runExplicitly(
 }
 
 describe('SimulationEngine fork', () => {
+  it('clones shared stacks without sharing their items', () => {
+    const engine = createEngine(`
+      shared stack<int> values = stack[1];
+
+      process Producer {
+        values.push(2);
+      }
+    `)
+    const fork = engine.fork()
+
+    executeSelected(fork, 'Producer')
+
+    const originalStack = engine.getState().program.sharedMemory.values
+    const forkStack = fork.getState().program.sharedMemory.values
+
+    if (
+      !isStackValue(originalStack)
+      || !isStackValue(forkStack)
+    ) {
+      throw new Error('Expected values to be a stack')
+    }
+
+    expect(originalStack.items).toEqual([1])
+    expect(forkStack.items).toEqual([1, 2])
+    expect(originalStack.items).not.toBe(forkStack.items)
+  })
+
   it('clones shared priority queues without sharing their entries', () => {
     const engine = createEngine(`
       shared priority_queue<int> jobs = priority_queue[(1, 1)];

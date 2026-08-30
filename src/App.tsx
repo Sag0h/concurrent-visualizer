@@ -7,6 +7,7 @@ import { parseProgram } from './core/language/parseProgram'
 import {
   isPriorityQueueValue,
   isQueueValue,
+  isStackValue,
   type RuntimeValue,
 } from './core/memory/RuntimeValue'
 import { createScheduler } from './core/scheduler/createScheduler'
@@ -1531,10 +1532,10 @@ function App() {
                                     >
                                       {entry.awaitStatus}
                                     </span>
-                                  ) : entry.queueEvent ? (
-                                    <span className="queue-operation-status">
-                                      {entry.queueEvent.scope}
-                                      {` · ${entry.queueEvent.queueKind} · ATOMIC`}
+                                  ) : entry.dataStructureEvent ? (
+                                    <span className="data-structure-operation-status">
+                                      {entry.dataStructureEvent.scope}
+                                      {` · ${entry.dataStructureEvent.structureKind} · ATOMIC`}
                                     </span>
                                   ) : (
                                     '—'
@@ -2022,6 +2023,14 @@ function formatValue(
     return `priority_queue<${value.elementType}> [highest → ${value.items
       .map((item) => `${String(item.value)} (p=${item.priority})`)
       .join(', ')} ← lowest]`
+  }
+
+  if (isStackValue(value)) {
+    if (value.items.length === 0) {
+      return `stack<${value.elementType}> [empty]`
+    }
+
+    return `stack<${value.elementType}> [bottom → ${value.items.join(', ')} ← top]`
   }
 
   if (Array.isArray(value)) {

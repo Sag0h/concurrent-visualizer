@@ -25,8 +25,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** completar M10.1 sobre la base de las colas FIFO y
-colas de prioridad estables ya implementadas: pilas. Las assertions
+**Próximo objetivo:** completar M10.1 con procesos parametrizados o por
+rango, por ejemplo `process Controlador[i:0..3]`. Las colas FIFO, colas de
+prioridad estables y pilas ya están implementadas. Las assertions
 explícitas se evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
@@ -1902,7 +1903,8 @@ posponen para no introducir efectos mutables inadvertidos en el evaluador
 general.
 
 Cada operación de cola consume un step atómico y registra un
-`QueueExecutionEvent` con cola, scope, valor y tamaños anterior/posterior.
+`DataStructureExecutionEvent` con estructura, scope, valor y tamaños
+anterior/posterior.
 La UI muestra el contenido ordenado desde `front` hacia `back` y distingue
 estas operaciones en el historial.
 
@@ -1913,8 +1915,7 @@ canónica utilizada por M9. La exploración puede distinguir contenidos y
 
 Las pruebas cubren tokenizer/parser, orden FIFO, colas locales aisladas,
 dequeue compartido atómico, errores por vacío o tipo incompatible,
-snapshots, forks y exploración. El próximo paso de M10.1 es definir e
-implementar pilas reutilizando la misma base.
+snapshots, forks y exploración.
 
 Las colas de prioridad se representan mediante `PriorityQueueValue` y
 la sintaxis `priority_queue<T>`. Cada entrada contiene valor y prioridad
@@ -1931,13 +1932,25 @@ La implementación quedó separada en los commits `02ce345` (colas FIFO) y
 `32d8a88` (colas de prioridad). Al cerrar esta vertical, la suite completa
 contaba con 234 tests aprobados, además de lint y build correctos.
 
+## 2026-08-30 --- M10.1: pilas LIFO
+
+Se incorporaron pilas primitivas locales y compartidas mediante
+`stack<T>` y literales `stack[...]` ordenados desde el fondo hacia la
+cima. `push`, `pop`, `top`, `size` e `isEmpty` son operaciones atómicas;
+`top` no modifica la estructura y `pop` elimina el elemento superior.
+
+La instrucción y el evento internos se generalizaron a operaciones de
+estructuras de datos. Esto permite compartir las consultas comunes sin
+tratar incorrectamente una pila como una cola, manteniendo validaciones
+de métodos específicas para cada ADT.
+
+La integración incluye visualización, historial, snapshots, forks,
+claves canónicas y exploración. La suite completa quedó en 247 tests,
+con lint y build correctos.
+
 ### Pendiente inmediato de M10.1
 
-1.  Incorporar pilas locales y compartidas con `push`, `pop`, `top`,
-    `size` e `isEmpty`.
-2.  Integrarlas con snapshots, forks, claves canónicas, exploración,
-    historial y visualización.
-3.  Incorporar procesos parametrizados o por rango, por ejemplo
+1.  Incorporar procesos parametrizados o por rango, por ejemplo
     `process Controlador[i:0..3]`.
 
 Después se podrá avanzar con M10.2: registros/campos, métodos educativos

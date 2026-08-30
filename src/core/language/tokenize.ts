@@ -9,6 +9,7 @@ const keywords: Record<string, TokenType> = {
   string: 'STRING_TYPE',
   queue: 'QUEUE',
   priority_queue: 'PRIORITY_QUEUE',
+  stack: 'STACK',
   true: 'BOOLEAN',
   false: 'BOOLEAN',
   if: 'IF',

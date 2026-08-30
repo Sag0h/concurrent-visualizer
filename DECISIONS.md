@@ -1113,6 +1113,12 @@ cola: retornan el valor primitivo, no la prioridad. Esto permite cambiar
 la política de orden sin obligar al consumidor a manipular metadata de
 la estructura.
 
+La tercera vertical incorpora `StackValue` y sintaxis `stack<T>`. El
+literal se escribe desde el fondo hacia la cima; el último elemento es la
+cima observable. `push`, `pop`, `top`, `size` e `isEmpty` reutilizan la
+misma instrucción interna y el mismo evento estructurado que las colas,
+pero el runtime valida que no se mezclen métodos propios de cada ADT.
+
 Las acciones externas necesarias sólo para expresar el algoritmo podrán
 ser operaciones simuladas. Por ejemplo, `print(valor)` podrá registrar
 que la acción ocurrió sin producir I/O real. Deberán ser deterministas y

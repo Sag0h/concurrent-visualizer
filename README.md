@@ -74,11 +74,12 @@ contexto. La búsqueda de exclusión mutua sólo acepta solapamientos
 observados con mutex incompatibles; una advertencia `POTENTIAL_RACE` por
 sí sola no se presenta como infracción demostrada.
 
-M10 incluye colas FIFO y colas de prioridad estables de valores
-primitivos. Pueden declararse como memoria local o compartida y ofrecen
-`enqueue`, `dequeue`, `front`, `size` e `isEmpty`. En una
+M10 incluye colas FIFO, colas de prioridad estables y pilas de valores
+primitivos. Pueden declararse como memoria local o compartida. Las colas
+ofrecen `enqueue`, `dequeue`, `front`, `size` e `isEmpty`. En una
 `priority_queue<T>`, el número más alto tiene mayor prioridad y los
-empates conservan FIFO. Cada operación es un paso atómico, queda
+empates conservan FIFO. Las pilas ofrecen `push`, `pop`, `top`, `size` e
+`isEmpty`, con orden LIFO. Cada operación es un paso atómico, queda
 registrada en el historial y sus contenidos participan en snapshots,
 forks y exploración.
 
@@ -672,10 +673,10 @@ código.
 
 ## Extensiones de lenguaje previstas
 
-Las colas FIFO y las colas de prioridad estables ya permiten expresar
+Las colas FIFO, las colas de prioridad estables y las pilas ya permiten expresar
 directamente estructuras utilizadas en ejercicios académicos, sin
-adaptarlas artificialmente con arrays e índices. La próxima estructura
-del roadmap es la pila, seguida por los procesos parametrizados.
+adaptarlas artificialmente con arrays e índices. El próximo objetivo del
+lenguaje son los procesos parametrizados.
 
 Como evolución posterior se evaluarán registros/estructuras u objetos
 educativos con campos y métodos simples, además de operaciones simuladas
@@ -740,7 +741,7 @@ En curso:
 M10.1  Estructuras de datos académicas
        ✓ Colas FIFO
        ✓ Colas de prioridad estables
-       → Pilas
+       ✓ Pilas
        → Procesos parametrizados
 ```
 

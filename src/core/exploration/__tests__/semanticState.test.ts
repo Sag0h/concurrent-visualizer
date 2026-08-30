@@ -245,6 +245,28 @@ describe('semantic exploration state', () => {
     )
   })
 
+  it('includes stack contents and order in the semantic key', () => {
+    const first = createEngine(`
+      shared stack<int> values = stack[1, 2];
+      process Worker { }
+    `)
+    const second = createEngine(`
+      shared stack<int> values = stack[2, 1];
+      process Worker { }
+    `)
+    const third = createEngine(`
+      shared stack<int> values = stack[1];
+      process Worker { }
+    `)
+
+    expect(createSemanticStateKey(first.getState())).not.toBe(
+      createSemanticStateKey(second.getState()),
+    )
+    expect(createSemanticStateKey(first.getState())).not.toBe(
+      createSemanticStateKey(third.getState()),
+    )
+  })
+
   it('detects a repeated semantic state independently of its trace', () => {
     const engine = createEngine(`
       process Spinner {

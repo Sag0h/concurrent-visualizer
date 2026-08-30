@@ -16,9 +16,9 @@ import type {
   AtomicInstruction,
   SemaphoreVInstruction,
   SemaphorePInstruction,
-  QueueOperationInstruction,
-  QueueOperation,
-  QueueResultTarget,
+  DataStructureOperationInstruction,
+  DataStructureOperation,
+  DataStructureResultTarget,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -214,18 +214,18 @@ export function semaphoreVInstruction(
   }
 }
 
-export function queueOperationInstruction(
-  queueName: string,
-  operation: QueueOperation,
+export function dataStructureOperationInstruction(
+  structureName: string,
+  operation: DataStructureOperation,
   options: {
     readonly argument?: Expression
     readonly priorityArgument?: Expression
-    readonly resultTarget?: QueueResultTarget
+    readonly resultTarget?: DataStructureResultTarget
   } = {},
-): QueueOperationInstruction {
+): DataStructureOperationInstruction {
   return {
-    type: 'QUEUE_OPERATION',
-    queueName,
+    type: 'DATA_STRUCTURE_OPERATION',
+    structureName,
     operation,
     argument: options.argument,
     priorityArgument: options.priorityArgument,

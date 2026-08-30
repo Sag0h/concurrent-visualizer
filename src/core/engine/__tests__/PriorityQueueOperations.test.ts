@@ -72,11 +72,11 @@ describe('stable priority queue operations', () => {
     expect(queue.items).toEqual([])
 
     const firstEvent = engine.getState().history
-      .find((event) => event.queueEvent)
+      .find((event) => event.dataStructureEvent)
 
-    expect(firstEvent?.queueEvent).toMatchObject({
+    expect(firstEvent?.dataStructureEvent).toMatchObject({
       operation: 'ENQUEUE',
-      queueKind: 'PRIORITY',
+      structureKind: 'PRIORITY_QUEUE',
       priority: 1,
       value: 'low',
       sizeBefore: 0,

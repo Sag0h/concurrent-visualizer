@@ -10,6 +10,7 @@ export type TokenType =
   | 'STRING_TYPE'
   | 'QUEUE'
   | 'PRIORITY_QUEUE'
+  | 'STACK'
   | 'LEFT_BRACE'
   | 'RIGHT_BRACE'
   | 'LEFT_BRACKET'

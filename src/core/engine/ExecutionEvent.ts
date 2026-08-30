@@ -24,15 +24,21 @@ export interface LoopConditionExecutionEvent {
   readonly bodyIsEmpty: boolean
 }
 
-export interface QueueExecutionEvent {
+export interface DataStructureExecutionEvent {
   readonly operation:
     | 'ENQUEUE'
     | 'DEQUEUE'
     | 'FRONT'
+    | 'PUSH'
+    | 'POP'
+    | 'TOP'
     | 'IS_EMPTY'
     | 'SIZE'
-  readonly queueName: string
-  readonly queueKind: 'FIFO' | 'PRIORITY'
+  readonly structureName: string
+  readonly structureKind:
+    | 'FIFO_QUEUE'
+    | 'PRIORITY_QUEUE'
+    | 'STACK'
   readonly scope: 'LOCAL' | 'SHARED'
   readonly sizeBefore: number
   readonly sizeAfter: number
@@ -48,5 +54,5 @@ export interface ExecutionEvent {
   readonly awaitStatus?: AwaitEventStatus
   readonly semaphoreEvent?: SemaphoreExecutionEvent
   readonly loopConditionEvent?: LoopConditionExecutionEvent
-  readonly queueEvent?: QueueExecutionEvent
+  readonly dataStructureEvent?: DataStructureExecutionEvent
 }

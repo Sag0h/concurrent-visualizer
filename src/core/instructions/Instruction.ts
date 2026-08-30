@@ -95,14 +95,17 @@ export interface SemaphoreVInstruction {
   readonly semaphoreName: string
 }
 
-export type QueueOperation =
+export type DataStructureOperation =
   | 'ENQUEUE'
   | 'DEQUEUE'
   | 'FRONT'
+  | 'PUSH'
+  | 'POP'
+  | 'TOP'
   | 'IS_EMPTY'
   | 'SIZE'
 
-export type QueueResultTarget =
+export type DataStructureResultTarget =
   | {
       readonly type: 'DECLARE'
       readonly scope: 'LOCAL'
@@ -113,13 +116,13 @@ export type QueueResultTarget =
       readonly target: AssignmentTarget
     }
 
-export interface QueueOperationInstruction {
-  readonly type: 'QUEUE_OPERATION'
-  readonly queueName: string
-  readonly operation: QueueOperation
+export interface DataStructureOperationInstruction {
+  readonly type: 'DATA_STRUCTURE_OPERATION'
+  readonly structureName: string
+  readonly operation: DataStructureOperation
   readonly argument?: Expression
   readonly priorityArgument?: Expression
-  readonly resultTarget?: QueueResultTarget
+  readonly resultTarget?: DataStructureResultTarget
 }
 
 export type Instruction =
@@ -140,4 +143,4 @@ export type Instruction =
   | AwaitInstruction
   | SemaphorePInstruction
   | SemaphoreVInstruction
-  | QueueOperationInstruction
+  | DataStructureOperationInstruction

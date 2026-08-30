@@ -4,18 +4,20 @@ import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
-import type { CallInstruction, ForeachInstruction, IfInstruction, Instruction, QueueOperationInstruction, WhileInstruction } from '../instructions/Instruction'
+import type { CallInstruction, DataStructureOperationInstruction, ForeachInstruction, IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import {
   assertPriority,
   assertPrimitiveType,
   enqueuePriorityItem,
-  isAnyQueueValue,
+  isDataStructureValue,
   isPriorityQueueValue,
+  isStackValue,
   type PriorityQueueValue,
   type PrimitiveValue,
   type QueueValue,
   type RuntimeValue,
+  type StackValue,
 } from '../memory/RuntimeValue'
 import type { PendingInstruction } from '../process/PendingInstruction'
 
@@ -33,7 +35,7 @@ import { summarizeMemoryAccessConflicts } from './summarizeMemoryAccessConflicts
 import type {
   ExecutionEvent,
   LoopConditionExecutionEvent,
-  QueueExecutionEvent,
+  DataStructureExecutionEvent,
   SemaphoreExecutionEvent,
 } from './ExecutionEvent'
 import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
@@ -229,8 +231,8 @@ export class SimulationEngine {
     let loopConditionEvent:
       LoopConditionExecutionEvent | undefined
 
-    let queueEvent:
-      QueueExecutionEvent | undefined
+    let dataStructureEvent:
+      DataStructureExecutionEvent | undefined
 
     switch (instruction.type) {
       case 'NO_OP':
@@ -776,14 +778,14 @@ export class SimulationEngine {
         break
       }
 
-      case 'QUEUE_OPERATION': {
+      case 'DATA_STRUCTURE_OPERATION': {
         const result =
-          this.executeQueueOperation(
+          this.executeDataStructureOperation(
             process,
             instruction,
           )
 
-        queueEvent = result.event
+        dataStructureEvent = result.event
         executionDescription =
           result.description
 
@@ -799,7 +801,7 @@ export class SimulationEngine {
       awaitStatus,
       semaphoreEvent,
       loopConditionEvent,
-      queueEvent,
+      dataStructureEvent,
       description: executionDescription,
     }
 
@@ -2952,7 +2954,7 @@ export class SimulationEngine {
 
     if (
       Array.isArray(value)
-      || isAnyQueueValue(value)
+      || isDataStructureValue(value)
     ) {
       throw new Error(
         'Nested collection values are not supported yet',
@@ -3171,7 +3173,7 @@ export class SimulationEngine {
 
     if (
       Array.isArray(value)
-      || isAnyQueueValue(value)
+      || isDataStructureValue(value)
     ) {
       throw new Error(
         'Nested collection values are not supported yet',
@@ -3273,118 +3275,68 @@ export class SimulationEngine {
     }
   }
 
-  private executeQueueOperation(
+  private executeDataStructureOperation(
     process: Process,
-    instruction: QueueOperationInstruction,
+    instruction: DataStructureOperationInstruction,
   ): {
-    readonly event: QueueExecutionEvent
+    readonly event: DataStructureExecutionEvent
     readonly description: string
   } {
-    const resolved = this.resolveQueue(
+    const resolved = this.resolveDataStructure(
       process,
-      instruction.queueName,
+      instruction.structureName,
     )
+    const operationReturnsValue =
+      instruction.operation !== 'ENQUEUE'
+      && instruction.operation !== 'PUSH'
 
-    if (instruction.operation !== 'ENQUEUE') {
-      this.validateQueueResultTarget(
+    if (operationReturnsValue) {
+      this.validateDataStructureResultTarget(
         process,
         instruction,
       )
     }
 
-    const sizeBefore = resolved.queue.items.length
+    const sizeBefore = resolved.structure.items.length
     let value: PrimitiveValue
     let priority: number | undefined
 
     switch (instruction.operation) {
       case 'ENQUEUE': {
-        if (!instruction.argument) {
-          throw new Error(
-            'enqueue() requires one argument',
-          )
+        if (isStackValue(resolved.structure)) {
+          throw new Error('enqueue() requires a queue')
         }
 
-        if (
-          this.containsFunctionCall(
-            instruction.argument,
-          )
-        ) {
-          throw new Error(
-            'Function calls inside enqueue() are not supported yet',
-          )
-        }
-
-        if (
-          this.findNextSharedMemoryRead(
-            process,
-            instruction.argument,
-          )
-        ) {
-          throw new Error(
-            'Shared-memory reads inside enqueue() are not supported yet; copy the value to local memory first',
-          )
-        }
-
-        const evaluated = evaluateExpression(
-          instruction.argument,
-          {
-            localMemory:
-              this.getActiveLocalMemory(process),
-            sharedMemory:
-              this.state.program.sharedMemory,
-          },
+        const evaluated = this.evaluateDataStructureArgument(
+          process,
+          instruction,
+          'enqueue',
         )
-
         assertPrimitiveType(
           evaluated,
-          resolved.queue.elementType,
-          isPriorityQueueValue(resolved.queue)
+          resolved.structure.elementType,
+          isPriorityQueueValue(resolved.structure)
             ? 'PriorityQueue'
             : 'Queue',
         )
-
         value = evaluated
 
-        if (isPriorityQueueValue(resolved.queue)) {
+        if (isPriorityQueueValue(resolved.structure)) {
           if (!instruction.priorityArgument) {
             throw new Error(
               'priority_queue.enqueue() requires a value and an integer priority',
             )
           }
 
-          if (
-            this.containsFunctionCall(
-              instruction.priorityArgument,
-            )
-          ) {
-            throw new Error(
-              'Function calls inside enqueue() are not supported yet',
-            )
-          }
-
-          if (
-            this.findNextSharedMemoryRead(
+          const evaluatedPriority =
+            this.evaluateDataStructureExpression(
               process,
               instruction.priorityArgument,
+              'enqueue',
             )
-          ) {
-            throw new Error(
-              'Shared-memory reads inside enqueue() are not supported yet; copy the value to local memory first',
-            )
-          }
-
-          const evaluatedPriority = evaluateExpression(
-            instruction.priorityArgument,
-            {
-              localMemory:
-                this.getActiveLocalMemory(process),
-              sharedMemory:
-                this.state.program.sharedMemory,
-            },
-          )
           assertPriority(evaluatedPriority)
           priority = evaluatedPriority
-          enqueuePriorityItem(resolved.queue, {
+          enqueuePriorityItem(resolved.structure, {
             value,
             priority,
           })
@@ -3395,20 +3347,55 @@ export class SimulationEngine {
             )
           }
 
-          resolved.queue.items.push(value)
+          resolved.structure.items.push(value)
         }
+
         this.advanceProcess(process)
         break
       }
 
-      case 'DEQUEUE': {
-        value = this.requireQueueFront(
-          instruction.queueName,
-          resolved.queue,
-          'dequeue',
+      case 'PUSH': {
+        if (!isStackValue(resolved.structure)) {
+          throw new Error('push() requires a stack')
+        }
+
+        const evaluated = this.evaluateDataStructureArgument(
+          process,
+          instruction,
+          'push',
         )
-        resolved.queue.items.shift()
-        this.completeQueueResult(
+        assertPrimitiveType(
+          evaluated,
+          resolved.structure.elementType,
+          'Stack',
+        )
+        value = evaluated
+        resolved.structure.items.push(value)
+        this.advanceProcess(process)
+        break
+      }
+
+      case 'DEQUEUE':
+      case 'FRONT': {
+        if (isStackValue(resolved.structure)) {
+          throw new Error(
+            `${dataStructureMethodName(instruction.operation)}() requires a queue`,
+          )
+        }
+
+        value = this.requireQueueFront(
+          instruction.structureName,
+          resolved.structure,
+          instruction.operation === 'DEQUEUE'
+            ? 'dequeue'
+            : 'front',
+        )
+
+        if (instruction.operation === 'DEQUEUE') {
+          resolved.structure.items.shift()
+        }
+
+        this.completeDataStructureResult(
           process,
           instruction,
           value,
@@ -3416,13 +3403,27 @@ export class SimulationEngine {
         break
       }
 
-      case 'FRONT': {
-        value = this.requireQueueFront(
-          instruction.queueName,
-          resolved.queue,
-          'front',
+      case 'POP':
+      case 'TOP': {
+        if (!isStackValue(resolved.structure)) {
+          throw new Error(
+            `${dataStructureMethodName(instruction.operation)}() requires a stack`,
+          )
+        }
+
+        value = this.requireStackTop(
+          instruction.structureName,
+          resolved.structure,
+          instruction.operation === 'POP'
+            ? 'pop'
+            : 'top',
         )
-        this.completeQueueResult(
+
+        if (instruction.operation === 'POP') {
+          resolved.structure.items.pop()
+        }
+
+        this.completeDataStructureResult(
           process,
           instruction,
           value,
@@ -3431,8 +3432,8 @@ export class SimulationEngine {
       }
 
       case 'IS_EMPTY': {
-        value = resolved.queue.items.length === 0
-        this.completeQueueResult(
+        value = resolved.structure.items.length === 0
+        this.completeDataStructureResult(
           process,
           instruction,
           value,
@@ -3441,8 +3442,8 @@ export class SimulationEngine {
       }
 
       case 'SIZE': {
-        value = resolved.queue.items.length
-        this.completeQueueResult(
+        value = resolved.structure.items.length
+        this.completeDataStructureResult(
           process,
           instruction,
           value,
@@ -3451,76 +3452,75 @@ export class SimulationEngine {
       }
     }
 
-    const sizeAfter = resolved.queue.items.length
-    const method = queueMethodName(
+    const sizeAfter = resolved.structure.items.length
+    const method = dataStructureMethodName(
       instruction.operation,
     )
-    const renderedValue =
-      JSON.stringify(value)
+    const renderedValue = JSON.stringify(value)
+    const isInsertion =
+      instruction.operation === 'ENQUEUE'
+      || instruction.operation === 'PUSH'
 
     return {
       event: {
         operation: instruction.operation,
-        queueName: instruction.queueName,
-        queueKind: isPriorityQueueValue(resolved.queue)
-          ? 'PRIORITY'
-          : 'FIFO',
+        structureName: instruction.structureName,
+        structureKind: isStackValue(resolved.structure)
+          ? 'STACK'
+          : isPriorityQueueValue(resolved.structure)
+            ? 'PRIORITY_QUEUE'
+            : 'FIFO_QUEUE',
         scope: resolved.scope,
         sizeBefore,
         sizeAfter,
         value,
         priority,
       },
-      description: instruction.operation === 'ENQUEUE'
-        ? `${instruction.queueName}.${method}(${renderedValue}${priority === undefined ? '' : `, ${priority}`}): size ${sizeBefore} -> ${sizeAfter}`
-        : `${instruction.queueName}.${method}() = ${renderedValue}: size ${sizeBefore} -> ${sizeAfter}`,
+      description: isInsertion
+        ? `${instruction.structureName}.${method}(${renderedValue}${priority === undefined ? '' : `, ${priority}`}): size ${sizeBefore} -> ${sizeAfter}`
+        : `${instruction.structureName}.${method}() = ${renderedValue}: size ${sizeBefore} -> ${sizeAfter}`,
     }
   }
 
-  private resolveQueue(
+  private resolveDataStructure(
     process: Process,
-    queueName: string,
+    structureName: string,
   ): {
-    readonly queue: QueueValue | PriorityQueueValue
+    readonly structure:
+      | QueueValue
+      | PriorityQueueValue
+      | StackValue
     readonly scope: 'LOCAL' | 'SHARED'
   } {
-    const localMemory =
-      this.getActiveLocalMemory(process)
+    const localMemory = this.getActiveLocalMemory(process)
 
-    if (queueName in localMemory) {
-      const value = localMemory[queueName]
+    if (structureName in localMemory) {
+      const value = localMemory[structureName]
 
-      if (!isAnyQueueValue(value)) {
+      if (!isDataStructureValue(value)) {
         throw new Error(
-          `Variable "${queueName}" is not a queue`,
+          `Variable "${structureName}" is not a supported data structure`,
         )
       }
 
-      return {
-        queue: value,
-        scope: 'LOCAL',
-      }
+      return { structure: value, scope: 'LOCAL' }
     }
 
-    const value =
-      this.state.program.sharedMemory[queueName]
+    const value = this.state.program.sharedMemory[structureName]
 
     if (value === undefined) {
       throw new Error(
-        `Queue "${queueName}" is not defined`,
+        `Data structure "${structureName}" is not defined`,
       )
     }
 
-    if (!isAnyQueueValue(value)) {
+    if (!isDataStructureValue(value)) {
       throw new Error(
-        `Variable "${queueName}" is not a queue`,
+        `Variable "${structureName}" is not a supported data structure`,
       )
     }
 
-    return {
-      queue: value,
-      scope: 'SHARED',
-    }
+    return { structure: value, scope: 'SHARED' }
   }
 
   private requireQueueFront(
@@ -3551,15 +3551,72 @@ export class SimulationEngine {
     return value
   }
 
-  private completeQueueResult(
+  private requireStackTop(
+    stackName: string,
+    stack: StackValue,
+    method: 'pop' | 'top',
+  ): PrimitiveValue {
+    const value = stack.items.at(-1)
+
+    if (value === undefined) {
+      throw new Error(
+        `Stack "${stackName}" is empty; ${method}() cannot continue`,
+      )
+    }
+
+    return value
+  }
+
+  private evaluateDataStructureArgument(
     process: Process,
-    instruction: QueueOperationInstruction,
+    instruction: DataStructureOperationInstruction,
+    method: 'enqueue' | 'push',
+  ): RuntimeValue {
+    if (!instruction.argument) {
+      throw new Error(`${method}() requires one argument`)
+    }
+
+    return this.evaluateDataStructureExpression(
+      process,
+      instruction.argument,
+      method,
+    )
+  }
+
+  private evaluateDataStructureExpression(
+    process: Process,
+    expression: Expression,
+    method: 'enqueue' | 'push',
+  ): RuntimeValue {
+    if (this.containsFunctionCall(expression)) {
+      throw new Error(
+        `Function calls inside ${method}() are not supported yet`,
+      )
+    }
+
+    if (this.findNextSharedMemoryRead(process, expression)) {
+      throw new Error(
+        `Shared-memory reads inside ${method}() are not supported yet; copy the value to local memory first`,
+      )
+    }
+
+    return evaluateExpression(expression, {
+      localMemory: this.getActiveLocalMemory(process),
+      sharedMemory: this.state.program.sharedMemory,
+    })
+  }
+
+  private completeDataStructureResult(
+    process: Process,
+    instruction: DataStructureOperationInstruction,
     value: PrimitiveValue,
   ): void {
     const target = instruction.resultTarget
 
     if (!target) {
-      throw new Error('Missing validated queue result target')
+      throw new Error(
+        'Missing validated data structure result target',
+      )
     }
 
     if (target.type === 'DECLARE') {
@@ -3577,15 +3634,15 @@ export class SimulationEngine {
     )
   }
 
-  private validateQueueResultTarget(
+  private validateDataStructureResultTarget(
     process: Process,
-    instruction: QueueOperationInstruction,
+    instruction: DataStructureOperationInstruction,
   ): void {
     const target = instruction.resultTarget
 
     if (!target) {
       throw new Error(
-        `${queueMethodName(instruction.operation)}() result must be assigned`,
+        `${dataStructureMethodName(instruction.operation)}() result must be assigned`,
       )
     }
 
@@ -3597,7 +3654,7 @@ export class SimulationEngine {
       )
     ) {
       throw new Error(
-        'Queue operation results must be assigned to local memory',
+        'Data structure operation results must be assigned to local memory',
       )
     }
   }
@@ -3620,8 +3677,8 @@ export class SimulationEngine {
   }
 }
 
-function queueMethodName(
-  operation: QueueOperationInstruction['operation'],
+function dataStructureMethodName(
+  operation: DataStructureOperationInstruction['operation'],
 ): string {
   switch (operation) {
     case 'ENQUEUE':
@@ -3630,6 +3687,12 @@ function queueMethodName(
       return 'dequeue'
     case 'FRONT':
       return 'front'
+    case 'PUSH':
+      return 'push'
+    case 'POP':
+      return 'pop'
+    case 'TOP':
+      return 'top'
     case 'IS_EMPTY':
       return 'isEmpty'
     case 'SIZE':
