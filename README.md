@@ -672,10 +672,10 @@ código.
 
 ## Extensiones de lenguaje previstas
 
-El roadmap incluye colas y pilas para expresar directamente estructuras
-utilizadas en ejercicios académicos. Las colas tienen prioridad porque
-ya aparecen en casos que hoy requieren adaptaciones artificiales con
-arrays e índices.
+Las colas FIFO y las colas de prioridad estables ya permiten expresar
+directamente estructuras utilizadas en ejercicios académicos, sin
+adaptarlas artificialmente con arrays e índices. La próxima estructura
+del roadmap es la pila, seguida por los procesos parametrizados.
 
 Como evolución posterior se evaluarán registros/estructuras u objetos
 educativos con campos y métodos simples, además de operaciones simuladas
@@ -738,6 +738,10 @@ En curso:
 
 ``` text
 M10.1  Estructuras de datos académicas
+       ✓ Colas FIFO
+       ✓ Colas de prioridad estables
+       → Pilas
+       → Procesos parametrizados
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

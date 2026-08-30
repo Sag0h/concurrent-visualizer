@@ -1088,10 +1088,12 @@ próxima estructura.
 Una cola local pertenece al estado privado del proceso. Si es compartida,
 sus contenidos y orden forman parte del estado semántico global: se
 clonan de forma independiente y participan en la identidad canónica de
-M9. `enqueue`, `dequeue`, `front`, `size` e `isEmpty` son operaciones atómicas de
-un step y generan un `QueueExecutionEvent`. Esa atomicidad no se extiende
-a secuencias compuestas de consultas, extracciones y otras variables;
-esas invariantes siguen requiriendo `P` / `V` u otro protocolo.
+M9. `enqueue`, `dequeue`, `front`, `size` e `isEmpty` son operaciones
+atómicas de un step y generan un `QueueExecutionEvent`. El evento indica
+si la estructura es FIFO o de prioridad y, en una inserción priorizada,
+registra también la prioridad. Esa atomicidad no se extiende a secuencias
+compuestas de consultas, extracciones y otras variables; esas invariantes
+siguen requiriendo `P` / `V` u otro protocolo.
 
 `QueueValue` es un valor etiquetado de `RuntimeValue`, con tipo primitivo
 de elemento y un array ordenado desde frente hacia fondo. Esto permite
@@ -1103,7 +1105,9 @@ cola vacía producen un error explícito; no introducen bloqueo implícito.
 prioridad numérica descendente. La inserción se ubica después de todos
 los elementos con igual prioridad, de modo que el desempate es FIFO sin
 necesitar un contador auxiliar. El orden y las prioridades forman parte
-del estado canónico y se clonan en snapshots y forks.
+del estado canónico y se clonan en snapshots y forks. `front` y
+`dequeue` retornan únicamente el valor; la prioridad gobierna el orden,
+pero no se filtra al código consumidor.
 
 Los resultados se escriben inicialmente sólo en memoria local y los
 argumentos de `enqueue` no leen memoria compartida directamente. Esta

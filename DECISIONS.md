@@ -1108,6 +1108,11 @@ inserción: el propio orden de los pares `{ value, priority }` contiene
 toda la información observable y evita inflar innecesariamente la clave
 semántica de M9.
 
+`front()` y `dequeue()` conservan la misma interfaz en ambos tipos de
+cola: retornan el valor primitivo, no la prioridad. Esto permite cambiar
+la política de orden sin obligar al consumidor a manipular metadata de
+la estructura.
+
 Las acciones externas necesarias sólo para expresar el algoritmo podrán
 ser operaciones simuladas. Por ejemplo, `print(valor)` podrá registrar
 que la acción ocurrió sin producir I/O real. Deberán ser deterministas y

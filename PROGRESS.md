@@ -1884,7 +1884,7 @@ evidencia en la traza, pero no realizarán I/O real.
 **Prioridad:** colas primero; pilas bajo el mismo modelo; registros,
 objetos, métodos y operaciones simuladas como evolución posterior.
 
-## 2026-08-30 --- M10.1: primera vertical de colas FIFO
+## 2026-08-30 --- M10.1: colas FIFO y de prioridad estable
 
 Se incorporaron colas FIFO de valores `int`, `bool` o `string` como
 valores etiquetados de `RuntimeValue`. La sintaxis permite declararlas en
@@ -1921,3 +1921,24 @@ la sintaxis `priority_queue<T>`. Cada entrada contiene valor y prioridad
 entera; el número más alto se atiende primero y los empates conservan el
 orden FIFO de inserción. Las operaciones comparten la atomicidad, los
 eventos, snapshots, forks y exploración de las colas FIFO.
+
+La interfaz muestra cada entrada como `valor (p=prioridad)`, ordenada
+desde la prioridad más alta hacia la más baja, y etiqueta sus eventos
+como `PRIORITY · ATOMIC`. La prueba visual confirmó que dos elementos de
+igual prioridad salen en el mismo orden en que fueron insertados.
+
+La implementación quedó separada en los commits `02ce345` (colas FIFO) y
+`32d8a88` (colas de prioridad). Al cerrar esta vertical, la suite completa
+contaba con 234 tests aprobados, además de lint y build correctos.
+
+### Pendiente inmediato de M10.1
+
+1.  Incorporar pilas locales y compartidas con `push`, `pop`, `top`,
+    `size` e `isEmpty`.
+2.  Integrarlas con snapshots, forks, claves canónicas, exploración,
+    historial y visualización.
+3.  Incorporar procesos parametrizados o por rango, por ejemplo
+    `process Controlador[i:0..3]`.
+
+Después se podrá avanzar con M10.2: registros/campos, métodos educativos
+simples y operaciones simuladas como `print(...)`.
