@@ -8,6 +8,7 @@ import {
   isPriorityQueueValue,
   isQueueValue,
   isStackValue,
+  isRecordValue,
   type RuntimeValue,
 } from './core/memory/RuntimeValue'
 import { createScheduler } from './core/scheduler/createScheduler'
@@ -1719,7 +1720,9 @@ function App() {
                                 const locationDescription =
                                   summary.location.type === 'VARIABLE'
                                     ? summary.location.name
-                                    : `${summary.location.arrayName}[${summary.location.index}]`
+                                    : summary.location.type === 'ARRAY_ELEMENT'
+                                      ? `${summary.location.arrayName}[${summary.location.index}]`
+                                      : `${summary.location.recordName}.${summary.location.fieldName}`
 
                                 return (
                                   <div
@@ -1787,6 +1790,8 @@ function App() {
                                         : location?.type
                                             === 'ARRAY_ELEMENT'
                                           ? `${location.arrayName}[${location.index}]`
+                                          : location?.type === 'RECORD_FIELD'
+                                            ? `${location.recordName}.${location.fieldName}`
                                           : 'Unknown'
 
                                     return (
@@ -1898,6 +1903,8 @@ function App() {
                                           ? location.name
                                           : location?.type === 'ARRAY_ELEMENT'
                                             ? `${location.arrayName}[${location.index}]`
+                                            : location?.type === 'RECORD_FIELD'
+                                              ? `${location.recordName}.${location.fieldName}`
                                             : 'Unknown'
 
                                       return (
@@ -2031,6 +2038,12 @@ function formatValue(
     }
 
     return `stack<${value.elementType}> [bottom → ${value.items.join(', ')} ← top]`
+  }
+
+  if (isRecordValue(value)) {
+    return `${value.recordType} { ${Object.entries(value.fields)
+      .map(([name, fieldValue]) => `${name}: ${String(fieldValue)}`)
+      .join(', ')} }`
   }
 
   if (Array.isArray(value)) {

@@ -214,6 +214,17 @@ export function semaphoreVInstruction(
   }
 }
 
+export function recordFieldTarget(
+  recordName: string,
+  fieldName: string,
+): AssignmentTarget {
+  return {
+    type: 'RECORD_FIELD',
+    recordName,
+    fieldName,
+  }
+}
+
 export function dataStructureOperationInstruction(
   structureName: string,
   operation: DataStructureOperation,

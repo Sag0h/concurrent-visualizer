@@ -6,6 +6,7 @@ import {
   unary,
   variable,
   functionCall,
+  fieldAccess,
 } from '../expressions/expressionFactories'
 import type { Instruction } from '../instructions/Instruction'
 import {
@@ -27,8 +28,10 @@ import {
   semaphoreVInstruction,
   semaphorePInstruction,
   dataStructureOperationInstruction,
+  recordFieldTarget,
 } from '../instructions/instructionFactories'
 import {
+  createRecordValue,
   createPriorityQueueValue,
   createQueueValue,
   createStackValue,
@@ -47,16 +50,22 @@ import type { Token, TokenType } from './Token'
 import { ParserError } from './ParserError'
 import { tokenize } from './tokenize'
 import type { FunctionDefinition } from './FunctionDefinition'
+import type { RecordDefinition } from './RecordDefinition'
 
-interface ParsedType {
-  readonly container:
+type ParsedType =
+  | {
+    readonly container:
     | 'SCALAR'
     | 'ARRAY'
     | 'QUEUE'
     | 'PRIORITY_QUEUE'
     | 'STACK'
-  readonly primitiveType: PrimitiveType
-}
+    readonly primitiveType: PrimitiveType
+  }
+  | {
+    readonly container: 'RECORD'
+    readonly recordType: string
+  }
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 
@@ -71,6 +80,10 @@ export function parseProgram(
 class Parser {
   private current = 0
   private readonly tokens: Token[]
+  private readonly recordDefinitions: Record<
+    string,
+    RecordDefinition
+  > = {}
 
   constructor(tokens: Token[]) {
     this.tokens = tokens
@@ -90,6 +103,11 @@ class Parser {
     > = {}
 
     while (!this.isAtEnd()) {
+      if (this.match('RECORD')) {
+        this.parseRecordDefinition()
+        continue
+      }
+
       if (this.match('SHARED')) {
         this.parseSharedDeclaration(sharedMemory)
         continue
@@ -137,7 +155,7 @@ class Parser {
 
       throw this.error(
         this.peek(),
-        'Expected "shared", "sem", "function" or "process"'
+        'Expected "record", "shared", "sem", "function" or "process"'
       )
     }
 
@@ -146,6 +164,59 @@ class Parser {
       sharedMemory,
       functions,
       semaphores,
+      recordDefinitions: this.recordDefinitions,
+    }
+  }
+
+  private parseRecordDefinition(): void {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected record name',
+    )
+
+    if (this.recordDefinitions[name.lexeme]) {
+      throw this.error(
+        name,
+        `Record "${name.lexeme}" is already defined`,
+      )
+    }
+
+    this.consume(
+      'LEFT_BRACE',
+      'Expected "{" after record name',
+    )
+
+    const fields: RecordDefinition['fields'] = []
+
+    while (!this.check('RIGHT_BRACE') && !this.isAtEnd()) {
+      const type = this.parsePrimitiveType()
+      const field = this.consume(
+        'IDENTIFIER',
+        'Expected record field name',
+      )
+
+      if (fields.some((existing) => existing.name === field.lexeme)) {
+        throw this.error(
+          field,
+          `Field "${field.lexeme}" is already defined in record "${name.lexeme}"`,
+        )
+      }
+
+      this.consume(
+        'SEMICOLON',
+        'Expected ";" after record field',
+      )
+      fields.push({ name: field.lexeme, type })
+    }
+
+    this.consume(
+      'RIGHT_BRACE',
+      'Expected "}" after record definition',
+    )
+
+    this.recordDefinitions[name.lexeme] = {
+      name: name.lexeme,
+      fields,
     }
   }
 
@@ -176,7 +247,11 @@ class Parser {
           ? this.parseStackLiteral(
               declaredType.primitiveType,
             )
-      : this.parseLiteralOrArrayValue()
+          : declaredType.container === 'RECORD'
+            ? this.parseRecordLiteral(
+                declaredType.recordType,
+              )
+            : this.parseLiteralOrArrayValue()
 
     this.consume(
       'SEMICOLON',
@@ -344,7 +419,7 @@ class Parser {
   }
 
   private parseProcessInstruction(): Instruction {
-    if (this.isTypeToken(this.peek().type)) {
+    if (this.isLocalDeclarationStart()) {
       return this.parseLocalDeclaration()
     }
 
@@ -407,6 +482,7 @@ class Parser {
     if (
       this.check('IDENTIFIER')
       && this.checkNext('DOT')
+      && !this.checkAt(3, 'ASSIGN')
     ) {
       return this.parseDataStructureOperationStatement()
     }
@@ -496,7 +572,13 @@ class Parser {
                   declaredType.primitiveType,
                 ),
               )
-        : this.parseExpression()
+            : declaredType.container === 'RECORD'
+              ? literal(
+                  this.parseRecordLiteral(
+                    declaredType.recordType,
+                  ),
+                )
+              : this.parseExpression()
 
     this.consume(
       'SEMICOLON',
@@ -778,6 +860,8 @@ class Parser {
         )
       }
 
+      let expression: Expression = variable(name)
+
       if (this.match('LEFT_BRACKET')) {
         const index =
           this.parseExpression()
@@ -787,13 +871,32 @@ class Parser {
           'Expected "]" after array index',
         )
 
-        return arrayAccess(
-          variable(name),
+        expression = arrayAccess(
+          expression,
           index,
         )
       }
 
-      return variable(name)
+      if (this.match('DOT')) {
+        const field = this.consume(
+          'IDENTIFIER',
+          'Expected field name after "."',
+        )
+
+        if (this.check('LEFT_PAREN')) {
+          throw this.error(
+            field,
+            'Record methods are not supported yet; access a field directly',
+          )
+        }
+
+        expression = fieldAccess(
+          expression,
+          field.lexeme,
+        )
+      }
+
+      return expression
     }
 
     if (this.match('LEFT_PAREN')) {
@@ -1057,7 +1160,137 @@ class Parser {
     return createStackValue(elementType, items)
   }
 
+  private parseRecordLiteral(
+    recordType: string,
+  ): RuntimeValue {
+    const definition = this.recordDefinitions[recordType]
+
+    if (!definition) {
+      throw this.error(
+        this.peek(),
+        `Record "${recordType}" is not defined`,
+      )
+    }
+
+    const literalType = this.consume(
+      'IDENTIFIER',
+      `Expected record literal "${recordType}"`,
+    )
+
+    if (literalType.lexeme !== recordType) {
+      throw this.error(
+        literalType,
+        `Expected record literal "${recordType}"`,
+      )
+    }
+
+    this.consume(
+      'LEFT_BRACE',
+      `Expected "{" after "${recordType}"`,
+    )
+
+    const fields: Record<string, PrimitiveValue> = {}
+
+    if (!this.check('RIGHT_BRACE')) {
+      do {
+        const field = this.consume(
+          'IDENTIFIER',
+          'Expected record field name',
+        )
+        const fieldDefinition = definition.fields.find(
+          (candidate) => candidate.name === field.lexeme,
+        )
+
+        if (!fieldDefinition) {
+          throw this.error(
+            field,
+            `Record "${recordType}" has no field "${field.lexeme}"`,
+          )
+        }
+
+        if (field.lexeme in fields) {
+          throw this.error(
+            field,
+            `Field "${field.lexeme}" is repeated in record literal "${recordType}"`,
+          )
+        }
+
+        this.consume(
+          'COLON',
+          'Expected ":" after record field name',
+        )
+        const valueToken = this.peek()
+        const value = this.parsePrimitiveLiteral(
+          'Expected primitive record field value',
+        )
+
+        if (!matchesPrimitiveType(value, fieldDefinition.type)) {
+          throw this.error(
+            valueToken,
+            `Field "${field.lexeme}" of record "${recordType}" must be ${fieldDefinition.type}`,
+          )
+        }
+
+        fields[field.lexeme] = value
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_BRACE',
+      `Expected "}" after record literal "${recordType}"`,
+    )
+
+    const missingField = definition.fields.find(
+      (field) => !(field.name in fields),
+    )
+
+    if (missingField) {
+      throw this.error(
+        this.previous(),
+        `Record literal "${recordType}" is missing field "${missingField.name}"`,
+      )
+    }
+
+    return createRecordValue(recordType, fields)
+  }
+
+  private parsePrimitiveLiteral(
+    message: string,
+  ): PrimitiveValue {
+    const sign = this.match('MINUS') ? -1 : 1
+
+    if (this.match('NUMBER')) {
+      return sign * Number(this.previous().lexeme)
+    }
+
+    if (sign === -1) {
+      throw this.error(this.peek(), message)
+    }
+
+    if (this.match('STRING')) {
+      return this.previous().lexeme
+    }
+
+    if (this.match('BOOLEAN')) {
+      return this.previous().lexeme === 'true'
+    }
+
+    throw this.error(this.peek(), message)
+  }
+
   private parseType(): ParsedType {
+    if (
+      this.check('IDENTIFIER')
+      && this.recordDefinitions[this.peek().lexeme]
+    ) {
+      const recordType = this.advance().lexeme
+
+      return {
+        container: 'RECORD',
+        recordType,
+      }
+    }
+
     if (this.match('STACK')) {
       this.consume(
         'LESS',
@@ -1167,6 +1400,17 @@ class Parser {
       || type === 'QUEUE'
       || type === 'PRIORITY_QUEUE'
       || type === 'STACK'
+    )
+  }
+
+  private isLocalDeclarationStart(): boolean {
+    return (
+      this.isTypeToken(this.peek().type)
+      || (
+        this.check('IDENTIFIER')
+        && Boolean(this.recordDefinitions[this.peek().lexeme])
+        && this.checkNext('IDENTIFIER')
+      )
     )
   }
 
@@ -1442,6 +1686,26 @@ class Parser {
       )
     }
 
+    if (this.match('DOT')) {
+      const field = this.consume(
+        'IDENTIFIER',
+        'Expected record field name',
+      )
+
+      this.consume(
+        'ASSIGN',
+        'Expected "=" after assignment target',
+      )
+
+      return assign(
+        recordFieldTarget(
+          name.lexeme,
+          field.lexeme,
+        ),
+        this.parseExpression(),
+      )
+    }
+
     this.consume(
       'ASSIGN',
       'Expected "=" after assignment target',
@@ -1585,6 +1849,7 @@ class Parser {
     return (
       this.check('IDENTIFIER')
       && this.checkNext('DOT')
+      && this.checkAt(3, 'LEFT_PAREN')
     )
   }
 
@@ -1794,6 +2059,13 @@ class Parser {
     return operation === 'P'
       ? semaphorePInstruction(semaphore.lexeme)
       : semaphoreVInstruction(semaphore.lexeme)
+  }
+
+  private checkAt(
+    offset: number,
+    type: TokenType,
+  ): boolean {
+    return this.tokens[this.current + offset]?.type === type
   }
 }
 

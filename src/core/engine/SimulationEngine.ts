@@ -11,7 +11,9 @@ import {
   assertPrimitiveType,
   enqueuePriorityItem,
   isDataStructureValue,
+  isRecordValue,
   isPriorityQueueValue,
+  isPrimitiveValue,
   isStackValue,
   type PriorityQueueValue,
   type PrimitiveValue,
@@ -969,6 +971,10 @@ export class SimulationEngine {
           visit(candidate.index)
           return
 
+        case 'FIELD_ACCESS':
+          visit(candidate.record)
+          return
+
         case 'FUNCTION_CALL':
           candidate.arguments.forEach(visit)
           return
@@ -1474,6 +1480,11 @@ export class SimulationEngine {
           || this.containsFunctionCall(expression.index)
         )
 
+      case 'FIELD_ACCESS':
+        return this.containsFunctionCall(
+          expression.record,
+        )
+
       default:
         return false
     }
@@ -1846,6 +1857,11 @@ export class SimulationEngine {
           )
         )
 
+      case 'FIELD_ACCESS':
+        return this.findNextFunctionCall(
+          expression.record,
+        )
+
       default:
         return undefined
     }
@@ -1909,6 +1925,17 @@ export class SimulationEngine {
           index:
             this.replaceFunctionCallWithValue(
               expression.index,
+              target,
+              value,
+            ),
+        }
+
+      case 'FIELD_ACCESS':
+        return {
+          ...expression,
+          record:
+            this.replaceFunctionCallWithValue(
+              expression.record,
               target,
               value,
             ),
@@ -2006,6 +2033,28 @@ export class SimulationEngine {
       return structuredClone(value)
     }
 
+    if (location.type === 'RECORD_FIELD') {
+      const record = this.state.program.sharedMemory[
+        location.recordName
+      ]
+
+      if (!isRecordValue(record)) {
+        throw new Error(
+          `Shared variable "${location.recordName}" is not a record`,
+        )
+      }
+
+      if (!(location.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${location.fieldName}"`,
+        )
+      }
+
+      return structuredClone(
+        record.fields[location.fieldName],
+      )
+    }
+
     const array =
       this.state.program.sharedMemory[
         location.arrayName
@@ -2042,6 +2091,10 @@ export class SimulationEngine {
   ): string {
     if (location.type === 'VARIABLE') {
       return location.name
+    }
+
+    if (location.type === 'RECORD_FIELD') {
+      return `${location.recordName}.${location.fieldName}`
     }
 
     return `${location.arrayName}[${location.index}]`
@@ -2148,6 +2201,33 @@ export class SimulationEngine {
         )
       }
 
+      case 'FIELD_ACCESS': {
+        if (expression.record.type === 'VARIABLE') {
+          const recordName = expression.record.name
+          const localMemory =
+            this.getActiveLocalMemory(process)
+
+          if (
+            !(recordName in localMemory)
+            && recordName in this.state.program.sharedMemory
+          ) {
+            return {
+              expression,
+              location: {
+                type: 'RECORD_FIELD',
+                recordName,
+                fieldName: expression.fieldName,
+              },
+            }
+          }
+        }
+
+        return this.findNextSharedMemoryRead(
+          process,
+          expression.record,
+        )
+      }
+
       case 'FUNCTION_CALL':
         for (const argument of expression.arguments) {
           const read =
@@ -2219,6 +2299,17 @@ export class SimulationEngine {
           index:
             this.replaceExpressionWithValue(
               expression.index,
+              target,
+              value,
+            ),
+        }
+
+      case 'FIELD_ACCESS':
+        return {
+          ...expression,
+          record:
+            this.replaceExpressionWithValue(
+              expression.record,
               target,
               value,
             ),
@@ -2528,10 +2619,11 @@ export class SimulationEngine {
     const localMemory =
       this.getActiveLocalMemory(process)
 
-    const variableName =
-      target.type === 'VARIABLE'
-        ? target.name
-        : target.arrayName
+    const variableName = target.type === 'VARIABLE'
+      ? target.name
+      : target.type === 'ARRAY_ACCESS'
+        ? target.arrayName
+        : target.recordName
 
     if (variableName in localMemory) {
       return false
@@ -2554,6 +2646,40 @@ export class SimulationEngine {
         this.state.program.sharedMemory,
       )
 
+      return
+    }
+
+    if (target.type === 'RECORD_FIELD') {
+      const localMemory =
+        this.getActiveLocalMemory(process)
+      const record = target.recordName in localMemory
+        ? localMemory[target.recordName]
+        : this.state.program.sharedMemory[target.recordName]
+
+      if (!isRecordValue(record)) {
+        throw new Error(
+          `Variable "${target.recordName}" is not a record`,
+        )
+      }
+
+      if (!(target.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${target.fieldName}"`,
+        )
+      }
+
+      const previousValue = record.fields[target.fieldName]
+
+      if (
+        !isPrimitiveValue(value)
+        || typeof value !== typeof previousValue
+      ) {
+        throw new Error(
+          `Field "${target.recordName}.${target.fieldName}" requires ${typeof previousValue} but received ${typeof value}`,
+        )
+      }
+
+      record.fields[target.fieldName] = structuredClone(value)
       return
     }
 
@@ -2955,6 +3081,7 @@ export class SimulationEngine {
     if (
       Array.isArray(value)
       || isDataStructureValue(value)
+      || isRecordValue(value)
     ) {
       throw new Error(
         'Nested collection values are not supported yet',
@@ -3052,6 +3179,13 @@ export class SimulationEngine {
       )
     }
 
+    if (target.type === 'RECORD_FIELD') {
+      return this.resolveAssignmentTargetLocation(
+        process,
+        target,
+      )
+    }
+
     if (!runtime.pendingTargetIndex) {
       return undefined
     }
@@ -3092,6 +3226,28 @@ export class SimulationEngine {
         return {
           type: 'VARIABLE',
           name: target.name,
+        }
+      }
+
+      return undefined
+    }
+
+    if (target.type === 'RECORD_FIELD') {
+      const localMemory =
+        this.getActiveLocalMemory(process)
+
+      if (target.recordName in localMemory) {
+        return undefined
+      }
+
+      if (
+        target.recordName
+        in this.state.program.sharedMemory
+      ) {
+        return {
+          type: 'RECORD_FIELD',
+          recordName: target.recordName,
+          fieldName: target.fieldName,
         }
       }
 
@@ -3151,6 +3307,38 @@ export class SimulationEngine {
       return
     }
 
+    if (location.type === 'RECORD_FIELD') {
+      const record = this.state.program.sharedMemory[
+        location.recordName
+      ]
+
+      if (!isRecordValue(record)) {
+        throw new Error(
+          `Shared variable "${location.recordName}" is not a record`,
+        )
+      }
+
+      if (!(location.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${location.fieldName}"`,
+        )
+      }
+
+      const previousValue = record.fields[location.fieldName]
+
+      if (
+        !isPrimitiveValue(value)
+        || typeof value !== typeof previousValue
+      ) {
+        throw new Error(
+          `Field "${location.recordName}.${location.fieldName}" requires ${typeof previousValue} but received ${typeof value}`,
+        )
+      }
+
+      record.fields[location.fieldName] = structuredClone(value)
+      return
+    }
+
     const array =
       this.state.program.sharedMemory[
         location.arrayName
@@ -3174,6 +3362,7 @@ export class SimulationEngine {
     if (
       Array.isArray(value)
       || isDataStructureValue(value)
+      || isRecordValue(value)
     ) {
       throw new Error(
         'Nested collection values are not supported yet',

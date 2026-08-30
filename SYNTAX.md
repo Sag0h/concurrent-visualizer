@@ -474,6 +474,45 @@ Las pilas de registros/objetos todavía no están soportadas.
 
 ------------------------------------------------------------------------
 
+## Registros
+
+Un registro agrupa campos primitivos relacionados bajo un tipo con
+nombre. La definición debe aparecer antes de sus declaraciones:
+
+``` text
+record Fallo {
+    int id;
+    int nivel;
+    string mensaje;
+}
+
+shared Fallo fallo = Fallo {
+    id: 7,
+    nivel: 3,
+    mensaje: "temperatura"
+};
+
+process Controlador {
+    int nivelAnterior = fallo.nivel;
+    fallo.nivel = 2;
+}
+```
+
+Los literales usan campos con nombre, pueden escribirlos en cualquier
+orden y deben incluirlos exactamente una vez con el tipo declarado. Los
+registros pueden ser locales o compartidos; actualmente sus campos sólo
+pueden ser `int`, `bool` o `string`.
+
+Cada campo compartido tiene granularidad propia para microoperaciones y
+análisis. Por ejemplo, `fallo.id` y `fallo.nivel` son ubicaciones de
+memoria diferentes.
+
+Todavía no se permiten registros dentro de arrays, colas o pilas, ni
+métodos como `fallo.getNivel()`. El acceso vigente es directo mediante
+`fallo.nivel`.
+
+------------------------------------------------------------------------
+
 ## Expresiones aritméticas
 
 ``` text
@@ -1080,15 +1119,14 @@ También permanecen fuera del alcance actual:
 -   fairness formal/FIFO para semáforos;
 -   sintaxis especial como `i++`;
 -   arrays anidados;
--   registros/estructuras u objetos con campos;
 -   métodos como `fallo.getNivel()`;
 -   operaciones educativas simuladas como `print(...)`.
 
 Las colas FIFO primitivas, las colas de prioridad estables y las pilas ya
 están implementadas bajo el mismo modelo general.
 
-Los registros/objetos y métodos quedan como mejora posterior y todavía
-no tienen sintaxis definitiva. Las operaciones como `print(...)` podrán
+Los registros con campos primitivos ya están disponibles. Los métodos y
+objetos con comportamiento quedan como mejora posterior. Las operaciones como `print(...)` podrán
 modelarse como acciones simuladas y observables en la traza, pero sin
 I/O real; su semántica exacta se definirá antes de implementarlas.
 

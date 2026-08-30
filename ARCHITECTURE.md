@@ -1131,11 +1131,14 @@ restricción evita que una operación de alto nivel oculte accesos que hoy
 deben descomponerse como microoperaciones para el análisis de
 interferencia.
 
-Como mejora posterior se evaluarán registros/estructuras u objetos
-educativos con campos. El objetivo es representar datos como un `Fallo`
-con `id` y `nivel`, no construir inicialmente un sistema orientado a
-objetos completo. Métodos simples como `getNivel()` podrán ser azúcar
-sintáctica.
+`RecordValue` representa registros educativos con campos primitivos. La
+definición nominal vive en `Program.recordDefinitions` y el valor guarda
+su nombre de tipo y sus campos. Un acceso compartido se traduce a una
+`MemoryLocation` de tipo `RECORD_FIELD`, por lo que cada campo conserva
+su propia historia y granularidad de conflicto. El objetivo es
+representar datos como un `Fallo` con `id` y `nivel`, no construir un
+sistema orientado a objetos completo. Métodos simples como `getNivel()`
+podrán incorporarse luego como azúcar sintáctica.
 
 También se prevén operaciones educativas simuladas como `print(...)` o
 `procesar(...)`. No realizarán I/O real ni dependerán del navegador,

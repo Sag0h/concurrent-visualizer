@@ -851,9 +851,11 @@ excepciones específicas del ejemplo.
 Siguiente evolución del lenguaje después de completar las estructuras de
 datos primitivas y los procesos parametrizados de M10.1.
 
--   [ ] Evaluar registros/estructuras con campos como representación
+-   [x] Incorporar registros/estructuras con campos primitivos como representación
     mínima de datos compuestos.
--   [ ] Evaluar acceso a campos como `fallo.nivel` y `fallo.id`.
+-   [x] Incorporar acceso de lectura y escritura a campos como
+    `fallo.nivel` y `fallo.id`, con granularidad independiente para
+    memoria compartida.
 -   [ ] Evaluar métodos simples o azúcar sintáctica equivalente, por
     ejemplo `fallo.getNivel()` y `fallo.getID()`, sin requerir
     orientación a objetos completa.

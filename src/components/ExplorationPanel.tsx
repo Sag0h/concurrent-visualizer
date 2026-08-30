@@ -408,6 +408,10 @@ function memoryLocationLabel(
     return `${location.arrayName}[${location.index}]`
   }
 
+  if (location?.type === 'RECORD_FIELD') {
+    return `${location.recordName}.${location.fieldName}`
+  }
+
   return 'unknown'
 }
 

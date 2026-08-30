@@ -6,6 +6,7 @@ import {
   isPriorityQueueValue,
   isQueueValue,
   isStackValue,
+  isRecordValue,
 } from '../memory/RuntimeValue'
 
 export function formatExpression(
@@ -43,6 +44,9 @@ export function formatExpression(
       return `${expression.functionName}(${expression.arguments
         .map(formatExpression)
         .join(', ')})`
+
+    case 'FIELD_ACCESS':
+      return `${formatExpression(expression.record)}.${expression.fieldName}`
   }
 }
 
@@ -65,6 +69,12 @@ function formatRuntimeValue(
     return `stack[${value.items
       .map(formatRuntimeValue)
       .join(', ')}]`
+  }
+
+  if (isRecordValue(value)) {
+    return `${value.recordType} { ${Object.entries(value.fields)
+      .map(([name, fieldValue]) => `${name}: ${formatRuntimeValue(fieldValue)}`)
+      .join(', ')} }`
   }
 
   if (typeof value === 'string') {

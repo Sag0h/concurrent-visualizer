@@ -1973,3 +1973,23 @@ y consola del navegador sin errores.
 
 El siguiente objetivo es M10.2: registros/campos, métodos educativos
 simples y operaciones simuladas como `print(...)`.
+
+## 2026-08-30 --- M10.2: registros y acceso a campos
+
+Se incorporaron definiciones `record` con campos `int`, `bool` o
+`string`, literales con nombres obligatorios y declaraciones locales o
+compartidas. El lenguaje permite leer y escribir directamente campos
+como `fallo.nivel` y valida campos faltantes, repetidos, desconocidos o
+con un tipo incompatible.
+
+Los registros son valores etiquetados y clonables de `RuntimeValue`.
+Para conservar el valor educativo del simulador, cada campo compartido
+se modela como una ubicación independiente: leer `fallo.nivel` produce
+una microoperación sobre `fallo.nivel`, no sobre todo `fallo`. Esto evita
+marcar como conflicto dos procesos que acceden a campos diferentes y
+permite detectar interferencia cuando coinciden en el mismo campo.
+
+La UI representa los registros en memoria y muestra sus campos en el
+historial y el análisis. La suite quedó en 258 tests, con lint y build
+correctos. Los métodos como `getNivel()` y las operaciones simuladas
+como `print(...)` permanecen pendientes dentro de M10.2.

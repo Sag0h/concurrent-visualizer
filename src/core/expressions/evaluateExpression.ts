@@ -1,4 +1,7 @@
-import type { RuntimeValue } from '../memory/RuntimeValue'
+import {
+  isRecordValue,
+  type RuntimeValue,
+} from '../memory/RuntimeValue'
 import type { Expression } from './Expression'
 import type { ExpressionContext } from './ExpressionContext'
 
@@ -26,6 +29,25 @@ export function evaluateExpression(
       throw new Error(
         'Function call expressions require suspended evaluation',
       )
+
+    case 'FIELD_ACCESS': {
+      const record = evaluateExpression(
+        expression.record,
+        context,
+      )
+
+      if (!isRecordValue(record)) {
+        throw new Error('Field access requires a record')
+      }
+
+      if (!(expression.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${expression.fieldName}"`,
+        )
+      }
+
+      return record.fields[expression.fieldName]
+    }
     
   }
 }

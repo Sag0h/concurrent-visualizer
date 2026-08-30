@@ -6,7 +6,8 @@ import type {
   VariableExpression,
   UnaryExpression,
   ArrayAccessExpression,
-  FunctionCallExpression
+  FunctionCallExpression,
+  FieldAccessExpression,
 } from './Expression'
 
 export function literal(value: RuntimeValue): LiteralExpression {
@@ -69,3 +70,13 @@ export function functionCall(
   }
 }
 
+export function fieldAccess(
+  record: Expression,
+  fieldName: string,
+): FieldAccessExpression {
+  return {
+    type: 'FIELD_ACCESS',
+    record,
+    fieldName,
+  }
+}

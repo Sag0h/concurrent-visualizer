@@ -682,11 +682,11 @@ Las colas FIFO, las colas de prioridad estables y las pilas ya permiten
 expresar
 directamente estructuras utilizadas en ejercicios académicos, sin
 adaptarlas artificialmente con arrays e índices. Los procesos
-parametrizados completan M10.1; el próximo objetivo es M10.2 sobre
-registros, campos y operaciones educativas simuladas.
+parametrizados completan M10.1. M10.2 ya incorporó su primera vertical:
+registros con campos primitivos y acceso directo de lectura/escritura.
 
-Como evolución posterior se evaluarán registros/estructuras u objetos
-educativos con campos y métodos simples, además de operaciones simuladas
+Como evolución posterior se evaluarán métodos simples sobre esos
+registros, además de operaciones simuladas
 como `print(...)`. Estas podrán representar una acción observable sin
 realizar I/O real, preservando la reproducibilidad y la exploración
 determinista.
@@ -743,10 +743,10 @@ M9    Exploración de ejecuciones
 M10.1 Colas FIFO, colas de prioridad, pilas y procesos parametrizados
 ```
 
-Próximo:
+En curso:
 
 ``` text
-M10.2  Registros, objetos y operaciones educativas simuladas
+M10.2  Registros implementados; métodos y operaciones simuladas pendientes
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

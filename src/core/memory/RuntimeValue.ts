@@ -8,6 +8,16 @@ export type PrimitiveType =
   | 'bool'
   | 'string'
 
+export function isPrimitiveValue(
+  value: unknown,
+): value is PrimitiveValue {
+  return (
+    typeof value === 'number'
+    || typeof value === 'boolean'
+    || typeof value === 'string'
+  )
+}
+
 export interface QueueValue {
   readonly kind: 'QUEUE'
   readonly elementType: PrimitiveType
@@ -31,12 +41,30 @@ export interface StackValue {
   readonly items: PrimitiveValue[]
 }
 
+export interface RecordValue {
+  readonly kind: 'RECORD'
+  readonly recordType: string
+  readonly fields: Record<string, PrimitiveValue>
+}
+
 export type RuntimeValue =
   | PrimitiveValue
   | PrimitiveValue[]
   | QueueValue
   | PriorityQueueValue
   | StackValue
+  | RecordValue
+
+export function createRecordValue(
+  recordType: string,
+  fields: Record<string, PrimitiveValue>,
+): RecordValue {
+  return {
+    kind: 'RECORD',
+    recordType,
+    fields: structuredClone(fields),
+  }
+}
 
 export function createQueueValue(
   elementType: PrimitiveType,
@@ -151,6 +179,23 @@ export function isStackValue(
   )
 }
 
+export function isRecordValue(
+  value: unknown,
+): value is RecordValue {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'kind' in value
+    && value.kind === 'RECORD'
+    && 'recordType' in value
+    && typeof value.recordType === 'string'
+    && 'fields' in value
+    && typeof value.fields === 'object'
+    && value.fields !== null
+    && !Array.isArray(value.fields)
+  )
+}
+
 export function isAnyQueueValue(
   value: unknown,
 ): value is QueueValue | PriorityQueueValue {
@@ -232,6 +277,10 @@ export function describeRuntimeType(
 
   if (isStackValue(value)) {
     return `stack<${value.elementType}>`
+  }
+
+  if (isRecordValue(value)) {
+    return value.recordType
   }
 
   if (typeof value === 'number') {

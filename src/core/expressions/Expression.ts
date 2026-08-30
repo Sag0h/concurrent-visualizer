@@ -46,6 +46,12 @@ export interface FunctionCallExpression {
   readonly arguments: Expression[]
 }
 
+export interface FieldAccessExpression {
+  readonly type: 'FIELD_ACCESS'
+  readonly record: Expression
+  readonly fieldName: string
+}
+
 export type Expression =
   | LiteralExpression
   | VariableExpression
@@ -53,3 +59,4 @@ export type Expression =
   | UnaryExpression
   | ArrayAccessExpression
   | FunctionCallExpression
+  | FieldAccessExpression

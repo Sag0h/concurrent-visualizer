@@ -16,6 +16,16 @@ export function sameMemoryLocation(
   }
 
   if (
+    left.type === 'RECORD_FIELD'
+    && right.type === 'RECORD_FIELD'
+  ) {
+    return (
+      left.recordName === right.recordName
+      && left.fieldName === right.fieldName
+    )
+  }
+
+  if (
     left.type === 'ARRAY_ELEMENT'
     && right.type === 'ARRAY_ELEMENT'
   ) {
