@@ -739,7 +739,8 @@ scheduler.
 -   [x] Incluir en la clave la metadata que afecte semántica o futuros
     diagnósticos.
 -   [x] Detectar estados repetidos mediante la clave canónica.
--   [x] Explorar primero en anchura para priorizar contraejemplos cortos.
+-   [x] Explorar primero en anchura para priorizar contraejemplos
+    cortos.
 -   [x] Limitar por separado profundidad y cantidad de estados.
 -   [x] Informar `FOUND`, `EXHAUSTED` o `TRUNCATED`.
 -   [x] Reportar cantidad de estados y transiciones exploradas.
@@ -754,8 +755,8 @@ scheduler.
     y estado terminal.
 -   [x] Reproducir el contraejemplo forzando la secuencia guardada, sin
     depender de una seed.
--   [x] Mostrar en la UI el resultado, los límites y la reproducción paso
-    a paso.
+-   [x] Mostrar en la UI el resultado, los límites y la reproducción
+    paso a paso.
 
 ### M9.4 --- Propiedades adicionales
 
@@ -811,6 +812,47 @@ mejoras transversales y extensiones futuras.
 -   [ ] Parsear primitivas temporales.
 -   [ ] Parsear monitores.
 -   [ ] Parsear primitivas de pasaje de mensajes.
+
+### M10.1 --- Estructuras de datos académicas
+
+Las estructuras necesarias para expresar fielmente ejercicios de la
+cátedra forman parte del lenguaje general y no deben reemplazarse por
+excepciones específicas del ejemplo.
+
+-   [ ] Incorporar colas utilizables como variables locales o
+    compartidas.
+-   [ ] Definir operaciones mínimas de cola: insertar, extraer,
+    consultar frente y consultar vacío.
+-   [ ] Incorporar pilas utilizables como variables locales o
+    compartidas.
+-   [ ] Definir operaciones mínimas de pila: `push`, `pop`, `top` y
+    vacío.
+-   [ ] Definir la granularidad atómica de operaciones sobre estructuras
+    compartidas.
+-   [ ] Integrar colas y pilas con `RuntimeValue`, snapshots, clonación,
+    claves canónicas y exploración de M9.
+-   [ ] Agregar tests de parser, runtime, clonación e interleavings.
+-   [ ] Priorizar colas: ya son necesarias para representar ejercicios
+    académicos sin deformar el pseudocódigo.
+
+### M10.2 --- Registros, objetos y operaciones educativas simuladas
+
+Mejora futura que no bloquea la incorporación de colas.
+
+-   [ ] Evaluar registros/estructuras con campos como representación
+    mínima de datos compuestos.
+-   [ ] Evaluar acceso a campos como `fallo.nivel` y `fallo.id`.
+-   [ ] Evaluar métodos simples o azúcar sintáctica equivalente, por
+    ejemplo `fallo.getNivel()` y `fallo.getID()`, sin requerir
+    orientación a objetos completa.
+-   [ ] Definir operaciones simuladas como `print(...)`, `procesar(...)`
+    o equivalentes para representar trabajo externo del pseudocódigo.
+-   [ ] Permitir que una operación simulada deje un evento observable en
+    la traza sin realizar I/O real.
+-   [ ] Definir si estas operaciones consumen una transición y qué
+    información afecta al estado semántico.
+-   [ ] Mantenerlas deterministas y compatibles con clonación,
+    reproducibilidad y exploración.
 
 Flujo vigente:
 
@@ -984,5 +1026,4 @@ Un ticket se considera terminado cuando:
 5.  Se actualizó `PROGRESS.md`.
 6.  Si introdujo una decisión arquitectónica relevante, se documentó en
     `DECISIONS.md`.
-7.  Si modificó la arquitectura actual, se actualizó
-    `ARCHITECTURE.md`.
+7.  Si modificó la arquitectura actual, se actualizó `ARCHITECTURE.md`.

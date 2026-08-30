@@ -892,7 +892,20 @@ También permanecen fuera del alcance actual:
 -   un tipo especial de semáforo binario;
 -   fairness formal/FIFO para semáforos;
 -   sintaxis especial como `i++`;
--   arrays anidados.
+-   arrays anidados;
+-   colas y pilas;
+-   registros/estructuras u objetos con campos;
+-   métodos como `fallo.getNivel()`;
+-   operaciones educativas simuladas como `print(...)`.
+
+Las colas tienen prioridad entre estas extensiones porque ya son
+necesarias para expresar fielmente ejercicios académicos. Las pilas
+seguirán el mismo modelo general.
+
+Los registros/objetos y métodos quedan como mejora posterior y todavía
+no tienen sintaxis definitiva. Las operaciones como `print(...)` podrán
+modelarse como acciones simuladas y observables en la traza, pero sin
+I/O real; su semántica exacta se definirá antes de implementarlas.
 
 Las primitivas posteriores se incorporarán incrementalmente y este
 documento se actualizará cuando sean implementadas.

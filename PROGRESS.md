@@ -15,10 +15,10 @@ atómicas condicionales mediante `await (B);` y `await (B) { S }`,
 procesos `BLOCKED`, reactivación sin reserva, reevaluación de guardas,
 historial/visualización de esperas y casos académicos representativos.
 
-**Estado M7:** completado. Están verificadas la semántica de
-semáforos generales/contadores, su modelo y AST, el tokenizer/parser,
-el runtime base de `P` / `V`, su historial/visualización y la integración
-con el análisis de interferencia, además de nueve casos académicos
+**Estado M7:** completado. Están verificadas la semántica de semáforos
+generales/contadores, su modelo y AST, el tokenizer/parser, el runtime
+base de `P` / `V`, su historial/visualización y la integración con el
+análisis de interferencia, además de nueve casos académicos
 reproducibles.
 
 **Estado M8:** completado. Incluye deadlock y wait-for graph,
@@ -27,15 +27,16 @@ waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
 **Próximo objetivo:** evaluar si las assertions explícitas sobre estados
-finales deben entrar en M9.4 o quedar como extensión futura del lenguaje;
-el resto de las propiedades previstas para M9 ya está implementado.
+finales deben entrar en M9.4 o quedar como extensión futura del
+lenguaje; el resto de las propiedades previstas para M9 ya está
+implementado.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
 semáforos de M7 y reutilizará una única fuente de pseudocódigo entre los
 tests y el selector visual. Cargar un ejemplo podrá elegir su scheduler
-recomendado, pero no ejecutará `Build` ni reemplazará trabajo del usuario
-sin advertencia.
+recomendado, pero no ejecutará `Build` ni reemplazará trabajo del
+usuario sin advertencia.
 
 ------------------------------------------------------------------------
 
@@ -108,8 +109,7 @@ Antes de continuar después de una pausa:
 1.  Leer `BACKLOG.md`.
 2.  Leer este archivo desde la entrada más reciente.
 3.  Revisar `DECISIONS.md`.
-4.  Consultar `ARCHITECTURE.md` para conocer la arquitectura
-    vigente.
+4.  Consultar `ARCHITECTURE.md` para conocer la arquitectura vigente.
 5.  Ejecutar los tests existentes.
 6.  Continuar únicamente desde el próximo ticket pendiente.
 
@@ -447,8 +447,8 @@ estructuras de control anidadas.
 2.  Agregar tests automáticos específicos del runtime suspendible.
 3.  Ejecutar `npm test`, `npm run lint` y `npm run build`.
 4.  Cerrar M4 con un commit estable.
-5.  Actualizar `ARCHITECTURE.md`, `DECISIONS.md` y `SYNTAX.md` si todavía
-    describen la arquitectura previa.
+5.  Actualizar `ARCHITECTURE.md`, `DECISIONS.md` y `SYNTAX.md` si
+    todavía describen la arquitectura previa.
 6.  Recién después avanzar a primitivas específicamente concurrentes.
 
 ## 2026-08-27 --- M4 completado: runtime suspendible
@@ -1121,8 +1121,8 @@ ejecutarse; quienes pierdan la competencia pueden volver a bloquearse.
     bloqueo.
 -   `ExecutionEvent` registra metadata estructurada para `P` bloqueado,
     `P` exitoso y `V`, incluyendo valor anterior y posterior.
--   El historial presenta transiciones como `0 → 0`, `1 → 0` y
-    `0 → 1` sin inferir ownership.
+-   El historial presenta transiciones como `0 → 0`, `1 → 0` y `0 → 1`
+    sin inferir ownership.
 -   Se incorporaron tests de snapshot, aislamiento y eventos.
 -   Se verificó manualmente la competencia entre dos waiters después de
     un `V`: ambos pueden habilitarse, uno completa `P` y el otro puede
@@ -1148,23 +1148,23 @@ ejecutarse; quienes pierdan la competencia pueden volver a bloquearse.
 -   La regla de señalización es deliberadamente acotada: no reconoce un
     `V` anterior al acceso productor, contadores mayores que uno ni
     protocolos que no alternen limpiamente entre `0` y `1`.
--   Los semáforos contadores y los protocolos incompatibles que delimitan
-    ambos accesos quedan `UNKNOWN`.
+-   Los semáforos contadores y los protocolos incompatibles que
+    delimitan ambos accesos quedan `UNKNOWN`.
 -   Cada conflicto incorpora una razón estructurada y la UI explica la
     clasificación.
 -   La interfaz aclara que el resultado corresponde a la ejecución
     observada y no prueba todos los interleavings.
--   Se agregaron tests para mutex, protección unilateral, contador y
-    `V` extra.
+-   Se agregaron tests para mutex, protección unilateral, contador y `V`
+    extra.
 -   Se verificaron visualmente los tres resultados en Round Robin.
 
 ### M7.7 --- Primer caso académico: exclusión mutua
 
 Se adaptó el Ejercicio 1 de la explicación práctica de semáforos a una
-ejecución finita compatible con el visualizador. Dos procesos representan
-chicos que toman un caramelo, incrementan el contador compartido `cant`
-bajo `P(mutex)` / `V(mutex)` y realizan el trabajo local de comer fuera de
-la sección crítica.
+ejecución finita compatible con el visualizador. Dos procesos
+representan chicos que toman un caramelo, incrementan el contador
+compartido `cant` bajo `P(mutex)` / `V(mutex)` y realizan el trabajo
+local de comer fuera de la sección crítica.
 
 El test académico verifica:
 
@@ -1178,8 +1178,8 @@ El test académico verifica:
     razón `SEMAPHORE_MUTEX`.
 
 La adaptación conserva la enseñanza de la práctica: solamente el acceso
-al recurso compartido pertenece a la sección crítica; el trabajo local se
-mantiene fuera para no reducir innecesariamente la concurrencia.
+al recurso compartido pertenece a la sección crítica; el trabajo local
+se mantiene fuera para no reducir innecesariamente la concurrencia.
 
 ### M7.7 --- Segundo caso académico: señalización de eventos
 
@@ -1216,8 +1216,8 @@ bloquea, comportamiento correcto para un semáforo general.
 ### M7.7 --- Tercer caso académico: varios waiters
 
 Se agregaron dos trabajadores esperando sobre `sem inicio = 0` y un
-coordinador que ejecuta dos operaciones `V(inicio)`, una por cada proceso
-demorado.
+coordinador que ejecuta dos operaciones `V(inicio)`, una por cada
+proceso demorado.
 
 Con Round Robin se verifica la secuencia:
 
@@ -1241,8 +1241,8 @@ El caso demuestra que:
 -   se necesita un `V` por cada proceso que deba continuar;
 -   el orden observado proviene de Round Robin y no de una cola FIFO del
     semáforo;
--   `waitingProcessIds` representa procesos actualmente `BLOCKED`, no una
-    cola ni una lista de permisos pendientes.
+-   `waitingProcessIds` representa procesos actualmente `BLOCKED`, no
+    una cola ni una lista de permisos pendientes.
 
 ### M7.7 --- Cuarto caso académico: contador de recursos
 
@@ -1274,8 +1274,8 @@ El test comprueba que:
     contador de recursos.
 
 Este uso no representa exclusión mutua. Un semáforo inicializado en `2`
-permite dos usuarios concurrentes y, por lo tanto, no protege por sí solo
-una sección crítica que requiera un único ejecutor.
+permite dos usuarios concurrentes y, por lo tanto, no protege por sí
+solo una sección crítica que requiera un único ejecutor.
 
 ### M7.7 --- Quinto caso académico: Productor/Consumidor unitario
 
@@ -1285,8 +1285,8 @@ Se adaptó el buffer limitado de la Clase 4 a una ejecución finita con un
 -   `vacio = 1` cuenta el único lugar inicialmente libre;
 -   `lleno = 0` indica que todavía no existe un dato para retirar;
 -   el consumidor ejecuta primero `P(lleno)` y queda bloqueado;
--   el productor consume el lugar con `P(vacio)`, deposita `42` y anuncia
-    el dato mediante `V(lleno)`;
+-   el productor consume el lugar con `P(vacio)`, deposita `42` y
+    anuncia el dato mediante `V(lleno)`;
 -   el consumidor completa `P(lleno)`, copia el dato y devuelve el lugar
     con `V(vacio)`.
 
@@ -1295,10 +1295,10 @@ restaura el estado vacío mediante `vacio == 1` y `lleno == 0`.
 
 Este caso también extendió el análisis de interferencia con un traspaso
 directo de señalización. La escritura del productor ocurre antes de
-`V(lleno)` y la lectura del consumidor después del `P(lleno)` que consume
-esa señal; el conflicto observado se explica como `SYNCHRONIZED` con
-razón `SEMAPHORE_SIGNALING`. Un test negativo comprueba que hacer `V`
-antes de escribir no establece ese orden.
+`V(lleno)` y la lectura del consumidor después del `P(lleno)` que
+consume esa señal; el conflicto observado se explica como `SYNCHRONIZED`
+con razón `SEMAPHORE_SIGNALING`. Un test negativo comprueba que hacer
+`V` antes de escribir no establece ese orden.
 
 La mejora no intenta resolver happens-before general: sólo reconoce
 señalización inicializada en `0`, alternante entre `0` y `1` y con un
@@ -1306,9 +1306,9 @@ emparejamiento directo no ambiguo en la traza observada.
 
 ### M7.7 --- Sexto caso académico: buffer con recursos contados
 
-Se amplió Productor/Consumidor a un buffer de capacidad `2`, representado
-por `shared int[] buffer = [0, 0]`, con tres mensajes finitos para hacer
-visible el bloqueo por falta de espacio.
+Se amplió Productor/Consumidor a un buffer de capacidad `2`,
+representado por `shared int[] buffer = [0, 0]`, con tres mensajes
+finitos para hacer visible el bloqueo por falta de espacio.
 
 El caso usa **First Ready** y coloca primero al productor. La ejecución
 observada permite que deposite `10` y `20`, dejando:
@@ -1346,8 +1346,9 @@ a ser secciones críticas que requieren exclusión mutua adicional.
 
 Se adaptó la barrera del Ejercicio 3 de la explicación práctica a tres
 procesos finitos. Cada chico incrementa `contador` dentro de una sección
-protegida por `mutex`. El último en observar `contador == 3` ejecuta tres
-operaciones `V(barrera)`, una por cada proceso que debe atravesarla.
+protegida por `mutex`. El último en observar `contador == 3` ejecuta
+tres operaciones `V(barrera)`, una por cada proceso que debe
+atravesarla.
 
 El protocolo mantiene el orden crítico:
 
@@ -1373,8 +1374,9 @@ El test verifica:
 -   conflictos sobre `contador` sincronizados mediante el protocolo
     `SEMAPHORE_MUTEX`.
 
-Es una barrera de un solo uso. No se supone orden FIFO: los tres permisos
-son equivalentes y el scheduler decide qué proceso consume cada uno.
+Es una barrera de un solo uso. No se supone orden FIFO: los tres
+permisos son equivalentes y el scheduler decide qué proceso consume cada
+uno.
 
 ### M7.7 --- Octavo caso académico: Lectores/Escritores
 
@@ -1484,8 +1486,8 @@ proceso --WAITS_FOR--> semáforo --HOLDS--> proceso inferido
 ```
 
 De esas dependencias deriva aristas proceso-a-proceso y busca
-componentes fuertemente conexas. Una componente con más de un proceso,
-o un proceso que depende de sí mismo, constituye espera circular.
+componentes fuertemente conexas. Una componente con más de un proceso, o
+un proceso que depende de sí mismo, constituye espera circular.
 
 Los poseedores son metadata inferida para la traza observada; no se
 agrega ownership a la semántica de los semáforos. Si un `await` no puede
@@ -1552,15 +1554,15 @@ corresponde a la traza observada.
 
 Se evaluó incorporar happens-before formal. El número global de paso no
 puede utilizarse como relación causal: convertiría el interleaving total
-del simulador en un orden entre todos los procesos y ocultaría races.
-Un detector formal futuro requerirá orden de programa, relaciones
+del simulador en un orden entre todos los procesos y ocultaría races. Un
+detector formal futuro requerirá orden de programa, relaciones
 específicas por primitiva y posiblemente relojes vectoriales. Debe
 integrar semáforos generales, `await`, monitores y comunicación, y
 permanecer separado de la exploración de interleavings de M9.
 
-Por ese motivo, M8 conserva deliberadamente el nombre
-`POTENTIAL_RACE`: es evidencia educativa de accesos conflictivos sin una
-protección común reconocida, no prueba formal de una data race.
+Por ese motivo, M8 conserva deliberadamente el nombre `POTENTIAL_RACE`:
+es evidencia educativa de accesos conflictivos sin una protección común
+reconocida, no prueba formal de una data race.
 
 ### M8 --- Otros diagnósticos y cierre
 
@@ -1576,9 +1578,9 @@ condiciones suspendibles quedan sin clasificar para evitar falsos
 positivos.
 
 El riesgo de starvation se informa cuando un proceso está `READY` pero
-no fue seleccionado durante doce pasos o más, mientras otros procesos
-sí acumulan ejecución. El diagnóstico habla de postergación observada,
-no afirma starvation inevitable.
+no fue seleccionado durante doce pasos o más, mientras otros procesos sí
+acumulan ejecución. El diagnóstico habla de postergación observada, no
+afirma starvation inevitable.
 
 El límite máximo de pasos ahora produce el estado global
 `STEP_LIMIT_REACHED` cuando todavía hay trabajo ejecutable. De esta
@@ -1616,9 +1618,9 @@ M9 se reorganizó en cuatro fases:
 3.  búsqueda de deadlock y contraejemplos reproducibles;
 4.  propiedades adicionales después de resolver el estado de análisis.
 
-La primera propiedad será deadlock. Los resultados distinguirán
-`FOUND`, `EXHAUSTED` y `TRUNCATED`; una búsqueda truncada nunca se
-presentará como prueba de corrección.
+La primera propiedad será deadlock. Los resultados distinguirán `FOUND`,
+`EXHAUSTED` y `TRUNCATED`; una búsqueda truncada nunca se presentará
+como prueba de corrección.
 
 Quedaron fuera del alcance inicial el grafo completo del espacio de
 estados, partial-order reduction, happens-before formal, verificación
@@ -1637,8 +1639,8 @@ fuerza la elección.
 
 `SimulationEngine.getEnabledTransitions()` evalúa las alternativas sin
 mutar el estado origen. Un `await` verdadero o un permiso disponible
-pueden volver elegible a un proceso todavía representado como
-`BLOCKED`; la reactivación efectiva ocurre al ejecutar la transición.
+pueden volver elegible a un proceso todavía representado como `BLOCKED`;
+la reactivación efectiva ocurre al ejecutar la transición.
 
 `stepTransition()` valida la elección y ejecuta exactamente el proceso
 pedido sin consultar al scheduler. `step()` reutiliza la misma operación
@@ -1663,9 +1665,9 @@ estado intermedio actual. El estado clonado es también el nuevo punto de
 `reset()` de la rama.
 
 Los tres schedulers implementan `clone()`. First Ready no conserva
-estado; Round Robin copia su último índice seleccionado y Random copia el
-estado actual de `SeededRandom`. Esta copia preserva `step()` dentro de
-un fork, pero la futura clave canónica no incluirá política de
+estado; Round Robin copia su último índice seleccionado y Random copia
+el estado actual de `SeededRandom`. Esta copia preserva `step()` dentro
+de un fork, pero la futura clave canónica no incluirá política de
 scheduling.
 
 Se verificó independencia durante:
@@ -1711,10 +1713,10 @@ desde la traza requiere un estado de análisis explícito.
 
 ### M9.2/M9.3 --- BFS acotada y primer contraejemplo
 
-Se agregó `exploreForDeadlock()`. La búsqueda recorre estados en anchura,
-bifurca el engine para cada transición habilitada y registra estados por
-su clave semántica. El engine entregado por la UI o por un test no se
-modifica durante la exploración.
+Se agregó `exploreForDeadlock()`. La búsqueda recorre estados en
+anchura, bifurca el engine para cada transición habilitada y registra
+estados por su clave semántica. El engine entregado por la UI o por un
+test no se modifica durante la exploración.
 
 Los límites de profundidad y cantidad de estados son independientes. El
 límite de seguridad interno del engine también se informa como causa de
@@ -1728,15 +1730,15 @@ Las estadísticas conservan estados visitados, transiciones ensayadas y
 máxima profundidad alcanzada. Los ciclos semánticos se cierran sin hacer
 crecer indefinidamente la cola.
 
-El primer contraejemplo guarda `DEADLOCK`, profundidad, límites, secuencia
-exacta de procesos, claves inicial/terminal, estado terminal y diagnóstico
-estructurado. `replayDeadlockCounterexample()` fuerza esa secuencia desde
-un fork y valida que comience en el mismo estado y termine en el deadlock
-registrado.
+El primer contraejemplo guarda `DEADLOCK`, profundidad, límites,
+secuencia exacta de procesos, claves inicial/terminal, estado terminal y
+diagnóstico estructurado. `replayDeadlockCounterexample()` fuerza esa
+secuencia desde un fork y valida que comience en el mismo estado y
+termine en el deadlock registrado.
 
 El caso clásico de dos procesos que toman dos semáforos en orden opuesto
-verifica las dos posibilidades: existe una traza secuencial que termina y
-un interleaving de cuatro elecciones que produce espera circular. BFS
+verifica las dos posibilidades: existe una traza secuencial que termina
+y un interleaving de cuatro elecciones que produce espera circular. BFS
 encuentra el contraejemplo mínimo.
 
 Las propiedades de memoria continúan pospuestas hasta representar su
@@ -1754,17 +1756,17 @@ del estado visible sin modificarlo y presenta:
 -   el tipo, profundidad y secuencia exacta del contraejemplo.
 
 Al iniciar la reproducción, la UI vuelve al fork conservado del estado
-origen. Cada clic resalta y ejecuta el siguiente proceso guardado. También
-se puede reproducir toda la secuencia, salir al origen o reiniciarla. Los
-controles normales `Step` y `Run` se deshabilitan durante la guía para no
-desviarse accidentalmente del camino demostrado.
+origen. Cada clic resalta y ejecuta el siguiente proceso guardado.
+También se puede reproducir toda la secuencia, salir al origen o
+reiniciarla. Los controles normales `Step` y `Run` se deshabilitan
+durante la guía para no desviarse accidentalmente del camino demostrado.
 
 Se verificó en navegador el flujo completo con dos semáforos tomados en
 orden opuesto: BFS encontró 16 estados, 16 transiciones y un deadlock
 mínimo de profundidad 4; tras cuatro elecciones guiadas ambos procesos
-quedaron bloqueados y apareció el diagnóstico de espera circular. También
-se comprobaron un resultado truncado por profundidad, un espacio seguro
-agotado y la ausencia de errores de consola.
+quedaron bloqueados y apareció el diagnóstico de espera circular.
+También se comprobaron un resultado truncado por profundidad, un espacio
+seguro agotado y la ausencia de errores de consola.
 
 **Estado:** M9.3 COMPLETADO.
 
@@ -1772,8 +1774,8 @@ agotado y la ausencia de errores de consola.
 
 Se extrajo `exploreExecution()` como BFS genérico. El algoritmo ya no
 conoce deadlock: recibe una `ExplorationProperty<Kind, Diagnostic>` y se
-encarga de ramas, límites, estados visitados, estadísticas y construcción
-del contraejemplo.
+encarga de ramas, límites, estados visitados, estadísticas y
+construcción del contraejemplo.
 
 Una propiedad define:
 
@@ -1792,10 +1794,10 @@ frontera explícita para propiedades dependientes de metadata adicional.
 `exploreForDeadlock()` queda como wrapper estable, por lo que la UI y la
 reproducción no cambiaron.
 
-Las pruebas agregadas usan una propiedad sintética diferente de deadlock,
-verifican que BFS encuentre su camino mínimo y demuestran que una
-propiedad puede distinguir estados semánticamente iguales mediante su
-metadata. Las regresiones completas de deadlock continúan pasando.
+Las pruebas agregadas usan una propiedad sintética diferente de
+deadlock, verifican que BFS encuentre su camino mínimo y demuestran que
+una propiedad puede distinguir estados semánticamente iguales mediante
+su metadata. Las regresiones completas de deadlock continúan pasando.
 
 La interfaz todavía no integra una propiedad de memoria. La sección
 siguiente resuelve primero su requisito de metadata; `POTENTIAL_RACE`
@@ -1810,10 +1812,11 @@ de `Program` y de las trazas. Su sección de memoria conserva únicamente:
 -   operaciones `P` / `V` exitosas;
 -   microoperaciones `SHARED_READ` y `SHARED_WRITE`.
 
-El engine actualiza esta evidencia al mismo tiempo que registra el evento.
-Los snapshots calculan conflictos desde `analysisState`, por lo que ya no
-necesitan releer los historiales crudos. Los estados anteriores que no
-posean el campo se reconstruyen una sola vez para conservar compatibilidad.
+El engine actualiza esta evidencia al mismo tiempo que registra el
+evento. Los snapshots calculan conflictos desde `analysisState`, por lo
+que ya no necesitan releer los historiales crudos. Los estados
+anteriores que no posean el campo se reconstruyen una sola vez para
+conservar compatibilidad.
 
 `ExplorationAnalysisState` ofrece una proyección desconectada y
 `createAnalyzedStateKey()` combina metadata y estado semántico. Deadlock
@@ -1854,10 +1857,31 @@ Las pruebas cubren cuatro fronteras importantes:
 -   dos procesos que protegen `value` con mutex distintos encuentran el
     contraejemplo mínimo de profundidad 6;
 -   ese camino se reproduce exactamente;
--   ambos procesos usando el mismo mutex agotan el espacio sin violación;
--   accesos sin protección continúan como `POTENTIAL_RACE` y no satisfacen
-    esta propiedad.
+-   ambos procesos usando el mismo mutex agotan el espacio sin
+    violación;
+-   accesos sin protección continúan como `POTENTIAL_RACE` y no
+    satisfacen esta propiedad.
 
 La verificación visual reprodujo el camino `P1 P1 P1 P1 P2 P2`. Al sexto
-paso, el historial de microoperaciones y el análisis de memoria mostraron
-una violación sobre `value`, con `mutexA` frente a `mutexB`.
+paso, el historial de microoperaciones y el análisis de memoria
+mostraron una violación sobre `value`, con `mutexA` frente a `mutexB`.
+
+## 2026-08-29 --- Requerimiento de estructuras de datos académicas
+
+Al adaptar un ejercicio con una cola de fallos se comprobó que
+reemplazarla por arrays e índices deforma innecesariamente el
+pseudocódigo. Se registró por eso una extensión prioritaria de M10 para
+incorporar colas y, bajo el mismo modelo general, pilas.
+
+Estas estructuras podrán ser locales o compartidas y deberán integrarse
+con runtime, snapshots, clonación, claves canónicas y exploración de M9.
+La atomicidad de sus operaciones compartidas deberá definirse
+explícitamente.
+
+También se registraron como mejora posterior registros/estructuras u
+objetos educativos con campos y métodos simples, y operaciones simuladas
+como `print(...)` o `procesar(...)`. Estas últimas podrán dejar
+evidencia en la traza, pero no realizarán I/O real.
+
+**Prioridad:** colas primero; pilas bajo el mismo modelo; registros,
+objetos, métodos y operaciones simuladas como evolución posterior.

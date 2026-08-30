@@ -856,10 +856,10 @@ La clasificación guarda una razón estructurada:
 -   `AMBIGUOUS_SEMAPHORE_PROTOCOL`;
 -   `UNPROTECTED`.
 
-Un mismo candidato mutex válido en ambos accesos produce
-`SYNCHRONIZED`. La protección unilateral produce `POTENTIAL_RACE`. Un
-mismo semáforo ambiguo en ambos accesos produce `UNKNOWN` en lugar de
-afirmar protección o carrera.
+Un mismo candidato mutex válido en ambos accesos produce `SYNCHRONIZED`.
+La protección unilateral produce `POTENTIAL_RACE`. Un mismo semáforo
+ambiguo en ambos accesos produce `UNKNOWN` en lugar de afirmar
+protección o carrera.
 
 **Consecuencia:** la UI puede explicar por qué clasificó cada conflicto
 y distinguir mutex, contadores y usos problemáticos. La conclusión vale
@@ -878,9 +878,9 @@ sincronización con ausencia total de interleaving.
 
 **Contexto:** un proceso `BLOCKED` no demuestra deadlock. Otro proceso
 puede ejecutar la operación que lo habilita y, después de un `V`, el
-waiter puede seguir marcado como bloqueado hasta la próxima reevaluación.
-Además, un programa puede quedar sin progreso aunque la información
-disponible no permita construir un ciclo de recursos.
+waiter puede seguir marcado como bloqueado hasta la próxima
+reevaluación. Además, un programa puede quedar sin progreso aunque la
+información disponible no permita construir un ciclo de recursos.
 
 **Decisión:** el análisis global distingue `RUNNING`,
 `TEMPORARILY_BLOCKED`, `FINISHED` y `DEADLOCK`.
@@ -923,9 +923,9 @@ interpretara cada paso anterior como happens-before, todos los accesos
 quedarían ordenados y ninguna race sería visible.
 
 Un happens-before formal requeriría orden de programa y aristas causales
-para `atomic`, transferencias de semáforos, `await`, monitores y canales.
-Los semáforos generales agregan además permisos contados y señalización
-sin ownership obligatorio.
+para `atomic`, transferencias de semáforos, `await`, monitores y
+canales. Los semáforos generales agregan además permisos contados y
+señalización sin ownership obligatorio.
 
 **Decisión:** M8 mantiene un análisis de protocolos sobre la traza
 observada y no lo presenta como detector formal de data races.
@@ -935,7 +935,7 @@ como sincronizados, ambiguos, potencialmente problemáticos o violaciones
 de exclusión mutua observadas. Esta última categoría exige que la traza
 muestre un acceso mientras otro proceso conserva un mutex incompatible.
 
-La UI usa explícitamente “potential race observation” y declara que el
+La UI usa explícitamente "potential race observation" y declara que el
 resultado no prueba una data race ni cubre todos los interleavings.
 
 **Consecuencia:** el diagnóstico es más preciso y educativo sin atribuir
@@ -954,9 +954,9 @@ protección por protocolo, causalidad formal y exploración de estados.
 
 **Contexto:** busy waiting, starvation y no terminación son propiedades
 de liveness. Una traza finita puede mostrar síntomas fuertes, pero en
-general no demuestra qué ocurrirá en todos los pasos futuros ni en
-otros interleavings. El límite del engine tampoco debe confundirse con
-un estado sin transiciones habilitadas.
+general no demuestra qué ocurrirá en todos los pasos futuros ni en otros
+interleavings. El límite del engine tampoco debe confundirse con un
+estado sin transiciones habilitadas.
 
 **Decisión:** los diagnósticos de liveness permanecen en
 `src/core/diagnostics/`, separados del runtime y del detector de
@@ -1038,26 +1038,62 @@ El algoritmo BFS será independiente de la propiedad concreta.
 extender la función de equivalencia con metadata de análisis propia. La
 clave semántica de `Program` continúa siendo el valor por defecto;
 deadlock se ofrece como una propiedad y un wrapper específicos. Una
-propiedad no podrá reutilizar la clave por defecto si su resultado futuro
-depende de información que esa clave omite.
+propiedad no podrá reutilizar la clave por defecto si su resultado
+futuro depende de información que esa clave omite.
 
 La metadata de memoria se almacenará explícitamente en
-`ExecutionAnalysisState`, separada de la traza explicativa. Sólo retendrá
-valores iniciales de semáforos, operaciones exitosas de sincronización y
-accesos compartidos. El engine la actualizará junto con los eventos y los
-forks la clonarán estructuralmente. Una clave analizada combinará esta
-metadata con `Program`; deadlock conservará la clave semántica más pequeña.
+`ExecutionAnalysisState`, separada de la traza explicativa. Sólo
+retendrá valores iniciales de semáforos, operaciones exitosas de
+sincronización y accesos compartidos. El engine la actualizará junto con
+los eventos y los forks la clonarán estructuralmente. Una clave
+analizada combinará esta metadata con `Program`; deadlock conservará la
+clave semántica más pequeña.
 
 La segunda propiedad buscable será la violación observada de exclusión
 mutua ya definida por M8. Usará la clave analizada y sólo aceptará el
 diagnóstico estructurado `MUTUAL_EXCLUSION_VIOLATION` con razón
 `OBSERVED_MUTEX_OVERLAP`. Un conflicto clasificado únicamente como
-`POTENTIAL_RACE` seguirá siendo evidencia educativa y no un fallo formal.
+`POTENTIAL_RACE` seguirá siendo evidencia educativa y no un fallo
+formal.
 
 La reproducción se generalizará en una operación común que fuerce la
-secuencia guardada y vuelva a evaluar la propiedad terminal; los wrappers
-tipados conservarán APIs explícitas para cada diagnóstico.
+secuencia guardada y vuelva a evaluar la propiedad terminal; los
+wrappers tipados conservarán APIs explícitas para cada diagnóstico.
 
 **Motivo:** obtener contraejemplos cortos y educativos sin presentar una
 búsqueda finita como model checking exhaustivo ni acoplar la semántica a
 una política particular de scheduling.
+
+------------------------------------------------------------------------
+
+## ADR-030 --- Estructuras académicas y efectos externos simulados
+
+**Estado:** Aceptada
+
+**Contexto:** algunos ejercicios utilizan colas, pilas y datos
+compuestos con operaciones conceptuales como `c.pop()`,
+`fallo.getNivel()` o `print(...)`. Reemplazarlos siempre por arrays e
+índices permite aproximaciones, pero deforma el pseudocódigo original.
+
+**Decisión:** las colas serán una extensión prioritaria del lenguaje y
+las pilas seguirán el mismo modelo. Podrán ser locales o compartidas y
+deberán integrarse con snapshots, clonación, claves canónicas y
+exploración de M9.
+
+Los registros/estructuras u objetos educativos quedan como mejora
+posterior. Servirán para agrupar campos y eventualmente ofrecer métodos
+simples o azúcar sintáctica, sin asumir un sistema orientado a objetos
+completo.
+
+Las acciones externas necesarias sólo para expresar el algoritmo podrán
+ser operaciones simuladas. Por ejemplo, `print(valor)` podrá registrar
+que la acción ocurrió sin producir I/O real. Deberán ser deterministas y
+reproducibles.
+
+**Consecuencia:** los programas podrán mantenerse cerca de los
+enunciados de la cátedra. Toda estructura mutable compartida será parte
+del estado semántico y toda operación observable tendrá una semántica de
+step explícita.
+
+**Motivo:** aumentar fidelidad académica sin convertir el simulador en
+un runtime de propósito general.

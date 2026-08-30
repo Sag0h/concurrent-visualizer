@@ -661,8 +661,8 @@ No se asume:
 -   reserva de permisos.
 
 La UI muestra qué procesos esperan cada semáforo derivando esa
-información de `blockingReason` y aclara que la colección es informativa,
-sin orden FIFO.
+información de `blockingReason` y aclara que la colección es
+informativa, sin orden FIFO.
 
 ### Eventos de semáforos
 
@@ -727,11 +727,11 @@ Este último criterio es metadata del analizador, no ownership agregado a
 la semántica del semáforo.
 
 Dos accesos conflictivos protegidos por el mismo candidato válido se
-clasifican como `SYNCHRONIZED` con razón `SEMAPHORE_MUTEX`. La protección
-unilateral sigue siendo `POTENTIAL_RACE`. Si ambos accesos están dentro
-de secciones delimitadas por el mismo semáforo pero el protocolo puede
-ser contador, señalización o uso inválido, la clasificación es
-`UNKNOWN`.
+clasifican como `SYNCHRONIZED` con razón `SEMAPHORE_MUTEX`. La
+protección unilateral sigue siendo `POTENTIAL_RACE`. Si ambos accesos
+están dentro de secciones delimitadas por el mismo semáforo pero el
+protocolo puede ser contador, señalización o uso inválido, la
+clasificación es `UNKNOWN`.
 
 La UI presenta la razón y aclara que se analiza una traza observada. No
 se incrementa `atomicDepth` entre `P` y `V` y no se modifica la elección
@@ -933,9 +933,9 @@ un `while` o `repeat/until` vacío cuya condición lee memoria compartida.
 No intenta clasificar bucles con cuerpo ni condiciones suspendibles.
 
 El riesgo de starvation se informa cuando un proceso permanece `READY`
-sin eventos propios durante al menos doce pasos, mientras otros
-procesos sí continúan ejecutando. Es evidencia de postergación en la
-traza finita, no una prueba de que el proceso nunca será elegido.
+sin eventos propios durante al menos doce pasos, mientras otros procesos
+sí continúan ejecutando. Es evidencia de postergación en la traza
+finita, no una prueba de que el proceso nunca será elegido.
 
 Al alcanzar el límite de seguridad con procesos ejecutables se usa
 `STEP_LIMIT_REACHED`, separado de `DEADLOCK`. El simulador puede afirmar
@@ -985,10 +985,10 @@ Las representaciones implementadas son:
 -   `VisitedStateRegistry` clasifica cada visita como `NEW` o
     `REPEATED`.
 
-La clave semántica excluye únicamente datos de traza y análisis; incluye instrucciones,
-funciones, memorias, recursos, program counters, frames, llamadas,
-evaluaciones pendientes, microoperaciones activas, atomicidad y razones
-de bloqueo. Deadlock utiliza esta equivalencia.
+La clave semántica excluye únicamente datos de traza y análisis; incluye
+instrucciones, funciones, memorias, recursos, program counters, frames,
+llamadas, evaluaciones pendientes, microoperaciones activas, atomicidad
+y razones de bloqueo. Deadlock utiliza esta equivalencia.
 
 `createAnalyzedStateKey()` combina el mismo estado semántico con
 `ExecutionAnalysisState`. Una propiedad cuyo resultado dependa de
@@ -997,10 +997,10 @@ dos estados con el mismo runtime pero distinto contexto de protección no
 se deduplican incorrectamente.
 
 El engine actualiza la metadata al registrar cada transición exitosa de
-semáforo y cada lectura/escritura compartida. `getSnapshot()` calcula los
-conflictos desde esta representación, no desde `history` y
-`microOperationHistory`. Estados legados sin el campo pueden reconstruirlo
-una vez desde sus trazas para conservar compatibilidad.
+semáforo y cada lectura/escritura compartida. `getSnapshot()` calcula
+los conflictos desde esta representación, no desde `history` y
+`microOperationHistory`. Estados legados sin el campo pueden
+reconstruirlo una vez desde sus trazas para conservar compatibilidad.
 
 ### Modelo de transición
 
@@ -1052,30 +1052,58 @@ profundidad alcanzada.
 La primera propiedad fue deadlock, porque su estado terminal ya poseía
 una definición formal en M8. La segunda es una violación observada de
 exclusión mutua. Sólo acepta el diagnóstico estructurado
-`MUTUAL_EXCLUSION_VIOLATION` con razón `OBSERVED_MUTEX_OVERLAP`: no eleva
-un `POTENTIAL_RACE` ordinario a violación demostrada.
+`MUTUAL_EXCLUSION_VIOLATION` con razón `OBSERVED_MUTEX_OVERLAP`: no
+eleva un `POTENTIAL_RACE` ordinario a violación demostrada.
 
 Cada contraejemplo conserva propiedad, profundidad, límites, secuencia
 exacta de procesos, claves de los estados inicial y terminal, estado
 terminal y diagnóstico. `replayCounterexample()` concentra la
 reproducción común: parte de un fork, fuerza la secuencia, vuelve a
 evaluar la propiedad y valida ambos extremos. Los wrappers tipados de
-deadlock y exclusión mutua no dependen de una seed ni modifican el engine
-original.
+deadlock y exclusión mutua no dependen de una seed ni modifican el
+engine original.
 
 La UI conserva el engine origen junto al resultado. El panel permite
 elegir la propiedad, configurar ambos límites, muestra estado, causas de
 truncamiento y estadísticas, y representa la secuencia de procesos del
 contraejemplo. Para exclusión mutua agrega ubicación, procesos y mutex
-incompatibles como evidencia.
-La reproducción guiada avanza una elección explícita por vez sobre un
-fork del origen; la ejecución normal queda deshabilitada durante ese
-modo para evitar desviarse accidentalmente de la secuencia guardada.
+incompatibles como evidencia. La reproducción guiada avanza una elección
+explícita por vez sobre un fork del origen; la ejecución normal queda
+deshabilitada durante ese modo para evitar desviarse accidentalmente de
+la secuencia guardada.
 
 Las assertions explícitas sobre estados finales permanecen como posible
 extensión del lenguaje. La prueba de starvation/terminación,
-happens-before, partial-order reduction y el grafo visual completo quedan
-fuera del alcance inicial.
+happens-before, partial-order reduction y el grafo visual completo
+quedan fuera del alcance inicial.
+
+## 21.1. Estructuras de datos y operaciones educativas futuras
+
+El lenguaje deberá representar estructuras usadas en ejercicios
+académicos sin convertirlas en casos especiales del visualizador. Las
+colas pasan a ser una extensión prioritaria; las pilas seguirán el mismo
+modelo general.
+
+Una cola o pila local pertenece al estado privado del proceso. Si es
+compartida, sus contenidos y orden forman parte del estado semántico
+global: deben clonarse de forma independiente y participar en la
+identidad canónica utilizada por M9. Antes de implementarlas deberá
+definirse la atomicidad de cada operación compartida.
+
+Como mejora posterior se evaluarán registros/estructuras u objetos
+educativos con campos. El objetivo es representar datos como un `Fallo`
+con `id` y `nivel`, no construir inicialmente un sistema orientado a
+objetos completo. Métodos simples como `getNivel()` podrán ser azúcar
+sintáctica.
+
+También se prevén operaciones educativas simuladas como `print(...)` o
+`procesar(...)`. No realizarán I/O real ni dependerán del navegador,
+red, reloj o máquina anfitriona. Podrán producir eventos estructurados
+en la traza. Antes de implementarlas deberá decidirse su granularidad de
+step y qué información, si alguna, pertenece al estado semántico.
+
+Toda extensión deberá preservar clonación, reproducibilidad y
+compatibilidad con la exploración de interleavings de M9.
 
 ## 22. Problemas clásicos
 
@@ -1107,8 +1135,8 @@ semánticas concretas deben contrastarse con el enfoque vigente de la
 cátedra.
 
 Actualmente `await`, semáforos y los diagnósticos de M8 están
-completados. M9 continúa sobre el mismo núcleo con exploración acotada de
-interleavings y contraejemplos reproducibles.
+completados. M9 continúa sobre el mismo núcleo con exploración acotada
+de interleavings y contraejemplos reproducibles.
 
 Las primitivas futuras deben reutilizar procesos, scheduling, bloqueo,
 historial, snapshots, análisis y el modelo de transición de M9, sin

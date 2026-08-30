@@ -42,10 +42,10 @@ violaciones observadas de exclusión mutua, busy waiting conservador,
 riesgo de starvation y un estado separado para ejecuciones que alcanzan
 el límite de pasos sin estar en deadlock.
 
-M9 separa la elección del scheduler de la transición del
-motor. El engine puede enumerar procesos habilitados y ejecutar una
-elección explícita sin modificar el comportamiento de `Step` y `Run`.
-También puede bifurcar un estado intermedio en ramas completamente
+M9 separa la elección del scheduler de la transición del motor. El
+engine puede enumerar procesos habilitados y ejecutar una elección
+explícita sin modificar el comportamiento de `Step` y `Run`. También
+puede bifurcar un estado intermedio en ramas completamente
 independientes.
 
 La infraestructura de exploración separa estado semántico, metadata de
@@ -53,23 +53,23 @@ análisis y traza. Reconoce estados repetidos con una clave canónica y
 puede ampliar esa identidad para propiedades cuyo diagnóstico depende de
 la evidencia de sincronización acumulada.
 
-El núcleo ya puede recorrer interleavings mediante BFS acotada, encontrar
-el contraejemplo más corto dentro de los límites para deadlock o una
-violación observada de exclusión mutua. Distingue una propiedad
+El núcleo ya puede recorrer interleavings mediante BFS acotada,
+encontrar el contraejemplo más corto dentro de los límites para deadlock
+o una violación observada de exclusión mutua. Distingue una propiedad
 encontrada, un espacio agotado y una búsqueda truncada. La interfaz
 permite elegir la propiedad, ajustar ambos límites, iniciar la búsqueda
 desde el estado visible y reproducir el contraejemplo una elección de
 proceso por vez o de forma completa.
 
 El BFS ya no está acoplado a deadlock: una interfaz de propiedad permite
-reutilizar recorrido, límites, deduplicación y contraejemplos. Cada nueva
-propiedad puede ampliar la identidad del estado con su metadata de
-análisis. Deadlock usa solamente el estado semántico; exclusión mutua usa
-además la evidencia de accesos y semáforos.
+reutilizar recorrido, límites, deduplicación y contraejemplos. Cada
+nueva propiedad puede ampliar la identidad del estado con su metadata de
+análisis. Deadlock usa solamente el estado semántico; exclusión mutua
+usa además la evidencia de accesos y semáforos.
 
 La evidencia necesaria para analizar memoria ya vive en un estado
-separado de la traza completa. El motor conserva solamente operaciones de
-semáforo exitosas y accesos compartidos relevantes, los clona en cada
+separado de la traza completa. El motor conserva solamente operaciones
+de semáforo exitosas y accesos compartidos relevantes, los clona en cada
 rama y ofrece una clave analizada para propiedades que dependan de ese
 contexto. La búsqueda de exclusión mutua sólo acepta solapamientos
 observados con mutex incompatibles; una advertencia `POTENTIAL_RACE` por
@@ -180,16 +180,16 @@ cuando `P` vuelve a ejecutarse.
 
 ### Diagnosticar un deadlock
 
-Cuando ningún proceso puede avanzar, el simulador diferencia un
-deadlock de un bloqueo temporal. Para semáforos reconstruye dependencias
+Cuando ningún proceso puede avanzar, el simulador diferencia un deadlock
+de un bloqueo temporal. Para semáforos reconstruye dependencias
 observadas y muestra el wait-for graph, los procesos, los recursos y los
 ciclos involucrados.
 
-El diagnóstico conserva el paso de detección y puede reproducir la
-misma ejecución reiniciando el scheduler. Si el estado es terminal pero
-la información no permite demostrar un ciclo —por ejemplo un `await`
-falso sin otro proceso ejecutable— se informa un grafo parcial en lugar
-de inventar una dependencia.
+El diagnóstico conserva el paso de detección y puede reproducir la misma
+ejecución reiniciando el scheduler. Si el estado es terminal pero la
+información no permite demostrar un ciclo ---por ejemplo un `await`
+falso sin otro proceso ejecutable--- se informa un grafo parcial en
+lugar de inventar una dependencia.
 
 ### Explicar problemas de liveness
 
@@ -200,9 +200,9 @@ continúan ejecutando.
 
 Estas conclusiones se limitan a la traza observada. Starvation se
 presenta como riesgo, no como certeza. Si la ejecución llega al límite
-de seguridad, el estado `STEP_LIMIT_REACHED` la distingue de un
-deadlock y aclara que un historial finito no permite decidir si la no
-terminación era intencional.
+de seguridad, el estado `STEP_LIMIT_REACHED` la distingue de un deadlock
+y aclara que un historial finito no permite decidir si la no terminación
+era intencional.
 
 ------------------------------------------------------------------------
 
@@ -398,13 +398,13 @@ No se asume:
 -   reserva de permisos durante la reactivación.
 
 El análisis de memoria puede reconocer un semáforo general inicializado
-en `1` cuando la ejecución observada respeta un protocolo mutex correcto.
-La protección por el mismo mutex se muestra como `SYNCHRONIZED`; la
-protección unilateral como `POTENTIAL_RACE`; y un contador o protocolo
-ambiguo como `UNKNOWN`. También se reconoce como `SYNCHRONIZED` un
-traspaso directo y no ambiguo `V(s) -> P(s)` sobre un semáforo de
-señalización inicializado en `0`, siempre que el primer acceso ocurra
-antes del `V` y el segundo después del `P`.
+en `1` cuando la ejecución observada respeta un protocolo mutex
+correcto. La protección por el mismo mutex se muestra como
+`SYNCHRONIZED`; la protección unilateral como `POTENTIAL_RACE`; y un
+contador o protocolo ambiguo como `UNKNOWN`. También se reconoce como
+`SYNCHRONIZED` un traspaso directo y no ambiguo `V(s) -> P(s)` sobre un
+semáforo de señalización inicializado en `0`, siempre que el primer
+acceso ocurra antes del `V` y el segundo después del `P`.
 
 Esta clasificación no crea un tipo binario ni agrega ownership al
 runtime. Tampoco demuestra el comportamiento para todos los
@@ -415,7 +415,7 @@ una advertencia de protección inconsistente de una violación observada.
 La violación exige que la traza muestre a un proceso accediendo mientras
 el otro todavía conserva un mutex incompatible.
 
-`POTENTIAL_RACE` no significa “data race demostrada”. Un análisis formal
+`POTENTIAL_RACE` no significa "data race demostrada". Un análisis formal
 basado en happens-before requeriría relaciones causales específicas para
 cada primitiva; el orden numérico de los pasos no sirve porque es el
 interleaving total elegido por el scheduler.
@@ -423,13 +423,13 @@ interleaving total elegido por el scheduler.
 El primer caso académico de M7.7 adapta el ejercicio práctico de los
 chicos y la bolsa de caramelos. El incremento compartido se protege con
 `sem mutex = 1`, mientras el trabajo local queda fuera de la sección
-crítica para maximizar la concurrencia. Un test reproducible comprueba el
-contador final, los bloqueos observados y que nunca haya más de un
+crítica para maximizar la concurrencia. Un test reproducible comprueba
+el contador final, los bloqueos observados y que nunca haya más de un
 proceso dentro de la sección protegida.
 
-El segundo caso utiliza `sem inicio = 0` para señalización. Un trabajador
-se bloquea en `P(inicio)`, un coordinador anuncia el evento con
-`V(inicio)` y el trabajador reevalúa y consume la señal antes de
+El segundo caso utiliza `sem inicio = 0` para señalización. Un
+trabajador se bloquea en `P(inicio)`, un coordinador anuncia el evento
+con `V(inicio)` y el trabajador reevalúa y consume la señal antes de
 continuar. Este uso sincroniza por condición y no representa exclusión
 mutua.
 
@@ -441,22 +441,22 @@ decide el scheduler; no existe una cola FIFO dentro del semáforo.
 
 El cuarto caso usa `sem recursos = 2` como contador de unidades libres.
 Dos trabajadores pueden adquirir una unidad antes de que ocurra ningún
-`V`; un tercero se bloquea al encontrar el valor `0` y continúa cuando se
-devuelve una unidad. El test comprueba una concurrencia máxima de dos
+`V`; un tercero se bloquea al encontrar el valor `0` y continúa cuando
+se devuelve una unidad. El test comprueba una concurrencia máxima de dos
 usuarios y que el semáforo recupere su valor inicial al terminar. Este
 protocolo modela capacidad y no exclusión mutua.
 
 El quinto caso adapta Productor/Consumidor a un buffer unitario. `vacio`
-empieza en `1` y cuenta el lugar libre; `lleno` empieza en `0` y obliga al
-consumidor a esperar un dato. El productor deposita `42`, ejecuta
+empieza en `1` y cuenta el lugar libre; `lleno` empieza en `0` y obliga
+al consumidor a esperar un dato. El productor deposita `42`, ejecuta
 `V(lleno)` y el consumidor consume esa señal antes de leer el buffer. Al
 terminar, el dato fue transferido, `vacio` vuelve a `1` y `lleno` a `0`.
 
 Para explicar correctamente ese acceso, el análisis reconoce el orden
 directo escritura - `V(lleno)` - `P(lleno)` - lectura como
-`SEMAPHORE_SIGNALING`. La regla es intencionalmente estrecha: no reemplaza
-un análisis formal completo de happens-before ni generaliza señales o
-contadores ambiguos.
+`SEMAPHORE_SIGNALING`. La regla es intencionalmente estrecha: no
+reemplaza un análisis formal completo de happens-before ni generaliza
+señales o contadores ambiguos.
 
 El sexto caso amplía el buffer a dos posiciones y produce tres mensajes.
 Con **First Ready**, el productor deposita `10` y `20`, consume las dos
@@ -472,14 +472,16 @@ consumidor. `atomic` hace indivisible cada acceso al buffer; `vacio` y
 productores o consumidores, que requerirían mutex adicionales para sus
 índices compartidos.
 
-El séptimo caso implementa una barrera de un solo uso para tres procesos.
-Cada uno incrementa un contador protegido por `mutex`; el último genera
-tres permisos mediante `V(barrera)` y todos consumen uno antes de
-continuar. El test exige que nadie cruce antes de `contador == 3` y que
-cada proceso libere el mutex antes de bloquearse en la barrera.
+El séptimo caso implementa una barrera de un solo uso para tres
+procesos. Cada uno incrementa un contador protegido por `mutex`; el
+último genera tres permisos mediante `V(barrera)` y todos consumen uno
+antes de continuar. El test exige que nadie cruce antes de
+`contador == 3` y que cada proceso libere el mutex antes de bloquearse
+en la barrera.
 
 La barrera usa `sem barrera = 0` como señalización, no como exclusión
-mutua. Se emite un permiso por proceso y no se infiere ningún orden FIFO.
+mutua. Se emite un permiso por proceso y no se infiere ningún orden
+FIFO.
 
 El octavo caso adapta Lectores/Escritores con preferencia a lectores.
 `mutexR` protege `nr`; el primer lector toma `rw` y el último lo libera.
@@ -494,9 +496,9 @@ puede causar starvation del escritor.
 
 El noveno caso adapta Filósofos Comensales sin requerir arrays de
 semáforos: cinco semáforos generales `tenedor0` a `tenedor4` representan
-los tenedores. Los filósofos `0` a `3` los toman en orden ascendente y el
-`Filosofo4` toma primero `tenedor0` y después `tenedor4`, rompiendo la
-espera circular.
+los tenedores. Los filósofos `0` a `3` los toman en orden ascendente y
+el `Filosofo4` toma primero `tenedor0` y después `tenedor4`, rompiendo
+la espera circular.
 
 Con Round Robin, `Filosofo0` y `Filosofo2` pueden comer simultáneamente
 porque no son vecinos, mientras los procesos que compiten por alguno de
@@ -639,24 +641,40 @@ cerrada una fase que modifica código.
 La documentación forma parte del proyecto y se actualiza junto con el
 código.
 
-  ---------------------------------------------------------------------------------
-  Documento                                     Contenido
-  --------------------------------------------- -----------------------------------
-  **[BACKLOG.md](BACKLOG.md)**                  Fuente de verdad del roadmap,
-                                                milestones y tickets
+  -----------------------------------------------------------------------
+  Documento                                Contenido
+  ---------------------------------------- ------------------------------
+  **[BACKLOG.md](BACKLOG.md)**             Fuente de verdad del roadmap,
+                                           milestones y tickets
 
-  **[ARCHITECTURE.md](ARCHITECTURE.md)**        Arquitectura vigente y
-                                                funcionamiento interno del motor
+  **[ARCHITECTURE.md](ARCHITECTURE.md)**   Arquitectura vigente y
+                                           funcionamiento interno del
+                                           motor
 
-  **[DECISIONS.md](DECISIONS.md)**              Decisiones arquitectónicas costosas
-                                                de olvidar
+  **[DECISIONS.md](DECISIONS.md)**         Decisiones arquitectónicas
+                                           costosas de olvidar
 
-  **[PROGRESS.md](PROGRESS.md)**                Historial de implementación y
-                                                estado actual
+  **[PROGRESS.md](PROGRESS.md)**           Historial de implementación y
+                                           estado actual
 
-  **[SYNTAX.md](SYNTAX.md)**                    Sintaxis actualmente soportada por
-                                                el lenguaje
-  ---------------------------------------------------------------------------------
+  **[SYNTAX.md](SYNTAX.md)**               Sintaxis actualmente soportada
+                                           por el lenguaje
+  -----------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## Extensiones de lenguaje previstas
+
+El roadmap incluye colas y pilas para expresar directamente estructuras
+utilizadas en ejercicios académicos. Las colas tienen prioridad porque
+ya aparecen en casos que hoy requieren adaptaciones artificiales con
+arrays e índices.
+
+Como evolución posterior se evaluarán registros/estructuras u objetos
+educativos con campos y métodos simples, además de operaciones simuladas
+como `print(...)`. Estas podrán representar una acción observable sin
+realizar I/O real, preservando la reproducibilidad y la exploración
+determinista.
 
 ------------------------------------------------------------------------
 
