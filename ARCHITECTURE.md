@@ -1251,9 +1251,27 @@ de simulación conserva `status-bar` como encabezado sticky y desplaza el
 resto de las vistas sin mover el editor.
 
 Por debajo de 1100 px se elimina la altura cerrada y ambas superficies
-regresan al flujo vertical del documento. En pantallas pequeñas las
-columnas se convertirán más adelante en pestañas semánticas, evitando
-reducir editor, procesos e historial hasta volverlos ilegibles.
+regresan al flujo vertical del documento. Hasta 600 px,
+`mobileWorkspaceTab` proyecta el mismo árbol de UI en cuatro vistas:
+Code, State, Processes e History. CSS oculta sólo las secciones ajenas a
+la vista y mantiene `editor-controls-dock` montado, de modo que cambiar de
+pestaña no clona ni reinicia engine, snapshot, editor o historial.
+
+El tablist usa selección única y navegación por flechas, Home y End. El
+catálogo permanece montado pero se presenta como panel desplegable dentro
+de Code; cargar un ejemplo lo vuelve a cerrar. Las tablas que necesitan
+ancho adicional contienen su propio scroll horizontal en vez de ampliar
+el documento.
+
+La semántica de pestañas se monta sólo cuando `matchMedia` confirma el
+breakpoint mobile; escritorio no conserva roles ARIA ocultos. Settings
+encierra el foco, admite Escape y lo devuelve a su disparador. Los errores
+de compilación son regiones `alert`, y botones, selects, inputs y textarea
+comparten un indicador `focus-visible` basado en `--focus-ring`.
+
+`prefers-reduced-motion: reduce` elimina las transiciones de tema y de los
+switches. El editor y el historial modifican sus posiciones de scroll de
+forma inmediata, por lo que no requieren una variante animada adicional.
 
 ## 22. Problemas clásicos
 

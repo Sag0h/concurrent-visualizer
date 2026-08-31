@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import './App.css'
 import { createExecutionState } from './core/engine/createExecutionState'
 import { SimulationEngine } from './core/engine/SimulationEngine'
@@ -78,6 +83,30 @@ type ExplorationSession =
         MutualExclusionViolationExplorationResult
     }
 
+type MobileWorkspaceTab =
+  | 'CODE'
+  | 'STATE'
+  | 'PROCESSES'
+  | 'HISTORY'
+
+const mobileWorkspaceTabs: ReadonlyArray<{
+  readonly id: MobileWorkspaceTab
+  readonly label: string
+}> = [
+  { id: 'CODE', label: 'Code' },
+  { id: 'STATE', label: 'State' },
+  { id: 'PROCESSES', label: 'Processes' },
+  { id: 'HISTORY', label: 'History' },
+]
+
+const mobileWorkspaceMediaQuery = '(max-width: 600px)'
+
+function matchesMobileWorkspace(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(mobileWorkspaceMediaQuery).matches
+}
+
 function App() {
   const [code, setCode] = useState(initialCode)
 
@@ -86,6 +115,15 @@ function App() {
 
   const [isSettingsOpen, setIsSettingsOpen] =
     useState(false)
+
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] =
+    useState<MobileWorkspaceTab>('CODE')
+
+  const [isMobileExamplesOpen, setIsMobileExamplesOpen] =
+    useState(false)
+
+  const [isMobileWorkspace, setIsMobileWorkspace] =
+    useState(matchesMobileWorkspace)
 
   const [selectedExampleId, setSelectedExampleId] =
     useState('')
@@ -166,6 +204,27 @@ function App() {
       // The app remains usable when storage is unavailable.
     }
   }, [interfacePreferences])
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia(
+      mobileWorkspaceMediaQuery,
+    )
+    const handleChange = () => setIsMobileWorkspace(
+      mediaQuery.matches,
+    )
+
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => mediaQuery.removeEventListener(
+      'change',
+      handleChange,
+    )
+  }, [])
 
   useEffect(() => {
     if (!isPlaying || !engine) {
@@ -294,6 +353,7 @@ function App() {
     setSelectedExampleId(example.id)
     setPendingExampleId(null)
     setHasUserEditedCode(false)
+    setIsMobileExamplesOpen(false)
     invalidateBuild()
   }
 
@@ -978,6 +1038,47 @@ function App() {
   const programStatus =
     snapshot?.executionStatus ?? 'RUNNING'
 
+  function handleMobileWorkspaceTabKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    tab: MobileWorkspaceTab,
+  ) {
+    const currentIndex = mobileWorkspaceTabs.findIndex(
+      (candidate) => candidate.id === tab,
+    )
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % mobileWorkspaceTabs.length
+    } else if (event.key === 'ArrowLeft') {
+      nextIndex = (
+        currentIndex - 1 + mobileWorkspaceTabs.length
+      ) % mobileWorkspaceTabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = mobileWorkspaceTabs.length - 1
+    }
+
+    if (nextIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+
+    const nextTab = mobileWorkspaceTabs[nextIndex]
+    const tabList = event.currentTarget.parentElement
+
+    setMobileWorkspaceTab(nextTab.id)
+
+    window.requestAnimationFrame(() => {
+      tabList
+        ?.querySelector<HTMLButtonElement>(
+          `#mobile-workspace-tab-${nextTab.id.toLowerCase()}`,
+        )
+        ?.focus()
+    })
+  }
+
   const canAdvanceSimulation =
     engine !== null
     && replayChoiceIndex === null
@@ -1002,6 +1103,7 @@ function App() {
         <button
           className="settings-button"
           type="button"
+          aria-label="Settings"
           aria-haspopup="dialog"
           aria-expanded={isSettingsOpen}
           onClick={() => setIsSettingsOpen(true)}
@@ -1022,7 +1124,48 @@ function App() {
         />
       )}
 
-      <section className="workspace">
+      {isMobileWorkspace && (
+        <div
+          className="mobile-workspace-tabs"
+          role="tablist"
+          aria-label="Workspace views"
+        >
+          {mobileWorkspaceTabs.map((tab) => (
+            <button
+              id={`mobile-workspace-tab-${tab.id.toLowerCase()}`}
+              type="button"
+              role="tab"
+              aria-controls="mobile-workspace-content"
+              aria-selected={mobileWorkspaceTab === tab.id}
+              tabIndex={mobileWorkspaceTab === tab.id ? 0 : -1}
+              className={
+                mobileWorkspaceTab === tab.id
+                  ? 'mobile-workspace-tab active'
+                  : 'mobile-workspace-tab'
+              }
+              key={tab.id}
+              onClick={() => setMobileWorkspaceTab(tab.id)}
+              onKeyDown={(event) =>
+                handleMobileWorkspaceTabKeyDown(event, tab.id)
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <section
+        id="mobile-workspace-content"
+        className="workspace"
+        role={isMobileWorkspace ? 'tabpanel' : undefined}
+        aria-labelledby={
+          isMobileWorkspace
+            ? `mobile-workspace-tab-${mobileWorkspaceTab.toLowerCase()}`
+            : undefined
+        }
+        data-mobile-tab={mobileWorkspaceTab.toLowerCase()}
+      >
         <div className="editor-panel">
           <div className="editor-scroll-region">
             <div className="panel-header">
@@ -1098,47 +1241,74 @@ function App() {
 
           {interfacePreferences.panels.examples && (
             <>
-              <ExamplePicker
-                examples={programExamples}
-                selectedExampleId={selectedExampleId}
-                onSelect={(exampleId) => {
-                  setSelectedExampleId(exampleId)
-                  setPendingExampleId(null)
-                }}
-                onRequestLoad={handleRequestExampleLoad}
-              />
+              <button
+                className="mobile-examples-toggle"
+                type="button"
+                aria-controls="mobile-examples-panel"
+                aria-expanded={isMobileExamplesOpen}
+                onClick={() => setIsMobileExamplesOpen(
+                  (current) => !current,
+                )}
+              >
+                <span>
+                  <strong>Educational examples</strong>
+                  <small>Browse the catalogue</small>
+                </span>
+                <span aria-hidden="true">
+                  {isMobileExamplesOpen ? '−' : '+'}
+                </span>
+              </button>
 
-              {pendingExampleId && (
-                <div
-                  className="example-replace-warning"
-                  role="alert"
-                >
-                  <div>
-                    <strong>Replace your edited program?</strong>
-                    <p>
-                      Loading this example will replace the current editor contents.
-                      The example will not be built or run automatically.
-                    </p>
-                  </div>
+              <div
+                id="mobile-examples-panel"
+                className={
+                  isMobileExamplesOpen
+                    ? 'mobile-examples-panel open'
+                    : 'mobile-examples-panel'
+                }
+              >
+                <ExamplePicker
+                  examples={programExamples}
+                  selectedExampleId={selectedExampleId}
+                  onSelect={(exampleId) => {
+                    setSelectedExampleId(exampleId)
+                    setPendingExampleId(null)
+                  }}
+                  onRequestLoad={handleRequestExampleLoad}
+                />
 
-                  <div className="example-replace-actions">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        applySelectedExample(pendingExampleId)
-                      }
-                    >
-                      Replace and load
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingExampleId(null)}
-                    >
-                      Cancel
-                    </button>
+                {pendingExampleId && (
+                  <div
+                    className="example-replace-warning"
+                    role="alert"
+                  >
+                    <div>
+                      <strong>Replace your edited program?</strong>
+                      <p>
+                        Loading this example will replace the current editor contents.
+                        The example will not be built or run automatically.
+                      </p>
+                    </div>
+
+                    <div className="example-replace-actions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applySelectedExample(pendingExampleId)
+                        }
+                      >
+                        Replace and load
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingExampleId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
 
@@ -1231,7 +1401,7 @@ function App() {
             />
 
             {error && (
-              <div className="error-box">
+              <div className="error-box" role="alert">
                 <strong>Error</strong>
                 <pre>{error}</pre>
               </div>
@@ -1282,35 +1452,39 @@ function App() {
                 </span>
               </section>
 
-              <ExecutionFocusPanel
-                focus={snapshot.executionFocus}
-              />
+              <div className="simulation-mobile-section simulation-state-section">
+                <ExecutionFocusPanel
+                  focus={snapshot.executionFocus}
+                />
+              </div>
 
               {interfacePreferences.panels.exploration && (
-                <ExplorationPanel
-                  target={explorationTarget}
-                  limits={explorationLimits}
-                  result={
-                    explorationSession?.result ?? null
-                  }
-                  replayChoiceIndex={replayChoiceIndex}
-                  onTargetChange={
-                    handleExplorationTargetChange
-                  }
-                  onLimitsChange={setExplorationLimits}
-                  onExplore={handleExplore}
-                  onStartReplay={
-                    handleStartCounterexampleReplay
-                  }
-                  onReplayNext={handleReplayNextChoice}
-                  onReplayAll={handleReplayAllChoices}
-                  onExitReplay={
-                    handleExitCounterexampleReplay
-                  }
-                />
+                <div className="simulation-mobile-section simulation-state-section">
+                  <ExplorationPanel
+                    target={explorationTarget}
+                    limits={explorationLimits}
+                    result={
+                      explorationSession?.result ?? null
+                    }
+                    replayChoiceIndex={replayChoiceIndex}
+                    onTargetChange={
+                      handleExplorationTargetChange
+                    }
+                    onLimitsChange={setExplorationLimits}
+                    onExplore={handleExplore}
+                    onStartReplay={
+                      handleStartCounterexampleReplay
+                    }
+                    onReplayNext={handleReplayNextChoice}
+                    onReplayAll={handleReplayAllChoices}
+                    onExitReplay={
+                      handleExitCounterexampleReplay
+                    }
+                  />
+                </div>
               )}
 
-              <section>
+              <section className="simulation-mobile-section simulation-processes-section">
                 <h2>Processes</h2>
 
                 <div className="process-grid">
@@ -1426,7 +1600,7 @@ function App() {
                 </div>
               </section>
 
-              <section>
+              <section className="simulation-mobile-section simulation-state-section">
                 <h2>
                   Shared Memory
                 </h2>
@@ -1441,7 +1615,7 @@ function App() {
               </section>
 
               {snapshot.semaphores.length > 0 && (
-                <section>
+                <section className="simulation-mobile-section simulation-state-section">
                   <h2>Semaphores</h2>
 
                   <div className="semaphore-grid">
@@ -1496,7 +1670,7 @@ function App() {
 
               {snapshot.deadlock && (
                 <section
-                  className="deadlock-panel"
+                  className="deadlock-panel simulation-mobile-section simulation-state-section"
                   aria-labelledby="deadlock-heading"
                 >
                   <div className="deadlock-header">
@@ -1672,7 +1846,7 @@ function App() {
               {interfacePreferences.panels.diagnostics
                 && snapshot.runtimeDiagnostics.length > 0 && (
                 <section
-                  className="runtime-diagnostics"
+                  className="runtime-diagnostics simulation-mobile-section simulation-state-section"
                   aria-labelledby="runtime-diagnostics-heading"
                 >
                   <div className="runtime-diagnostics-header">
@@ -1749,7 +1923,7 @@ function App() {
                 </section>
               )}
 
-              <section>
+              <section className="simulation-mobile-section simulation-history-section">
                 <div className="history-header">
                   <h2>Execution History</h2>
 

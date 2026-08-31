@@ -55,8 +55,14 @@ Restore defaults recupera System y todos los paneles.
 En escritorio, editor y simulación ocupan la altura disponible y tienen
 scroll independiente. Los controles permanecen visibles bajo el editor y
 la barra de estado queda fija sobre procesos, memorias e historial. En
-anchos menores el contenido vuelve a un flujo vertical legible; la
-navegación mobile por pestañas permanece como siguiente mejora de M11.
+anchos menores el contenido vuelve a un flujo vertical legible. En mobile,
+las pestañas Code, State, Processes e History reorganizan ese mismo estado
+sin reiniciar la simulación; los controles siguen accesibles y el catálogo
+se abre sólo cuando se necesita.
+
+La interfaz admite teclado en pestañas y Settings, conserva indicadores de
+foco visibles, anuncia errores de compilación, respeta movimiento reducido
+y mantiene contraste WCAG en los estados revisados de Light y Dark.
 
 Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
 comparar soluciones con semáforos, monitores y pasaje de mensajes. El

@@ -25,9 +25,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** continuar M11 adaptando la navegación mobile
-mediante pestañas para Código, Estado, Procesos e Historial. Después se
-hará la auditoría responsive y de accesibilidad completa. Las assertions
+**Próximo objetivo:** la vertical de personalización de M11 está cerrada.
+Corresponde decidir si se priorizan las visualizaciones opcionales aún
+pendientes de M11 o si comienza M12 con monitores. Las assertions
 explícitas se evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
@@ -2232,3 +2232,53 @@ La validación visual cubrió escritorio de 1440×900 en temas Light y Dark,
 scroll independiente, controles activos y teléfonos de 390 y 320 px. Las
 pestañas mobile siguen siendo el próximo ticket: este cambio sólo asegura
 una base vertical usable y no anticipa su navegación.
+
+## 2026-08-31 --- M11: navegación mobile por pestañas
+
+En pantallas de hasta 600 px la interfaz ofrece cuatro vistas: Code,
+State, Processes e History. La navegación no duplica componentes ni
+estado: aplica una proyección visual sobre el mismo editor, snapshot e
+historial usados en escritorio. En anchos mayores el tablist desaparece
+y ambas columnas continúan visibles simultáneamente.
+
+Code muestra editor y catálogo; State reúne foco, memoria compartida,
+semáforos, BFS, deadlock y diagnósticos; Processes conserva las tarjetas
+de procesos; History presenta instrucciones o microoperaciones. El dock
+con Build, Step Back, Step, Run, Reset y Play/Pause permanece visible
+sobre las tres vistas de simulación para poder avanzar sin volver a Code.
+
+El catálogo se convirtió en un panel desplegable mobile y se cierra al
+cargar un ejemplo. Settings conserva su modal y su botón recibió un nombre
+accesible aun cuando la etiqueta visual se oculta. El tablist implementa
+`aria-selected`, foco único y navegación con Arrow Left/Right, Home y End.
+
+La validación visual cubrió Light y Dark, cambio entre las cuatro vistas,
+construcción, Step, regreso a Code sin perder la simulación, catálogo
+desplegable y ausencia de desbordamiento global. Las tablas extensas del
+historial mantienen scroll horizontal local.
+
+## 2026-08-31 --- M11: auditoría responsive y de accesibilidad
+
+La auditoría responsive verificó 320, 390, 600, 768, 1100 y 1440 px sin
+scroll horizontal global. También recorrió Code, State, Processes e
+History con una simulación activa a 320 px; sólo las tablas extensas
+conservan desplazamiento horizontal dentro de su propio contenedor.
+
+El tablist se renderiza únicamente cuando el media query mobile está
+activo, por lo que escritorio no expone un `tabpanel` sin navegación
+asociada. Arrow Left/Right, Home y End actualizan selección y foco. Todos
+los botones visibles tienen nombre accesible y todos los campos visibles
+tienen etiqueta. Los controles interactivos comparten un indicador
+`focus-visible` de tres píxeles.
+
+Settings enfoca inicialmente Close, cicla de Done a Close y de Close a
+Done, cierra con Escape y devuelve el foco al botón que lo abrió. Los
+errores de Build usan `role="alert"` para anunciarse sin exigir que el
+usuario encuentre visualmente el panel.
+
+La medición WCAG de los estados representativos no encontró fallos en
+Dark. En Light detectó únicamente `.empty` a 3.54:1; se reemplazó su gris
+fijo por `--text-muted` y quedó en 5.98:1 sobre blanco. El soporte de
+movimiento reducido elimina las únicas transiciones existentes —tema y
+switches— y el seguimiento del editor utiliza desplazamiento inmediato,
+no animado.

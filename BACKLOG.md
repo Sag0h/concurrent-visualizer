@@ -973,11 +973,11 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
     código, estado e historial observables sin recorrer toda la página.
 -   [ ] Evaluar paneles redimensionables después de validar el nuevo
     layout; no incorporarlos como requisito de la primera versión.
--   [ ] Mejorar la experiencia mobile mediante pestañas para Código,
+-   [x] Mejorar la experiencia mobile mediante pestañas para Código,
     Estado, Procesos e Historial, conservando los controles principales
     accesibles y usando modal o panel deslizable para catálogo y
     Settings.
--   [ ] Verificar responsive, navegación por teclado, foco del modal,
+-   [x] Verificar responsive, navegación por teclado, foco del modal,
     contraste y preferencia de movimiento reducido.
 
 ------------------------------------------------------------------------
