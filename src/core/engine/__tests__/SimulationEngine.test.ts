@@ -514,6 +514,13 @@ describe('SimulationEngine', () => {
     expect(engine.getSnapshot()).toEqual({
       stepCount: 1,
       executionStatus: 'FINISHED',
+      executionFocus: {
+        step: 1,
+        processId: 'P1',
+        instructionType: 'DECLARE',
+        description: undefined,
+        microOperation: undefined,
+      },
       deadlock: undefined,
       runtimeDiagnostics: [],
       sharedMemory: {
@@ -966,6 +973,23 @@ describe('SimulationEngine', () => {
         atomicDepth: 0,
       },
     ])
+    expect(snapshot.executionFocus).toEqual({
+      step: 3,
+      processId: 'P1',
+      instructionType: 'ASSIGN',
+      description: undefined,
+      microOperation: {
+        step: 3,
+        processId: 'P1',
+        type: 'SHARED_WRITE',
+        description: 'x = 1',
+        location: {
+          type: 'VARIABLE',
+          name: 'x',
+        },
+        atomicDepth: 0,
+      },
+    })
   })
 
   it('records shared memory locations structurally in micro-operation history', () => {
@@ -2348,6 +2372,28 @@ describe('SimulationEngine', () => {
         waitingProcessIds: [],
       },
     ])
+  })
+
+  it('clears execution focus when the simulation resets', () => {
+    const engine = new SimulationEngine(
+      createExecutionState(parseProgram(`
+        process P1 {
+          int value = 1;
+        }
+      `)),
+      new FirstReadyScheduler(),
+    )
+
+    expect(engine.getSnapshot().executionFocus)
+      .toBeUndefined()
+
+    engine.step()
+    expect(engine.getSnapshot().executionFocus?.processId)
+      .toBe('P1')
+
+    engine.reset()
+    expect(engine.getSnapshot().executionFocus)
+      .toBeUndefined()
   })
 
   it('returns semaphore copies in the visualization snapshot', () => {

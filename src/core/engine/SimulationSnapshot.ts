@@ -10,9 +10,11 @@ import type {
   ProgramExecutionStatus,
 } from '../deadlock/DeadlockDiagnostic'
 import type { RuntimeDiagnostic } from '../diagnostics/RuntimeDiagnostic'
+
 export interface SimulationSnapshot {
   readonly stepCount: number
   readonly executionStatus: ProgramExecutionStatus
+  readonly executionFocus?: ExecutionFocusSnapshot
   readonly deadlock?: DeadlockDiagnostic
   readonly runtimeDiagnostics: RuntimeDiagnostic[]
   readonly sharedMemory: Memory
@@ -21,6 +23,14 @@ export interface SimulationSnapshot {
   readonly microOperationHistory: MicroOperationEvent[]
   readonly memoryAccessConflicts: MemoryAccessConflict[]
   readonly memoryConflictSummaries: MemoryConflictSummary[]
+}
+
+export interface ExecutionFocusSnapshot {
+  readonly step: number
+  readonly processId: ProcessId
+  readonly instructionType: string
+  readonly description?: string
+  readonly microOperation?: MicroOperationEvent
 }
 
 export interface SemaphoreSnapshot {

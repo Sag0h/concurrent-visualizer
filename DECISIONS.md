@@ -1187,3 +1187,30 @@ scheduler.
 
 **Motivo:** ofrecer animación educativa sin crear un segundo motor ni
 introducir concurrencia real dentro del simulador.
+
+------------------------------------------------------------------------
+
+## ADR-033 --- El foco visual deriva del snapshot y de la traza
+
+**Estado:** Aceptada
+
+**Contexto:** Step, Play y replay necesitan señalar el mismo proceso,
+instrucción y microoperación sin hacer que la UI inspeccione program
+counters, frames internos o runtimes parciales del engine.
+
+**Decisión:** `SimulationSnapshot` expone un `executionFocus` derivado
+del último evento ejecutado. Si la microoperación más reciente pertenece
+al mismo step, se incluye como detalle del foco. La vista utiliza esa
+metadata para el panel, la tarjeta de proceso y el historial.
+
+El foco representa el último step efectivamente ejecutado. No se lo
+presenta como ubicación exacta dentro del código fuente, porque el AST
+todavía no conserva rangos del tokenizer.
+
+**Consecuencia:** todas las formas de avance comparten el mismo foco y
+Reset lo elimina junto con el historial. La metadata no modifica estado
+semántico, schedulers, claves de exploración ni contraejemplos.
+
+**Motivo:** mantener la explicación visual fiel a los eventos reales y
+reservar el resaltado del editor para una implementación con posiciones
+de origen correctas.

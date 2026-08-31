@@ -25,10 +25,10 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** continuar M11 resaltando la instrucción y la
-microoperación actual durante Step y reproducción continua. Las
-assertions explícitas se evaluaron y quedaron como extensión futura del
-lenguaje.
+**Próximo objetivo:** continuar M11 conservando posiciones de origen
+desde el parser para poder resaltar la línea exacta dentro del editor.
+Las assertions explícitas se evaluaron y quedaron como extensión futura
+del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2122,3 +2122,22 @@ adquisición.
 Cuando M13.5 incorpore `sleep(ticks)`, `yield` o una operación simulada de
 trabajo equivalente, estos incrementos deberán reemplazarse por esa
 primitiva explícita y determinista.
+
+## 2026-08-31 --- M11: foco de ejecución
+
+Cada `SimulationSnapshot` expone ahora `executionFocus`: step, proceso,
+tipo de instrucción, descripción disponible y la microoperación del
+mismo paso cuando existe. La UI no consulta estructuras internas para
+determinar el foco, por lo que Step, Play, Reset y los replays producen
+el mismo resultado visual.
+
+La interfaz presenta un panel de foco, destaca la tarjeta del último
+proceso seleccionado y marca con `Latest` la instrucción ejecutada. En
+la pestaña de microoperaciones se resalta el evento más reciente sin
+ocultar sus colores de race, sincronización o diagnóstico. El historial
+se desplaza hacia la última fila mientras avanza la ejecución.
+
+Este foco explica el último paso real. Resaltar la línea exacta del
+pseudocódigo queda como ticket separado porque requiere conservar
+posiciones de origen en tokenizer, parser y AST; el editor actual no
+dispone todavía de esa correspondencia.

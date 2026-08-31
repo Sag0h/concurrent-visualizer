@@ -1171,6 +1171,21 @@ reproducción. Las operaciones que reemplazan, reinician, exploran o
 ejecutan completamente el estado también la cancelan, impidiendo dos
 fuentes simultáneas de avance.
 
+### 21.2. Foco de ejecución
+
+`SimulationSnapshot.executionFocus` deriva del último `ExecutionEvent`.
+Expone step, proceso, tipo de instrucción, descripción y, si pertenece al
+mismo step, la última `MicroOperationEvent`. Esta metadata es de
+presentación y no se almacena como estado semántico adicional: Reset la
+elimina naturalmente al vaciar la traza y los forks la reconstruyen a
+partir de su propio historial.
+
+`ExecutionFocusPanel`, las tarjetas de procesos y ambas vistas del
+historial consumen el mismo foco. La UI distingue explícitamente “último
+step ejecutado” de “próxima instrucción”; todavía no intenta inferir una
+línea del editor desde el program counter. Esa segunda capacidad requiere
+preservar rangos de origen en tokens y AST.
+
 ## 22. Problemas clásicos
 
 Los problemas clásicos no se codifican como animaciones especiales.

@@ -868,9 +868,38 @@ export class SimulationEngine {
             memoryAnalysis.initialSemaphoreValues,
         },
       )
+    const latestExecutionEvent =
+      this.state.history[
+        this.state.history.length - 1
+      ]
+    const microOperationHistory =
+      this.state.microOperationHistory ?? []
+    const latestMicroOperation =
+      microOperationHistory[
+        microOperationHistory.length - 1
+      ]
+
     return {
       stepCount: this.state.stepCount,
       executionStatus: executionDiagnostic.status,
+      executionFocus: latestExecutionEvent
+        ? {
+            step: latestExecutionEvent.step,
+            processId:
+              latestExecutionEvent.processId,
+            instructionType:
+              latestExecutionEvent.instructionType,
+            description:
+              latestExecutionEvent.description,
+            microOperation:
+              latestMicroOperation?.step
+                === latestExecutionEvent.step
+                ? structuredClone(
+                    latestMicroOperation,
+                  )
+                : undefined,
+          }
+        : undefined,
       deadlock: executionDiagnostic.deadlock,
       runtimeDiagnostics:
         analyzeRuntimeDiagnostics(this.state, {
@@ -922,7 +951,7 @@ export class SimulationEngine {
         }),
       ),
       microOperationHistory: structuredClone(
-        this.state.microOperationHistory ?? [],
+        microOperationHistory,
       ),
       memoryAccessConflicts,
       memoryConflictSummaries:

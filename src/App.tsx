@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import { createExecutionState } from './core/engine/createExecutionState'
 import { SimulationEngine } from './core/engine/SimulationEngine'
@@ -30,6 +30,7 @@ import {
 } from './components/ExplorationPanel'
 import { ExamplePicker } from './components/ExamplePicker'
 import { PlaybackControls } from './components/PlaybackControls'
+import { ExecutionFocusPanel } from './components/ExecutionFocusPanel'
 import {
   findProgramExample,
   programExamples,
@@ -126,6 +127,14 @@ function App() {
   const [replayChoiceIndex, setReplayChoiceIndex] =
     useState<number | null>(null)
 
+  const [historyMode, setHistoryMode] =
+    useState<'instructions' | 'microoperations'>(
+      'instructions',
+    )
+
+  const historyRef =
+    useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (!isPlaying || !engine) {
       return
@@ -153,6 +162,16 @@ function App() {
 
     return () => window.clearInterval(intervalId)
   }, [engine, isPlaying, playbackSpeed])
+
+  useEffect(() => {
+    const history = historyRef.current
+
+    if (!history) {
+      return
+    }
+
+    history.scrollTop = history.scrollHeight
+  }, [historyMode, snapshot?.stepCount])
 
   function handleBuild() {
     setIsPlaying(false)
@@ -598,11 +617,6 @@ function App() {
       Math.random() * 2_147_483_647,
     )
   }
-
-  const [historyMode, setHistoryMode] =
-    useState<'instructions' | 'microoperations'>(
-      'instructions',
-    )
 
   const handleEditorKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
@@ -1161,6 +1175,10 @@ function App() {
                 </span>
               </section>
 
+              <ExecutionFocusPanel
+                focus={snapshot.executionFocus}
+              />
+
               <ExplorationPanel
                 target={explorationTarget}
                 limits={explorationLimits}
@@ -1190,7 +1208,12 @@ function App() {
                   {snapshot.processes.map(
                     (process) => (
                       <article
-                        className="process-card"
+                        className={
+                          process.id
+                            === snapshot.executionFocus?.processId
+                            ? 'process-card process-card-focused'
+                            : 'process-card'
+                        }
                         key={process.id}
                       >
                         <div className="process-header">
@@ -1206,6 +1229,13 @@ function App() {
                             {process.state}
                           </span>
                         </div>
+
+                        {process.id
+                          === snapshot.executionFocus?.processId && (
+                          <span className="process-focus-badge">
+                            LAST STEP
+                          </span>
+                        )}
 
                         <p>
                           Program counter:{' '}
@@ -1644,7 +1674,10 @@ function App() {
                   </div>
                 </div>
 
-                <div className="history">
+                <div
+                  className="history"
+                  ref={historyRef}
+                >
                   {historyMode === 'instructions' ? (
                     engine.getState().history.length === 0 ? (
                       <p className="empty">
@@ -1669,8 +1702,28 @@ function App() {
                             .map((entry) => (
                               <tr
                                 key={`${entry.step}-${entry.processId}`}
+                                className={
+                                  entry.step
+                                    === snapshot.executionFocus?.step
+                                    ? 'history-current-row'
+                                    : undefined
+                                }
+                                aria-current={
+                                  entry.step
+                                    === snapshot.executionFocus?.step
+                                    ? 'step'
+                                    : undefined
+                                }
                               >
-                                <td>{entry.step}</td>
+                                <td>
+                                  {entry.step}
+                                  {entry.step
+                                    === snapshot.executionFocus?.step && (
+                                    <span className="history-current-indicator">
+                                      Latest
+                                    </span>
+                                  )}
+                                </td>
                                 <td>{entry.processId}</td>
 
                                 <td>
@@ -1777,20 +1830,41 @@ function App() {
                               const hasUnknownAccess =
                                 unknownConflicts.some(belongsToConflict)
 
+                              const isLatestMicroOperation =
+                                index
+                                  === snapshot.microOperationHistory.length - 1
+
+                              const rowClassName = [
+                                isLatestMicroOperation
+                                  ? 'history-current-row'
+                                  : '',
+                                hasPotentialRace
+                                  ? 'memory-conflict-row'
+                                  : hasUnknownAccess
+                                    ? 'memory-unknown-row'
+                                    : hasSynchronizedAccess
+                                      ? 'memory-synchronized-row'
+                                      : '',
+                              ].filter(Boolean).join(' ')
+
                               return (
                                 <tr
                                   key={`${entry.step}-${entry.processId}-${entry.type}-${index}`}
-                                  className={
-                                    hasPotentialRace
-                                      ? 'memory-conflict-row'
-                                      : hasUnknownAccess
-                                        ? 'memory-unknown-row'
-                                      : hasSynchronizedAccess
-                                        ? 'memory-synchronized-row'
-                                        : undefined
+                                  className={rowClassName || undefined}
+                                  aria-current={
+                                    isLatestMicroOperation
+                                      ? 'step'
+                                      : undefined
                                   }
                                 >
-                                  <td>{entry.step}</td>
+                                  <td>
+                                    {entry.step}
+                                    {isLatestMicroOperation && (
+                                      <span className="history-current-indicator">
+                                        Latest
+                                      </span>
+                                    )}
+                                  </td>
                                   <td>{entry.processId}</td>
                                   <td>
                                     <span

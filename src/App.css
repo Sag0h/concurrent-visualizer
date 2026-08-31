@@ -303,6 +303,76 @@ button:disabled {
   background: #fafafa;
 }
 
+.execution-focus-panel {
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border: 1px solid #d4b54f;
+  border-left: 5px solid #c89d17;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.execution-focus-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.execution-focus-heading > span,
+.process-focus-badge,
+.history-current-indicator {
+  color: #725400;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.execution-focus-panel > p {
+  margin: 9px 0 0;
+  color: #6b603f;
+  font-size: 13px;
+}
+
+.execution-focus-detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.execution-focus-detail > div {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 5px 10px;
+  padding: 10px;
+  border: 1px solid #eadba7;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.execution-focus-detail span {
+  color: #736946;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.execution-focus-detail code {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.execution-focus-detail small,
+.execution-focus-detail em {
+  grid-column: 1 / -1;
+  color: #6b624a;
+  font-size: 12px;
+}
+
 .exploration-panel {
   margin-bottom: 28px;
   padding: 20px;
@@ -583,6 +653,24 @@ button:disabled {
   padding: 20px;
 }
 
+.process-card-focused {
+  border-color: #d2aa2f;
+  box-shadow: 0 0 0 3px rgb(210 170 47 / 18%);
+  background: linear-gradient(
+    180deg,
+    #fffbeb 0,
+    #fff 72px
+  );
+}
+
+.process-focus-badge {
+  display: inline-block;
+  margin-top: 9px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f8e8a9;
+}
+
 .process-header {
   display: flex;
   align-items: center;
@@ -667,6 +755,24 @@ h2 {
   border: 1px solid #ddd;
   border-radius: 8px;
   padding: 12px;
+}
+
+.history-current-row {
+  outline: 2px solid #d2aa2f;
+  outline-offset: -2px;
+}
+
+.history-current-row > td:first-child {
+  border-left: 4px solid #c89d17;
+}
+
+.history-current-indicator {
+  display: block;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #f8e8a9;
 }
 
 .build-required {
@@ -1288,6 +1394,10 @@ h2 {
 
   .playback-state {
     margin-left: 0;
+  }
+
+  .execution-focus-detail {
+    grid-template-columns: 1fr;
   }
 
   .exploration-limit-grid {

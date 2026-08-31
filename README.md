@@ -31,6 +31,12 @@ con `Run` o reproducirse con `Play/Pause` a 0.5×, 1×, 2× o 4×. La
 reproducción se detiene sola ante finalización, deadlock, límite de pasos
 o error.
 
+Después de cada avance, un panel identifica el último proceso e
+instrucción ejecutados. La tarjeta del proceso y la fila correspondiente
+del historial quedan resaltadas; la vista de microoperaciones marca
+también el último acceso, cómputo o escritura y sigue automáticamente el
+avance durante Play.
+
 Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
 comparar soluciones con semáforos, monitores y pasaje de mensajes. El
 escenario general se mantendrá separado de los errores específicos de

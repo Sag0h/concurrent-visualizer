@@ -936,7 +936,11 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 
 -   [x] Play / Pause continuo.
 -   [x] Control de velocidad.
--   [ ] Resaltar instrucción y microoperación actual.
+-   [x] Resaltar el proceso y la instrucción asociados al último step,
+    además de la microoperación más reciente en el historial.
+-   [ ] Conservar posiciones de origen desde el tokenizer/parser y
+    resaltar la línea exacta dentro del editor. Este ticket es distinto
+    del foco de ejecución basado en eventos.
 -   [ ] Timeline visual de interleavings.
 -   [ ] Mejorar historial visual de lecturas y escrituras.
 -   [ ] Visualización explícita de regiones atómicas.
