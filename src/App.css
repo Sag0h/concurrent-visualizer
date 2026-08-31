@@ -181,8 +181,84 @@ select {
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.playback-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #c9c2e7;
+  border-radius: 8px;
+  background: #faf9ff;
+}
+
+.playback-controls button {
+  min-width: 82px;
+}
+
+.playback-controls .play-button {
+  border-color: #5b4db2;
+  color: #fff;
+  background: #6657bd;
+}
+
+.playback-controls .play-button:hover:not(:disabled) {
+  background: #5546a6;
+}
+
+.playback-controls .pause-button {
+  border-color: #b47221;
+  color: #714307;
+  background: #fff3d8;
+}
+
+.playback-controls label {
+  margin-left: 4px;
+  color: #58536d;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.playback-controls select {
+  min-width: 72px;
+}
+
+.playback-state {
+  margin-left: auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #666078;
+  background: #ebe8f5;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.playback-state-playing {
+  color: #255b39;
+  background: #dff2e6;
+}
+
+.playback-state-finished {
+  color: #255b39;
+  background: #dff2e6;
+}
+
+.playback-state-deadlock {
+  color: #8a2d20;
+  background: #fde8e4;
+}
+
+.playback-state-step_limit_reached {
+  color: #714307;
+  background: #fff0cf;
 }
 
 button {
@@ -1204,6 +1280,14 @@ h2 {
 
   .example-replace-actions button {
     flex: 1;
+  }
+
+  .playback-controls {
+    flex-wrap: wrap;
+  }
+
+  .playback-state {
+    margin-left: 0;
   }
 
   .exploration-limit-grid {

@@ -1160,3 +1160,30 @@ natural del estado semántico y de los contraejemplos.
 
 **Motivo:** mantener la sintaxis cercana a la cátedra reutilizando por
 completo el modelo concurrente existente.
+
+------------------------------------------------------------------------
+
+## ADR-032 --- Play/Pause reutiliza `SimulationEngine.step()`
+
+**Estado:** Aceptada
+
+**Contexto:** M11 necesita observar una ejecución a velocidad humana sin
+duplicar el comportamiento de `Step`, `Run` o los schedulers.
+
+**Decisión:** la reproducción continua pertenece exclusivamente a la UI.
+Un temporizador invoca el mismo `SimulationEngine.step()`, publica un
+snapshot después de cada avance y se detiene ante finalización, deadlock,
+límite de pasos, falta de progreso o error. Las velocidades disponibles
+sólo modifican el intervalo entre avances.
+
+Toda acción que pueda reemplazar o avanzar el engine cancela primero la
+reproducción. `Run` conserva su significado de ejecución inmediata y no
+se implementa acelerando el temporizador.
+
+**Consecuencia:** la velocidad no modifica el estado semántico, las
+trazas, los interleavings, los seeds ni las claves de exploración. Las
+ejecuciones manual y continua producen los mismos pasos para el mismo
+scheduler.
+
+**Motivo:** ofrecer animación educativa sin crear un segundo motor ni
+introducir concurrencia real dentro del simulador.

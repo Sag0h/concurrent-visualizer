@@ -1157,6 +1157,20 @@ registro y scope. No ejecutan cuerpos ni modifican campos.
 Toda extensión deberá preservar clonación, reproducibilidad y
 compatibilidad con la exploración de interleavings de M9.
 
+### 21.1. Reproducción continua
+
+`Play` no introduce una segunda semántica de ejecución. La capa
+`src/playback/` solicita periódicamente el mismo `SimulationEngine.step()`
+que utiliza el control manual, actualiza el snapshot y decide si puede
+continuar. La velocidad sólo determina el intervalo de UI; no pertenece
+al estado semántico, al scheduler ni a la clave de exploración.
+
+El temporizador se libera al pausar o cambiar de engine. Finalización,
+deadlock, límite de pasos y errores detienen automáticamente la
+reproducción. Las operaciones que reemplazan, reinician, exploran o
+ejecutan completamente el estado también la cancelan, impidiendo dos
+fuentes simultáneas de avance.
+
 ## 22. Problemas clásicos
 
 Los problemas clásicos no se codifican como animaciones especiales.
@@ -1184,6 +1198,22 @@ Dos ejemplos con el mismo `topicId` forman un par educativo. La variante
 scheduler recomendado; la variante `SOLUTION` presenta la corrección del
 mismo tema. El catálogo de M7 tiene nueve pares y sus pruebas comprueban
 tanto la estructura como el resultado observable de cada defecto.
+
+En el futuro un `topicId` podrá contener más de una solución, cada una
+identificada por su mecanismo concurrente: semáforo, monitor o pasaje de
+mensajes. El escenario y su propiedad esperada deben ser independientes
+del mecanismo. Un defecto como omitir una operación `V` se conserva como
+variante específica de semáforos, no como definición general del
+problema. Las variantes sólo se habilitarán cuando el lenguaje implemente
+fielmente la primitiva correspondiente.
+
+Algunos ejemplos actuales consumen pasos mediante asignaciones locales
+sin relevancia semántica, como los contadores `espera` y `bocados` de
+Filósofos Comensales. Son recursos temporales para hacer visible la
+contención bajo un scheduler determinista; no deben interpretarse como
+sincronización. Cuando exista tiempo simulado, deberán expresarse con
+`sleep(ticks)`, `yield` o una operación de trabajo explícita, reutilizando
+el motor ordinario y sin temporizadores reales dentro del pseudocódigo.
 
 Los casos que necesiten características todavía ausentes ---por ejemplo
 arrays de semáforos--- deben esperar a que el lenguaje pueda

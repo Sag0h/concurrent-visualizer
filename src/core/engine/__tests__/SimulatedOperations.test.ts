@@ -185,6 +185,75 @@ describe('simulated operations', () => {
     )
   })
 
+  it('runs the user-facing print and record-method example', () => {
+    const engine = createEngine(`
+      record Fallo {
+        int id;
+        int nivel;
+        string mensaje;
+      }
+
+      shared Fallo fallo = Fallo {
+        id: 25,
+        nivel: 3,
+        mensaje: "temperatura"
+      };
+
+      process Controlador {
+        Fallo copia = Fallo {
+          id: 9,
+          nivel: 1,
+          mensaje: "copia local"
+        };
+
+        print("Estado inicial", fallo);
+        print("ID", fallo.getID(), "nivel", fallo.getNivel());
+
+        fallo.procesar();
+        copia.notificar("copia local", fallo.getNivel());
+
+        fallo.nivel = 2;
+        print("Nivel actualizado", fallo.getNivel());
+        print();
+      }
+    `)
+
+    runToCompletion(engine)
+
+    const operations = engine.getState().history
+      .flatMap((event) => event.simulatedOperationEvent
+        ? [event.simulatedOperationEvent]
+        : [])
+    const sharedRecord =
+      engine.getState().program.sharedMemory.fallo
+
+    expect(
+      operations.map((operation) => operation.operationName),
+    ).toEqual([
+      'print',
+      'print',
+      'procesar',
+      'notificar',
+      'print',
+      'print',
+    ])
+    expect(operations[1].arguments).toEqual([
+      'ID',
+      25,
+      'nivel',
+      3,
+    ])
+    expect(operations[3].receiver).toMatchObject({
+      name: 'copia',
+      recordType: 'Fallo',
+      scope: 'LOCAL',
+    })
+    expect(isRecordValue(sharedRecord)).toBe(true)
+    if (isRecordValue(sharedRecord)) {
+      expect(sharedRecord.fields.nivel).toBe(2)
+    }
+  })
+
   it('validates simulated-method receivers and getter usage', () => {
     expect(() => parseProgram(`
       record Fallo { int id; }

@@ -922,19 +922,28 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [ ] Incorporar progresivamente pares problema/solución de otros
     milestones, incluyendo memoria compartida, `atomic`, `await`,
     colas, pilas y registros.
+-   [ ] Permitir varias soluciones correctas para un mismo problema,
+    identificando el mecanismo utilizado: semáforos, monitores o pasaje
+    de mensajes. El problema debe describirse de forma independiente al
+    mecanismo; los errores específicos de una primitiva pueden vivir
+    como variantes adicionales.
+-   [ ] Al completar M12, agregar primero soluciones con monitor para
+    buffer limitado y otros problemas clásicos compatibles.
+-   [ ] Al completar M13, agregar soluciones mediante mensajes para
+    productor/consumidor, señalización y los demás casos pertinentes.
 
 ### Visualización concurrente avanzada
 
--   [ ] Play / Pause continuo.
--   [ ] Control de velocidad.
+-   [x] Play / Pause continuo.
+-   [x] Control de velocidad.
 -   [ ] Resaltar instrucción y microoperación actual.
 -   [ ] Timeline visual de interleavings.
 -   [ ] Mejorar historial visual de lecturas y escrituras.
 -   [ ] Visualización explícita de regiones atómicas.
--   [ ] Visualización de semáforos y procesos esperando recursos.
--   [ ] Diagnósticos de concurrencia.
--   [ ] Visualización de deadlocks.
--   [ ] Reproducción de contraejemplos.
+-   [x] Visualización de semáforos y procesos esperando recursos.
+-   [x] Diagnósticos de concurrencia.
+-   [x] Visualización de deadlocks.
+-   [x] Reproducción de contraejemplos.
 -   [ ] Visualización de canales y mensajes.
 -   [ ] Visualización del tiempo simulado cuando se incorpore.
 
@@ -989,6 +998,11 @@ la simulación.
 -   [ ] Implementar `yield`.
 -   [ ] Definir semántica de `sleep(ticks)`.
 -   [ ] Implementar `sleep(ticks)`.
+-   [ ] Reemplazar en los ejemplos educativos los incrementos locales
+    usados sólo para consumir pasos ---por ejemplo `espera = espera + 1`
+    y `bocados = bocados + 1` en Filósofos Comensales--- por
+    `sleep(ticks)`, `yield` o una operación simulada de trabajo con
+    semántica determinista.
 -   [ ] Representar procesos temporalmente no ejecutables.
 -   [ ] Despertar procesos cuando corresponda.
 -   [ ] Definir qué ocurre con el tiempo cuando ningún proceso está

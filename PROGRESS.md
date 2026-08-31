@@ -25,16 +25,16 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** revisar y continuar M11, priorizando el catálogo
-educativo cargable desde la interfaz. Las assertions explícitas se
-evaluaron y quedaron como extensión futura del lenguaje.
+**Próximo objetivo:** continuar M11 resaltando la instrucción y la
+microoperación actual durante Step y reproducción continua. Las
+assertions explícitas se evaluaron y quedaron como extensión futura del
+lenguaje.
 
-**Requerimiento futuro registrado:** incorporar en M11 un catálogo
-educativo cargable desde la interfaz. Comenzará con los nueve casos de
-semáforos de M7 y reutilizará una única fuente de pseudocódigo entre los
-tests y el selector visual. Cargar un ejemplo podrá elegir su scheduler
-recomendado, pero no ejecutará `Build` ni reemplazará trabajo del
-usuario sin advertencia.
+**Requerimiento futuro registrado:** un mismo problema del catálogo
+podrá ofrecer soluciones alternativas mediante semáforos, monitores o
+pasaje de mensajes. La incorporación será progresiva cuando M12 y M13
+provean esas primitivas, manteniendo separado el escenario general de
+los errores específicos de cada mecanismo.
 
 ------------------------------------------------------------------------
 
@@ -2083,3 +2083,42 @@ actualización perdida del contador, exceso de usuarios de un recurso,
 sobrescritura del buffer y acceso lector/escritor sin protección. Las
 pruebas verifican los 18 programas, la integridad de cada par y el
 resultado concreto de las nueve variantes incorrectas.
+
+### Extensión futura por paradigma
+
+Los problemas clásicos no quedan ligados para siempre a semáforos. Un
+mismo `topicId` podrá reunir soluciones con semáforos, monitores y
+pasaje de mensajes, identificadas por su mecanismo. El problema deberá
+formularse de forma neutral; errores como omitir `V(lleno)` seguirán
+siendo variantes específicas de semáforos. M12 comenzará esta extensión
+con el buffer limitado mediante monitor y M13 incorporará las variantes
+basadas en canales y mensajes.
+
+## 2026-08-31 --- M11: Play/Pause y velocidad
+
+La interfaz incorpora reproducción continua sobre el mismo `step()` del
+motor. `Play` avanza a intervalos configurables de 0.5×, 1×, 2× o 4×;
+`Pause` detiene el temporizador sin reiniciar el estado. La velocidad no
+forma parte del estado semántico ni cambia el scheduler.
+
+La reproducción se detiene automáticamente al finalizar, detectar un
+deadlock, alcanzar el límite de pasos o producir un error. Editar,
+reconstruir, resetear, ejecutar `Run` o iniciar una exploración también
+la cancela para que nunca existan dos acciones avanzando el mismo engine
+simultáneamente. La etiqueta lateral muestra `Finished`, `Deadlock` o
+`Step limit` una vez alcanzado un resultado terminal y reserva `Paused`
+para ejecuciones que todavía pueden continuar. Las pruebas cubren las
+velocidades y las tres salidas terminales relevantes.
+
+### Deuda educativa: trabajo local artificial
+
+El ejemplo de Filósofos Comensales sin deadlock usa incrementos locales
+de `espera` y `bocados` para consumir pasos, escalonar intentos y mantener
+los tenedores adquiridos el tiempo suficiente para visualizar
+contención. Esas instrucciones no sincronizan ni forman parte de la
+solución: el deadlock se evita mediante el orden asimétrico de
+adquisición.
+
+Cuando M13.5 incorpore `sleep(ticks)`, `yield` o una operación simulada de
+trabajo equivalente, estos incrementos deberán reemplazarse por esa
+primitiva explícita y determinista.

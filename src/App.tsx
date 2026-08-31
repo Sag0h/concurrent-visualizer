@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import { createExecutionState } from './core/engine/createExecutionState'
 import { SimulationEngine } from './core/engine/SimulationEngine'
@@ -29,10 +29,16 @@ import {
   type ExplorationTarget,
 } from './components/ExplorationPanel'
 import { ExamplePicker } from './components/ExamplePicker'
+import { PlaybackControls } from './components/PlaybackControls'
 import {
   findProgramExample,
   programExamples,
 } from './examples/programExamples'
+import {
+  advancePlayback,
+  playbackIntervalMs,
+  type PlaybackSpeed,
+} from './playback/playback'
 
 const initialCode = `shared int counter = 0;
 shared string message = "Concurrent Visualizer";
@@ -93,6 +99,12 @@ function App() {
   const [snapshot, setSnapshot] =
     useState<SimulationSnapshot | null>(null)
 
+  const [isPlaying, setIsPlaying] =
+    useState(false)
+
+  const [playbackSpeed, setPlaybackSpeed] =
+    useState<PlaybackSpeed>(1)
+
   const [error, setError] =
     useState<string | null>(null)
 
@@ -114,7 +126,37 @@ function App() {
   const [replayChoiceIndex, setReplayChoiceIndex] =
     useState<number | null>(null)
 
+  useEffect(() => {
+    if (!isPlaying || !engine) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      try {
+        const result = advancePlayback(engine)
+
+        setSnapshot(result.snapshot)
+        setError(null)
+
+        if (!result.shouldContinue) {
+          setIsPlaying(false)
+        }
+      } catch (playbackError) {
+        setError(errorMessage(
+          playbackError,
+          'Unknown playback error',
+        ))
+        setSnapshot(engine.getSnapshot())
+        setIsPlaying(false)
+      }
+    }, playbackIntervalMs(playbackSpeed))
+
+    return () => window.clearInterval(intervalId)
+  }, [engine, isPlaying, playbackSpeed])
+
   function handleBuild() {
+    setIsPlaying(false)
+
     try {
         const program = parseProgram(code)
 
@@ -155,6 +197,7 @@ function App() {
   }
 
   function invalidateBuild() {
+    setIsPlaying(false)
     setEngine(null)
     setSnapshot(null)
     setIsDirty(true)
@@ -221,6 +264,8 @@ function App() {
       return
     }
 
+    setIsPlaying(false)
+
     try {
       engine.step()
 
@@ -248,6 +293,8 @@ function App() {
     if (!engine) {
       return
     }
+
+    setIsPlaying(false)
 
     if (
       replayChoiceIndex !== null
@@ -305,6 +352,8 @@ function App() {
       return
     }
 
+    setIsPlaying(false)
+
     try {
       while (
         !engine.isFinished()
@@ -339,6 +388,8 @@ function App() {
     if (!engine) {
       return
     }
+
+    setIsPlaying(false)
 
     try {
       const originEngine = engine.fork()
@@ -381,6 +432,8 @@ function App() {
       return
     }
 
+    setIsPlaying(false)
+
     const replayEngine =
       explorationSession.originEngine.fork()
 
@@ -403,6 +456,8 @@ function App() {
     ) {
       return
     }
+
+    setIsPlaying(false)
 
     try {
       const processId =
@@ -436,6 +491,8 @@ function App() {
     if (!explorationSession) {
       return
     }
+
+    setIsPlaying(false)
 
     try {
       let replayEngine: SimulationEngine
@@ -489,6 +546,8 @@ function App() {
       return
     }
 
+    setIsPlaying(false)
+
     const originEngine =
       explorationSession.originEngine.fork()
 
@@ -510,6 +569,8 @@ function App() {
     if (!engine || !snapshot?.deadlock) {
       return
     }
+
+    setIsPlaying(false)
 
     const targetStep =
       snapshot.deadlock.replayTargetStep
@@ -848,6 +909,14 @@ function App() {
   const programStatus =
     snapshot?.executionStatus ?? 'RUNNING'
 
+  const canAdvanceSimulation =
+    engine !== null
+    && replayChoiceIndex === null
+    && !engine.isFinished()
+    && snapshot?.executionStatus !== 'DEADLOCK'
+    && snapshot?.executionStatus
+      !== 'STEP_LIMIT_REACHED'
+
   return (
     <main className="app">
       <header className="header">
@@ -1005,13 +1074,8 @@ function App() {
             <button
               onClick={handleStep}
               disabled={
-                !engine
-                || replayChoiceIndex !== null
-                || engine.isFinished()
-                || snapshot?.executionStatus
-                  === 'DEADLOCK'
-                || snapshot?.executionStatus
-                  === 'STEP_LIMIT_REACHED'
+                !canAdvanceSimulation
+                || isPlaying
               }
             >
               Step
@@ -1020,13 +1084,8 @@ function App() {
             <button
               onClick={handleRun}
               disabled={
-                !engine
-                || replayChoiceIndex !== null
-                || engine.isFinished()
-                || snapshot?.executionStatus
-                  === 'DEADLOCK'
-                || snapshot?.executionStatus
-                  === 'STEP_LIMIT_REACHED'
+                !canAdvanceSimulation
+                || isPlaying
               }
             >
               Run
@@ -1039,6 +1098,17 @@ function App() {
               Reset
             </button>
           </div>
+
+          <PlaybackControls
+            isPlaying={isPlaying}
+            canPlay={canAdvanceSimulation}
+            speed={playbackSpeed}
+            executionStatus={snapshot?.executionStatus}
+            onToggle={() =>
+              setIsPlaying((current) => !current)
+            }
+            onSpeedChange={setPlaybackSpeed}
+          />
 
           {error && (
             <div className="error-box">

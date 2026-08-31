@@ -26,6 +26,16 @@ solución correcta. Los 18 programas comparten su pseudocódigo con las
 pruebas, seleccionan un scheduler recomendado y nunca se construyen o
 ejecutan automáticamente.
 
+La simulación puede recorrerse con `Step`, completarse inmediatamente
+con `Run` o reproducirse con `Play/Pause` a 0.5×, 1×, 2× o 4×. La
+reproducción se detiene sola ante finalización, deadlock, límite de pasos
+o error.
+
+Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
+comparar soluciones con semáforos, monitores y pasaje de mensajes. El
+escenario general se mantendrá separado de los errores específicos de
+cada mecanismo.
+
 M7 está completado en sus siete fases:
 
 -   **M7.1:** semántica de semáforos generales/contadores;
