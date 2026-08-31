@@ -47,6 +47,117 @@
   font-weight: 600;
 }
 
+.example-picker {
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid #c9c2e7;
+  border-radius: 10px;
+  background: #faf9ff;
+}
+
+.example-picker-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.example-picker-heading h3 {
+  margin: 4px 0 0;
+  font-size: 16px;
+}
+
+.example-picker-heading button {
+  padding: 7px 12px;
+}
+
+.example-picker-badge {
+  color: #5746a5;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.example-picker > label {
+  display: block;
+  margin-bottom: 5px;
+  color: #58536d;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.example-picker > select {
+  width: 100%;
+  border-color: #b9b2dc;
+}
+
+.example-picker-description,
+.example-picker-empty {
+  margin: 10px 0 0;
+  color: #514c69;
+  font-size: 13px;
+}
+
+.example-picker-description p {
+  margin: 4px 0;
+}
+
+.example-picker-description span {
+  color: #6c6588;
+  font-size: 12px;
+}
+
+.example-picker-description .example-variant {
+  display: block;
+  width: fit-content;
+  margin-bottom: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.example-picker-description .example-variant-problem {
+  color: #8a2d20;
+  background: #fde8e4;
+}
+
+.example-picker-description .example-variant-solution {
+  color: #25613d;
+  background: #e1f4e8;
+}
+
+.example-replace-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #d5a84b;
+  border-radius: 8px;
+  color: #654600;
+  background: #fff9e9;
+  font-size: 13px;
+}
+
+.example-replace-warning p {
+  margin: 4px 0 0;
+}
+
+.example-replace-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.example-replace-actions button {
+  padding: 7px 10px;
+}
+
 select {
   padding: 8px;
   border: 1px solid #ccc;
@@ -1076,12 +1187,23 @@ h2 {
 
 @media (max-width: 600px) {
   .exploration-header,
-  .counterexample-heading {
+  .counterexample-heading,
+  .example-picker-heading,
+  .example-replace-warning {
     flex-direction: column;
   }
 
   .exploration-header button {
     width: 100%;
+  }
+
+  .example-picker-heading button,
+  .example-replace-actions {
+    width: 100%;
+  }
+
+  .example-replace-actions button {
+    flex: 1;
   }
 
   .exploration-limit-grid {

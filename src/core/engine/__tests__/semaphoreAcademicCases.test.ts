@@ -4,366 +4,23 @@ import { FirstReadyScheduler } from '../../scheduler/FirstReadyScheduler'
 import { RoundRobinScheduler } from '../../scheduler/RoundRobinScheduler'
 import { createExecutionState } from '../createExecutionState'
 import { SimulationEngine } from '../SimulationEngine'
-
-const candyMutualExclusionSource = `
-  sem mutex = 1;
-  shared int cant = 0;
-
-  process Chico1 {
-    bool comiendo = false;
-    P(mutex);
-    cant = cant + 1;
-    V(mutex);
-    comiendo = true;
-  }
-
-  process Chico2 {
-    bool comiendo = false;
-    P(mutex);
-    cant = cant + 1;
-    V(mutex);
-    comiendo = true;
-  }
-`
-
-const eventSignalingSource = `
-  sem inicio = 0;
-
-  process Trabajador {
-    P(inicio);
-    bool comenzo = true;
-  }
-
-  process Coordinador {
-    V(inicio);
-  }
-`
-
-const multipleWaitersSource = `
-  sem inicio = 0;
-
-  process Trabajador1 {
-    P(inicio);
-    bool comenzo = true;
-  }
-
-  process Trabajador2 {
-    P(inicio);
-    bool comenzo = true;
-  }
-
-  process Coordinador {
-    V(inicio);
-    V(inicio);
-  }
-`
-
-const countingSemaphoreSource = `
-  sem recursos = 2;
-
-  process Trabajador1 {
-    P(recursos);
-    bool usoRecurso = true;
-    V(recursos);
-  }
-
-  process Trabajador2 {
-    P(recursos);
-    bool usoRecurso = true;
-    V(recursos);
-  }
-
-  process Trabajador3 {
-    P(recursos);
-    bool usoRecurso = true;
-    V(recursos);
-  }
-`
-
-const unitBufferSource = `
-  sem vacio = 1;
-  sem lleno = 0;
-  shared int buffer = 0;
-  shared int consumido = 0;
-
-  process Consumidor {
-    P(lleno);
-    consumido = buffer;
-    V(vacio);
-  }
-
-  process Productor {
-    P(vacio);
-    buffer = 42;
-    V(lleno);
-  }
-`
-
-const countedBufferSource = `
-  sem vacio = 2;
-  sem lleno = 0;
-  shared int[] buffer = [0, 0];
-  shared int[] consumidos = [0, 0, 0];
-
-  process Productor {
-    P(vacio);
-    atomic {
-      buffer[0] = 10;
-    }
-    V(lleno);
-
-    P(vacio);
-    atomic {
-      buffer[1] = 20;
-    }
-    V(lleno);
-
-    P(vacio);
-    atomic {
-      buffer[0] = 30;
-    }
-    V(lleno);
-  }
-
-  process Consumidor {
-    P(lleno);
-    atomic {
-      consumidos[0] = buffer[0];
-    }
-    V(vacio);
-
-    P(lleno);
-    atomic {
-      consumidos[1] = buffer[1];
-    }
-    V(vacio);
-
-    P(lleno);
-    atomic {
-      consumidos[2] = buffer[0];
-    }
-    V(vacio);
-  }
-`
-
-const threeProcessBarrierSource = `
-  sem mutex = 1;
-  sem barrera = 0;
-  shared int contador = 0;
-
-  process Chico1 {
-    P(mutex);
-    contador = contador + 1;
-    if (contador == 3) {
-      V(barrera);
-      V(barrera);
-      V(barrera);
-    }
-    V(mutex);
-    P(barrera);
-    bool continuo = true;
-  }
-
-  process Chico2 {
-    P(mutex);
-    contador = contador + 1;
-    if (contador == 3) {
-      V(barrera);
-      V(barrera);
-      V(barrera);
-    }
-    V(mutex);
-    P(barrera);
-    bool continuo = true;
-  }
-
-  process Chico3 {
-    P(mutex);
-    contador = contador + 1;
-    if (contador == 3) {
-      V(barrera);
-      V(barrera);
-      V(barrera);
-    }
-    V(mutex);
-    P(barrera);
-    bool continuo = true;
-  }
-`
-
-const readerPreferenceSource = `
-  sem rw = 1;
-  sem mutexR = 1;
-  shared int nr = 0;
-  shared int baseDatos = 0;
-  shared int lectura1 = 0;
-  shared int lectura2 = 0;
-
-  process Lector1 {
-    P(mutexR);
-    nr = nr + 1;
-    if (nr == 1) {
-      P(rw);
-    }
-    V(mutexR);
-
-    bool leyendo = true;
-    atomic {
-      lectura1 = baseDatos;
-    }
-    int comprobacion = lectura1;
-    comprobacion = comprobacion + 1;
-    comprobacion = comprobacion + 1;
-    comprobacion = comprobacion + 1;
-    comprobacion = comprobacion + 1;
-    leyendo = false;
-
-    P(mutexR);
-    nr = nr - 1;
-    if (nr == 0) {
-      V(rw);
-    }
-    V(mutexR);
-  }
-
-  process Lector2 {
-    P(mutexR);
-    nr = nr + 1;
-    if (nr == 1) {
-      P(rw);
-    }
-    V(mutexR);
-
-    bool leyendo = true;
-    atomic {
-      lectura2 = baseDatos;
-    }
-    int comprobacion = lectura2;
-    comprobacion = comprobacion + 1;
-    comprobacion = comprobacion + 1;
-    comprobacion = comprobacion + 1;
-    comprobacion = comprobacion + 1;
-    leyendo = false;
-
-    P(mutexR);
-    nr = nr - 1;
-    if (nr == 0) {
-      V(rw);
-    }
-    V(mutexR);
-  }
-
-  process Escritor {
-    int preparacion = 0;
-    preparacion = preparacion + 1;
-    preparacion = preparacion + 1;
-    preparacion = preparacion + 1;
-    preparacion = preparacion + 1;
-    preparacion = preparacion + 1;
-    preparacion = preparacion + 1;
-    P(rw);
-    atomic {
-      baseDatos = 42;
-    }
-    V(rw);
-  }
-`
-
-const diningPhilosophersSource = `
-  sem tenedor0 = 1;
-  sem tenedor1 = 1;
-  sem tenedor2 = 1;
-  sem tenedor3 = 1;
-  sem tenedor4 = 1;
-
-  process Filosofo0 {
-    P(tenedor0);
-    P(tenedor1);
-    bool comiendo = true;
-    int bocados = 0;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    comiendo = false;
-    V(tenedor1);
-    V(tenedor0);
-  }
-
-  process Filosofo1 {
-    int espera = 0;
-    espera = espera + 1;
-    espera = espera + 1;
-    espera = espera + 1;
-    P(tenedor1);
-    P(tenedor2);
-    bool comiendo = true;
-    int bocados = 0;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    comiendo = false;
-    V(tenedor2);
-    V(tenedor1);
-  }
-
-  process Filosofo2 {
-    P(tenedor2);
-    P(tenedor3);
-    bool comiendo = true;
-    int bocados = 0;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    comiendo = false;
-    V(tenedor3);
-    V(tenedor2);
-  }
-
-  process Filosofo3 {
-    int espera = 0;
-    espera = espera + 1;
-    espera = espera + 1;
-    espera = espera + 1;
-    P(tenedor3);
-    P(tenedor4);
-    bool comiendo = true;
-    int bocados = 0;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    comiendo = false;
-    V(tenedor4);
-    V(tenedor3);
-  }
-
-  process Filosofo4 {
-    int espera = 0;
-    espera = espera + 1;
-    espera = espera + 1;
-    espera = espera + 1;
-    P(tenedor0);
-    P(tenedor4);
-    bool comiendo = true;
-    int bocados = 0;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    bocados = bocados + 1;
-    comiendo = false;
-    V(tenedor4);
-    V(tenedor0);
-  }
-`
+import {
+  candyMutualExclusionExample,
+  countedBufferExample,
+  countingSemaphoreExample,
+  diningPhilosophersExample,
+  eventSignalingExample,
+  multipleWaitersExample,
+  readerPreferenceExample,
+  threeProcessBarrierExample,
+  unitBufferExample,
+} from '../../../examples/semaphoreExamples'
 
 describe('M7 academic semaphore cases', () => {
   it('protects the candy counter with mutual exclusion while leaving local work outside', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(candyMutualExclusionSource),
+        parseProgram(candyMutualExclusionExample.source),
       ),
       new RoundRobinScheduler(),
       100,
@@ -484,7 +141,7 @@ describe('M7 academic semaphore cases', () => {
   it('signals an event from a coordinator to a blocked worker', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(eventSignalingSource),
+        parseProgram(eventSignalingExample.source),
       ),
       new RoundRobinScheduler(),
       20,
@@ -610,7 +267,7 @@ describe('M7 academic semaphore cases', () => {
   it('requires one signal for each worker waiting on the same semaphore', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(multipleWaitersSource),
+        parseProgram(multipleWaitersExample.source),
       ),
       new RoundRobinScheduler(),
       30,
@@ -785,7 +442,7 @@ describe('M7 academic semaphore cases', () => {
   it('allows at most the available units of a counted resource', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(countingSemaphoreSource),
+        parseProgram(countingSemaphoreExample.source),
       ),
       new RoundRobinScheduler(),
       30,
@@ -954,7 +611,7 @@ describe('M7 academic semaphore cases', () => {
   it('coordinates one producer and one consumer through a unit buffer', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(unitBufferSource),
+        parseProgram(unitBufferExample.source),
       ),
       new RoundRobinScheduler(),
       30,
@@ -1119,7 +776,7 @@ describe('M7 academic semaphore cases', () => {
   it('blocks a producer when a counted buffer has no free slots', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(countedBufferSource),
+        parseProgram(countedBufferExample.source),
       ),
       new FirstReadyScheduler(),
       100,
@@ -1328,7 +985,7 @@ describe('M7 academic semaphore cases', () => {
   it('keeps three processes behind a one-shot barrier until all arrive', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(threeProcessBarrierSource),
+        parseProgram(threeProcessBarrierExample.source),
       ),
       new RoundRobinScheduler(),
       150,
@@ -1465,7 +1122,7 @@ describe('M7 academic semaphore cases', () => {
   it('allows concurrent readers while keeping a writer exclusive', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(readerPreferenceSource),
+        parseProgram(readerPreferenceExample.source),
       ),
       new RoundRobinScheduler(),
       250,
@@ -1631,7 +1288,7 @@ describe('M7 academic semaphore cases', () => {
   it('avoids dining-philosopher deadlock while preserving selective mutual exclusion', () => {
     const engine = new SimulationEngine(
       createExecutionState(
-        parseProgram(diningPhilosophersSource),
+        parseProgram(diningPhilosophersExample.source),
       ),
       new RoundRobinScheduler(),
       400,

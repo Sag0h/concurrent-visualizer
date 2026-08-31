@@ -2050,3 +2050,36 @@ resultado y no pueden descartarse como sentencia.
 
 **Estado:** M10.2 COMPLETADO. El siguiente frente es M11, con prioridad
 en el catálogo educativo documentado previamente.
+
+## 2026-08-30 --- M11: catálogo educativo inicial
+
+Se creó el modelo `ProgramExample` con id, título, categoría,
+descripción, pseudocódigo y scheduler recomendado. Los nueve casos
+académicos de semáforos de M7 se movieron desde el archivo de tests a
+`src/examples/semaphoreExamples.ts`; tanto las pruebas como la interfaz
+consumen ahora esa única fuente.
+
+El nuevo `ExamplePicker` permite inspeccionar y cargar cualquiera de los
+nueve programas. Al cargarlo reemplaza el editor, selecciona el
+scheduler recomendado e invalida la simulación anterior, pero no ejecuta
+`Build` ni `Run`. Si hubo edición manual, muestra una confirmación propia
+antes de reemplazar contenido; cancelar conserva el programa intacto.
+
+La estructura queda abierta a nuevas categorías y ejemplos correctos o
+incorrectos. La incorporación progresiva de casos de races, deadlocks,
+registros y futuras primitivas continúa como ticket de M11.
+
+## 2026-08-31 --- M11: pares problema/solución
+
+El catálogo de semáforos ahora ofrece dos variantes para cada uno de los
+nueve temas académicos: el algoritmo con un defecto deliberado y su
+solución correcta. `ProgramExample` relaciona ambas variantes mediante
+`topicId` y las distingue con `PROBLEM` o `SOLUTION`; el selector las
+agrupa visualmente y muestra una etiqueta de estado antes de cargarlas.
+
+Los defectos no son ejemplos decorativos. Con el scheduler recomendado
+reproducen cinco bloqueos definitivos y cuatro resultados observables:
+actualización perdida del contador, exceso de usuarios de un recurso,
+sobrescritura del buffer y acceso lector/escritor sin protección. Las
+pruebas verifican los 18 programas, la integridad de cada par y el
+resultado concreto de las nueve variantes incorrectas.

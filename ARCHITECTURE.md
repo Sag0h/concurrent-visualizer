@@ -1172,6 +1172,19 @@ Ejemplos:
 Deben expresarse como programas válidos y ejecutarse mediante el mismo
 motor.
 
+Los ejemplos reutilizables viven bajo `src/examples/` como objetos
+`ProgramExample`. El catálogo contiene metadata de presentación y el
+pseudocódigo real; los tests académicos y `ExamplePicker` importan esa
+misma fuente. La UI sólo copia el source al editor y aplica el scheduler
+recomendado: parseo, ejecución y análisis continúan recorriendo el flujo
+ordinario del motor después de que el usuario solicita `Build`.
+
+Dos ejemplos con el mismo `topicId` forman un par educativo. La variante
+`PROBLEM` contiene un defecto que el motor puede reproducir con su
+scheduler recomendado; la variante `SOLUTION` presenta la corrección del
+mismo tema. El catálogo de M7 tiene nueve pares y sus pruebas comprueban
+tanto la estructura como el resultado observable de cada defecto.
+
 Los casos que necesiten características todavía ausentes ---por ejemplo
 arrays de semáforos--- deben esperar a que el lenguaje pueda
 representarlos fielmente en lugar de introducir excepciones específicas.

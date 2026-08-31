@@ -28,6 +28,11 @@ import {
   ExplorationPanel,
   type ExplorationTarget,
 } from './components/ExplorationPanel'
+import { ExamplePicker } from './components/ExamplePicker'
+import {
+  findProgramExample,
+  programExamples,
+} from './examples/programExamples'
 
 const initialCode = `shared int counter = 0;
 shared string message = "Concurrent Visualizer";
@@ -60,6 +65,15 @@ type ExplorationSession =
 
 function App() {
   const [code, setCode] = useState(initialCode)
+
+  const [selectedExampleId, setSelectedExampleId] =
+    useState('')
+
+  const [pendingExampleId, setPendingExampleId] =
+    useState<string | null>(null)
+
+  const [hasUserEditedCode, setHasUserEditedCode] =
+    useState(false)
 
   const [schedulerType, setSchedulerType] =
     useState<SchedulerType>('ROUND_ROBIN')
@@ -168,7 +182,38 @@ function App() {
       return `${cleanCode}\n\n${newProcess}`
     })
 
+    setHasUserEditedCode(true)
+    setPendingExampleId(null)
+
     invalidateBuild()
+  }
+
+  function applySelectedExample(exampleId: string) {
+    const example = findProgramExample(exampleId)
+
+    if (!example) {
+      return
+    }
+
+    setCode(example.source)
+    setSchedulerType(example.recommendedScheduler)
+    setSelectedExampleId(example.id)
+    setPendingExampleId(null)
+    setHasUserEditedCode(false)
+    invalidateBuild()
+  }
+
+  function handleRequestExampleLoad() {
+    if (!selectedExampleId) {
+      return
+    }
+
+    if (hasUserEditedCode) {
+      setPendingExampleId(selectedExampleId)
+      return
+    }
+
+    applySelectedExample(selectedExampleId)
   }
 
   function handleStep() {
@@ -512,6 +557,8 @@ function App() {
       newSelectionEnd: number,
     ) {
       setCode(newCode)
+      setHasUserEditedCode(true)
+      setPendingExampleId(null)
       invalidateBuild()
 
       requestAnimationFrame(() => {
@@ -885,11 +932,55 @@ function App() {
             </div>
           </div>
 
+          <ExamplePicker
+            examples={programExamples}
+            selectedExampleId={selectedExampleId}
+            onSelect={(exampleId) => {
+              setSelectedExampleId(exampleId)
+              setPendingExampleId(null)
+            }}
+            onRequestLoad={handleRequestExampleLoad}
+          />
+
+          {pendingExampleId && (
+            <div
+              className="example-replace-warning"
+              role="alert"
+            >
+              <div>
+                <strong>Replace your edited program?</strong>
+                <p>
+                  Loading this example will replace the current editor contents.
+                  The example will not be built or run automatically.
+                </p>
+              </div>
+
+              <div className="example-replace-actions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    applySelectedExample(pendingExampleId)
+                  }
+                >
+                  Replace and load
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingExampleId(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <textarea
             className="code-editor"
             value={code}
             onChange={(event) => {
               setCode(event.target.value)
+              setHasUserEditedCode(true)
+              setPendingExampleId(null)
               invalidateBuild()
             }}
             onKeyDown={handleEditorKeyDown}

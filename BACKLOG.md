@@ -904,20 +904,24 @@ Este requerimiento queda separado de M8. Debe comenzar con los nueve
 casos académicos de semáforos de M7 y quedar abierto a programas de
 memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 
--   [ ] Definir un modelo `ProgramExample` con identificador, título,
+-   [x] Definir un modelo `ProgramExample` con identificador, título,
     categoría, descripción, código fuente y scheduler recomendado.
--   [ ] Extraer los programas académicos de M7 desde los tests hacia un
+-   [x] Extraer los programas académicos de M7 desde los tests hacia un
     catálogo compartido bajo `src/examples/`.
--   [ ] Hacer que los tests y la interfaz consuman la misma fuente de
+-   [x] Hacer que los tests y la interfaz consuman la misma fuente de
     ejemplos, evitando copias divergentes del pseudocódigo.
--   [ ] Crear un componente `ExamplePicker` con botones o selector por
+-   [x] Crear un componente `ExamplePicker` con botones o selector por
     categoría para cargar algoritmos comunes en el editor.
--   [ ] Cargar también el scheduler recomendado, pero no ejecutar
+-   [x] Cargar también el scheduler recomendado, pero no ejecutar
     `Build` automáticamente.
--   [ ] Advertir antes de reemplazar código que el usuario haya editado.
--   [ ] Incorporar progresivamente ejemplos correctos e incorrectos de
-    milestones anteriores y posteriores, incluyendo races y deadlocks
-    reproducibles.
+-   [x] Advertir antes de reemplazar código que el usuario haya editado.
+-   [x] Incorporar para los nueve temas de semáforos de M7 un par
+    formado por el código con el problema y su solución correcta. Cada
+    problema reproduce determinísticamente una race, un resultado
+    incorrecto o un deadlock con el scheduler recomendado.
+-   [ ] Incorporar progresivamente pares problema/solución de otros
+    milestones, incluyendo memoria compartida, `atomic`, `await`,
+    colas, pilas y registros.
 
 ### Visualización concurrente avanzada
 

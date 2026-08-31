@@ -20,6 +20,12 @@ scheduler y de los interleavings producidos por el motor.
 
 **Último milestone completado:** M10.2 --- **Registros y operaciones educativas**.
 
+M11 comenzó con un catálogo cargable de los nueve temas académicos de
+semáforos. Cada tema ofrece el código con un problema reproducible y su
+solución correcta. Los 18 programas comparten su pseudocódigo con las
+pruebas, seleccionan un scheduler recomendado y nunca se construyen o
+ejecutan automáticamente.
+
 M7 está completado en sus siete fases:
 
 -   **M7.1:** semántica de semáforos generales/contadores;
