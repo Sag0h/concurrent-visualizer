@@ -973,7 +973,7 @@ describe('SimulationEngine', () => {
         atomicDepth: 0,
       },
     ])
-    expect(snapshot.executionFocus).toEqual({
+    expect(snapshot.executionFocus).toMatchObject({
       step: 3,
       processId: 'P1',
       instructionType: 'ASSIGN',

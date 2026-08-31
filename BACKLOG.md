@@ -943,7 +943,7 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
     costosa la reconstrucción desde el inicio.
 -   [x] Resaltar el proceso y la instrucción asociados al último step,
     además de la microoperación más reciente en el historial.
--   [ ] Conservar posiciones de origen desde el tokenizer/parser y
+-   [x] Conservar posiciones de origen desde el tokenizer/parser y
     resaltar la línea exacta dentro del editor. Este ticket es distinto
     del foco de ejecución basado en eventos.
 -   [ ] Timeline visual de interleavings.
@@ -955,6 +955,30 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [x] Reproducción de contraejemplos.
 -   [ ] Visualización de canales y mensajes.
 -   [ ] Visualización del tiempo simulado cuando se incorpore.
+
+### Personalización y aprovechamiento del espacio
+
+-   [ ] Incorporar temas `Sistema`, `Claro` y `Oscuro` mediante variables
+    CSS, respetando inicialmente `prefers-color-scheme`.
+-   [ ] Agregar un botón de Settings que abra un modal accesible y
+    permita restaurar la configuración predeterminada.
+-   [ ] Permitir mostrar u ocultar mediante switches los paneles
+    opcionales, comenzando por el catálogo de ejemplos, el explorador
+    BFS, los diagnósticos y las microoperaciones. Ocultar una vista no
+    debe eliminar sus resultados ni modificar la simulación.
+-   [ ] Persistir las preferencias puramente visuales en `localStorage`,
+    con versionado y recuperación segura ante datos inválidos.
+-   [ ] Reorganizar escritorio como un workspace que aproveche la altura
+    disponible: controles visibles, paneles con scroll independiente y
+    código, estado e historial observables sin recorrer toda la página.
+-   [ ] Evaluar paneles redimensionables después de validar el nuevo
+    layout; no incorporarlos como requisito de la primera versión.
+-   [ ] Mejorar la experiencia mobile mediante pestañas para Código,
+    Estado, Procesos e Historial, conservando los controles principales
+    accesibles y usando modal o panel deslizable para catálogo y
+    Settings.
+-   [ ] Verificar responsive, navegación por teclado, foco del modal,
+    contraste y preferencia de movimiento reducido.
 
 ------------------------------------------------------------------------
 

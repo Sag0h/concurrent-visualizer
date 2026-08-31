@@ -10,6 +10,7 @@ import type {
   ProgramExecutionStatus,
 } from '../deadlock/DeadlockDiagnostic'
 import type { RuntimeDiagnostic } from '../diagnostics/RuntimeDiagnostic'
+import type { SourceRange } from '../language/SourceRange'
 
 export interface SimulationSnapshot {
   readonly stepCount: number
@@ -29,6 +30,7 @@ export interface ExecutionFocusSnapshot {
   readonly step: number
   readonly processId: ProcessId
   readonly instructionType: string
+  readonly sourceRange?: SourceRange
   readonly description?: string
   readonly microOperation?: MicroOperationEvent
 }

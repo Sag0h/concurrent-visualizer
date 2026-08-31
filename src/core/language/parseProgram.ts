@@ -49,6 +49,7 @@ import type {
 import type { Process } from '../process/Process'
 import type { Program } from '../engine/Program'
 import type { Token, TokenType } from './Token'
+import type { SourceRange } from './SourceRange'
 import { ParserError } from './ParserError'
 import { tokenize } from './tokenize'
 import type { FunctionDefinition } from './FunctionDefinition'
@@ -424,6 +425,18 @@ class Parser {
   }
 
   private parseProcessInstruction(): Instruction {
+    const startToken = this.peek()
+    const instruction =
+      this.parseProcessInstructionWithoutSourceRange()
+
+    return this.withSourceRange(
+      instruction,
+      startToken,
+      this.previous(),
+    )
+  }
+
+  private parseProcessInstructionWithoutSourceRange(): Instruction {
     if (this.isLocalDeclarationStart()) {
       return this.parseLocalDeclaration()
     }
@@ -1579,6 +1592,22 @@ class Parser {
     return this.tokens[this.current - 1]
   }
 
+  private withSourceRange(
+    instruction: Instruction,
+    startToken: Token,
+    endToken: Token,
+  ): Instruction {
+    const sourceRange: SourceRange = {
+      start: startToken.sourceRange.start,
+      end: endToken.sourceRange.end,
+    }
+
+    return {
+      ...instruction,
+      sourceRange,
+    }
+  }
+
   private error(
     token: Token,
     message: string,
@@ -1700,6 +1729,7 @@ class Parser {
       'Expected "(" after "for"',
     )
 
+    const initializerStart = this.peek()
     this.parseType()
 
     const variableName = this.consume(
@@ -1715,15 +1745,19 @@ class Parser {
     const initialValue =
       this.parseExpression()
 
-    const initializer = declare(
-      'LOCAL',
-      variableName.lexeme,
-      initialValue,
-    )
-
-    this.consume(
+    const initializerEnd = this.consume(
       'SEMICOLON',
       'Expected ";" after FOR initializer',
+    )
+
+    const initializer = this.withSourceRange(
+      declare(
+        'LOCAL',
+        variableName.lexeme,
+        initialValue,
+      ),
+      initializerStart,
+      initializerEnd,
     )
 
     const condition =
@@ -1734,8 +1768,12 @@ class Parser {
       'Expected ";" after FOR condition',
     )
 
-    const increment =
-      this.parseAssignmentWithoutSemicolon()
+    const incrementStart = this.peek()
+    const increment = this.withSourceRange(
+      this.parseAssignmentWithoutSemicolon(),
+      incrementStart,
+      this.previous(),
+    )
 
     this.consume(
       'RIGHT_PAREN',

@@ -679,7 +679,7 @@ describe('parseProgram', () => {
 
     expect(
       program.processes[0].instructions,
-    ).toEqual([
+    ).toMatchObject([
       {
         type: 'SEMAPHORE_P',
         semaphoreName: 'mutex',

@@ -42,6 +42,11 @@ finalizadas o bloqueadas. El motor reconstruye determinísticamente el
 estado anterior desde el inicio y restaura también scheduler, historial,
 diagnósticos y foco; no intenta invertir manualmente cada operación.
 
+El editor resalta la línea que produjo el último step y la mantiene
+visible durante Step, Play, Run y Step Back. La ubicación proviene de
+rangos conservados por tokenizer, parser, AST y traza; no se infiere a
+partir del program counter.
+
 Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
 comparar soluciones con semáforos, monitores y pasaje de mensajes. El
 escenario general se mantendrá separado de los errores específicos de

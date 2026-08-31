@@ -39,6 +39,7 @@ export function tokenize(source: string): Token[] {
   let current = 0
   let line = 1
   let column = 1
+  let tokenStartOffset = 0
 
   function isAtEnd(): boolean {
     return current >= source.length
@@ -75,10 +76,23 @@ export function tokenize(source: string): Token[] {
       lexeme,
       line: tokenLine,
       column: tokenColumn,
+      sourceRange: {
+        start: {
+          offset: tokenStartOffset,
+          line: tokenLine,
+          column: tokenColumn,
+        },
+        end: {
+          offset: current,
+          line,
+          column,
+        },
+      },
     })
   }
 
   while (!isAtEnd()) {
+    tokenStartOffset = current
     const tokenLine = line
     const tokenColumn = column
 
@@ -363,6 +377,18 @@ export function tokenize(source: string): Token[] {
     lexeme: '',
     line,
     column,
+    sourceRange: {
+      start: {
+        offset: current,
+        line,
+        column,
+      },
+      end: {
+        offset: current,
+        line,
+        column,
+      },
+    },
   })
 
   return tokens

@@ -1,4 +1,5 @@
 import type { ProcessId } from '../process/ProcessId'
+import type { SourceRange } from '../language/SourceRange'
 import type {
   PrimitiveValue,
   RuntimeValue,
@@ -63,6 +64,7 @@ export interface ExecutionEvent {
   readonly step: number
   readonly processId: ProcessId
   readonly instructionType: string
+  readonly sourceRange?: SourceRange
   readonly description?: string
   readonly awaitStatus?: AwaitEventStatus
   readonly semaphoreEvent?: SemaphoreExecutionEvent

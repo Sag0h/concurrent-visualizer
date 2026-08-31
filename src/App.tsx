@@ -31,6 +31,7 @@ import {
 import { ExamplePicker } from './components/ExamplePicker'
 import { PlaybackControls } from './components/PlaybackControls'
 import { ExecutionFocusPanel } from './components/ExecutionFocusPanel'
+import { CodeEditor } from './components/CodeEditor'
 import {
   findProgramExample,
   programExamples,
@@ -954,6 +955,9 @@ function App() {
     && snapshot?.executionStatus
       !== 'STEP_LIMIT_REACHED'
 
+  const activeSourceLine =
+    snapshot?.executionFocus?.sourceRange?.start.line
+
   return (
     <main className="app">
       <header className="header">
@@ -1080,9 +1084,9 @@ function App() {
             </div>
           )}
 
-          <textarea
-            className="code-editor"
+          <CodeEditor
             value={code}
+            activeLine={activeSourceLine}
             onChange={(event) => {
               setCode(event.target.value)
               setHasUserEditedCode(true)
@@ -1090,7 +1094,6 @@ function App() {
               invalidateBuild()
             }}
             onKeyDown={handleEditorKeyDown}
-            spellCheck={false}
           />
 
           <div className="controls">

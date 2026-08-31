@@ -26,6 +26,11 @@ export function ExecutionFocusPanel({
           <div>
             <span>Instruction</span>
             <code>{instructionLabel(focus.instructionType)}</code>
+            {focus.sourceRange && (
+              <small className="execution-source-location">
+                Source line {focus.sourceRange.start.line}
+              </small>
+            )}
             {focus.description && (
               <small>{focus.description}</small>
             )}

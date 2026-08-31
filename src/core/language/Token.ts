@@ -1,3 +1,5 @@
+import type { SourceRange } from './SourceRange'
+
 export type TokenType =
   | 'IDENTIFIER'
   | 'NUMBER'
@@ -61,4 +63,6 @@ export interface Token {
   readonly lexeme: string
   readonly line: number
   readonly column: number
+  /** End position is exclusive. Lines and columns are one-based. */
+  readonly sourceRange: SourceRange
 }

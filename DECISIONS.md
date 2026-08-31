@@ -1242,3 +1242,34 @@ podrán optimizarlo sin cambiar el contrato.
 
 **Motivo:** reutilizar una única semántica forward y preservar todos los
 componentes del estado sin mantener lógica de undo por instrucción.
+
+------------------------------------------------------------------------
+
+## ADR-035 --- La ubicación ejecutada viaja con la instrucción y la traza
+
+**Estado:** Aceptada
+
+**Contexto:** resaltar el editor desde el program counter sería
+incorrecto para cuerpos anidados, funciones, procesos parametrizados,
+microoperaciones y retrocesos. Además, un `textarea` no permite colorear
+una línea individual.
+
+**Decisión:** tokenizer y parser conservan `SourceRange` con offsets y
+línea/columna; el extremo final es exclusivo. Las instrucciones parseadas
+transportan el rango y el engine lo copia al `ExecutionEvent` y al foco
+del snapshot. El rango es opcional para instrucciones creadas mediante
+factories fuera del parser.
+
+La UI mantiene el `textarea` como control editable y sincroniza detrás
+una capa visual no interactiva. El número de línea mostrado y el
+resaltado derivan exclusivamente de `executionFocus.sourceRange`.
+
+**Consecuencia:** Step, Play, Run y Step Back señalan la misma fuente sin
+consultar frames ni program counters. Los rangos pueden reutilizarse más
+adelante para errores enriquecidos, selección de fragmentos o breakpoints.
+La capa del editor exige mantener idénticas tipografía, espaciado y
+scroll en ambos elementos.
+
+**Motivo:** preservar la correspondencia semántica desde el código hasta
+la ejecución sin reemplazar todavía el editor por una dependencia
+externa de mayor tamaño.

@@ -25,16 +25,24 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** continuar M11 conservando posiciones de origen
-desde el parser para poder resaltar la línea exacta dentro del editor.
-Las assertions explícitas se evaluaron y quedaron como extensión futura
-del lenguaje.
+**Próximo objetivo:** continuar M11 con la base visual de temas
+Sistema/Claro/Oscuro y el modal de Settings para controlar paneles
+opcionales. Las assertions explícitas se evaluaron y quedaron como
+extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
 pasaje de mensajes. La incorporación será progresiva cuando M12 y M13
 provean esas primitivas, manteniendo separado el escenario general de
 los errores específicos de cada mecanismo.
+
+**Mejoras visuales registradas para M11:** temas Sistema/Claro/Oscuro,
+modal de Settings, visibilidad persistente de paneles opcionales y un
+workspace que reduzca el scroll general mediante áreas con desplazamiento
+independiente. En mobile se priorizarán pestañas para Código, Estado,
+Procesos e Historial en lugar de comprimir las columnas de escritorio.
+Los paneles ocultos conservarán su estado y los separadores
+redimensionables se evaluarán sólo después de validar el layout base.
 
 ------------------------------------------------------------------------
 
@@ -2162,3 +2170,23 @@ un contraejemplo queda deshabilitado porque esa ejecución utiliza
 transiciones explícitas y no el scheduler ordinario. La reconstrucción
 actual cuesta O(step destino); checkpoints quedan como optimización
 futura si el límite de ejecución crece.
+
+## 2026-08-31 --- M11: línea fuente ejecutada
+
+Los tokens conservan ahora rangos con offset cero-based y línea/columna
+uno-based; el extremo final es exclusivo. El parser transfiere esos
+rangos a todas las instrucciones de usuario, incluidas instrucciones
+anidadas, clones de procesos parametrizados y las cláusulas internas de
+`for`. Las instrucciones construidas programáticamente pueden omitirlos.
+
+Cada `ExecutionEvent` copia el rango de la instrucción ejecutada y
+`SimulationSnapshot.executionFocus` lo expone a la vista. Por derivar de
+la traza, Reset lo elimina y Step Back lo reconstruye junto con el resto
+del foco sin mantener estado visual paralelo.
+
+`CodeEditor` mantiene el `textarea` editable y superpone una copia visual
+sin interacción para resaltar la línea activa. Ambas capas sincronizan
+scroll vertical y horizontal; cuando el avance queda fuera de la ventana
+del editor, la línea se centra automáticamente. El panel de foco muestra
+además el número de línea. Se verificaron Step, Step Back, edición y una
+ejecución de 40 líneas con seguimiento automático.

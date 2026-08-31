@@ -1181,10 +1181,10 @@ elimina naturalmente al vaciar la traza y los forks la reconstruyen a
 partir de su propio historial.
 
 `ExecutionFocusPanel`, las tarjetas de procesos y ambas vistas del
-historial consumen el mismo foco. La UI distingue explícitamente “último
-step ejecutado” de “próxima instrucción”; todavía no intenta inferir una
-línea del editor desde el program counter. Esa segunda capacidad requiere
-preservar rangos de origen en tokens y AST.
+historial consumen el mismo foco. `CodeEditor` consume también el rango
+de origen y resalta su línea inicial. La UI distingue explícitamente
+“último step ejecutado” de “próxima instrucción” y nunca intenta inferir
+una ubicación desde el program counter.
 
 ### 21.3. Retroceso determinista
 
@@ -1205,6 +1205,42 @@ El replay manual de contraejemplos usa `stepTransition()` y por eso la UI
 deshabilita temporalmente Step Back en ese modo. La implementación actual
 es O(targetStep); checkpoints semánticos son una optimización futura, no
 parte del contrato inicial.
+
+### 21.4. Rangos de origen y editor sincronizado
+
+Cada token contiene un `SourceRange`: offsets cero-based y posiciones de
+línea/columna uno-based, con extremo final exclusivo. El parser compone
+el rango de cada instrucción desde su primer y último token. El campo es
+opcional en `Instruction` para conservar la API de programas construidos
+directamente por tests o clientes del core.
+
+Al ejecutar, el engine copia el rango a `ExecutionEvent`; el snapshot lo
+incluye en `executionFocus`. Esto mantiene una única fuente de verdad
+para Step, Play, Run, exploración ordinaria y Step Back. Los procesos
+parametrizados conservan la ubicación compartida del cuerpo original,
+mientras que inicialización e incremento de `for` reciben rangos propios.
+
+El navegador no permite aplicar estilos parciales dentro de un
+`textarea`. `CodeEditor` conserva ese control como superficie editable y
+coloca detrás una capa `pre` no interactiva con las mismas métricas. Los
+scrolls se sincronizan y la línea activa se centra sólo cuando sale del
+área visible, evitando saltos innecesarios durante la edición.
+
+### 21.5. Personalización y workspace adaptable (planificado)
+
+Las preferencias de presentación no formarán parte de `ExecutionState`
+ni de los snapshots: tema, paneles visibles y disposición pertenecen a
+la UI y se persistirán separadamente. Ocultar catálogo, exploración,
+diagnósticos o microoperaciones no detendrá su cálculo ni descartará sus
+resultados.
+
+El layout de escritorio evolucionará hacia un workspace que use la
+altura de la ventana, mantenga controles accesibles y asigne scroll
+independiente al editor y a las vistas extensas. En pantallas pequeñas
+las columnas se convertirán en pestañas semánticas, evitando reducir
+editor, procesos e historial hasta volverlos ilegibles. Los temas se
+implementarán con variables CSS compartidas y la preferencia `Sistema`
+seguirá `prefers-color-scheme`.
 
 ## 22. Problemas clásicos
 

@@ -890,6 +890,13 @@ export class SimulationEngine {
       step: this.state.stepCount + 1,
       processId: process.id,
       instructionType: instruction.type,
+      ...(instruction.sourceRange
+        ? {
+            sourceRange: structuredClone(
+              instruction.sourceRange,
+            ),
+          }
+        : {}),
       awaitStatus,
       semaphoreEvent,
       loopConditionEvent,
@@ -962,6 +969,13 @@ export class SimulationEngine {
               latestExecutionEvent.processId,
             instructionType:
               latestExecutionEvent.instructionType,
+            ...(latestExecutionEvent.sourceRange
+              ? {
+                  sourceRange: structuredClone(
+                    latestExecutionEvent.sourceRange,
+                  ),
+                }
+              : {}),
             description:
               latestExecutionEvent.description,
             microOperation:

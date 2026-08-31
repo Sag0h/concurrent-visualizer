@@ -1,4 +1,5 @@
 import type { Expression } from '../expressions/Expression'
+import type { SourceRange } from '../language/SourceRange'
 import type { AssignmentTarget } from './AssignmentTarget'
 export interface NoOpInstruction {
   readonly type: 'NO_OP'
@@ -132,7 +133,7 @@ export interface SimulatedOperationInstruction {
   readonly arguments: Expression[]
 }
 
-export type Instruction =
+type InstructionWithoutSourceRange =
   | NoOpInstruction
   | FinishInstruction
   | AssignmentInstruction
@@ -152,3 +153,8 @@ export type Instruction =
   | SemaphoreVInstruction
   | DataStructureOperationInstruction
   | SimulatedOperationInstruction
+
+export type Instruction = InstructionWithoutSourceRange & {
+  /** Present for instructions parsed from source code. */
+  readonly sourceRange?: SourceRange
+}
