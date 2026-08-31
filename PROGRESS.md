@@ -25,10 +25,11 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** continuar M11 con la base visual de temas
-Sistema/Claro/Oscuro y el modal de Settings para controlar paneles
-opcionales. Las assertions explícitas se evaluaron y quedaron como
-extensión futura del lenguaje.
+**Próximo objetivo:** continuar M11 reorganizando escritorio como un
+workspace que aproveche mejor la altura disponible y reduzca el scroll
+general. Después se adaptará la navegación mobile mediante pestañas. Las
+assertions explícitas se evaluaron y quedaron como extensión futura del
+lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2190,3 +2191,25 @@ scroll vertical y horizontal; cuando el avance queda fuera de la ventana
 del editor, la línea se centra automáticamente. El panel de foco muestra
 además el número de línea. Se verificaron Step, Step Back, edición y una
 ejecución de 40 líneas con seguimiento automático.
+
+## 2026-08-31 --- M11: Settings y temas persistentes
+
+El encabezado incorpora un botón Settings que abre un diálogo modal con
+foco inicial, ciclo de Tab contenido, cierre mediante Escape o backdrop y
+restauración del foco al botón disparador. El modal ofrece tema System,
+Light o Dark y switches para catálogo educativo, explorador BFS,
+diagnósticos de ejecución y microoperaciones.
+
+Las preferencias visuales tienen un esquema versionado independiente del
+estado semántico. Se guardan en `localStorage`, completan campos ausentes
+con defaults y se recuperan de JSON inválido o versiones desconocidas sin
+impedir el inicio. System observa `prefers-color-scheme`; los temas usan
+tokens CSS compartidos y respetan `prefers-reduced-motion`.
+
+Ocultar una vista sólo cambia su render. El catálogo conserva su selección,
+BFS conserva la sesión de exploración, diagnósticos permanecen en el
+snapshot y Micro-operations conserva tanto la traza como la pestaña elegida.
+Restore defaults recupera tema System y todos los paneles. Las pruebas
+automatizadas cubren carga, recuperación segura, persistencia y resolución
+de tema; la validación visual cubrió ambos temas, recarga, switches, Reset
+de preferencias, Escape y conservación de datos.

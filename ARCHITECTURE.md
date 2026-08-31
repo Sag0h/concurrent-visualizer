@@ -1226,21 +1226,28 @@ coloca detrás una capa `pre` no interactiva con las mismas métricas. Los
 scrolls se sincronizan y la línea activa se centra sólo cuando sale del
 área visible, evitando saltos innecesarios durante la edición.
 
-### 21.5. Personalización y workspace adaptable (planificado)
+### 21.5. Personalización persistente y workspace adaptable
 
 Las preferencias de presentación no formarán parte de `ExecutionState`
-ni de los snapshots: tema, paneles visibles y disposición pertenecen a
-la UI y se persistirán separadamente. Ocultar catálogo, exploración,
-diagnósticos o microoperaciones no detendrá su cálculo ni descartará sus
-resultados.
+ni de los snapshots: tema y paneles visibles pertenecen a la UI. El
+esquema `InterfacePreferences` tiene versión propia, se valida al cargar
+y se persiste en `localStorage`. Ocultar catálogo, exploración,
+diagnósticos o microoperaciones no detiene su cálculo ni descarta sus
+resultados; `displayedHistoryMode` sustituye sólo la presentación mientras
+la pestaña detallada está oculta.
+
+`useInterfaceTheme` resuelve System contra `prefers-color-scheme` y aplica
+el tema efectivo en el elemento raíz. Variables globales definen página,
+superficies, texto, bordes y acento; los estados semánticos conservan
+colores específicos adaptados a ambos fondos. `SettingsModal` mantiene el
+foco dentro del diálogo, admite Escape, bloquea el scroll del documento y
+devuelve el foco al control que lo abrió.
 
 El layout de escritorio evolucionará hacia un workspace que use la
 altura de la ventana, mantenga controles accesibles y asigne scroll
 independiente al editor y a las vistas extensas. En pantallas pequeñas
 las columnas se convertirán en pestañas semánticas, evitando reducir
-editor, procesos e historial hasta volverlos ilegibles. Los temas se
-implementarán con variables CSS compartidas y la preferencia `Sistema`
-seguirá `prefers-color-scheme`.
+editor, procesos e historial hasta volverlos ilegibles.
 
 ## 22. Problemas clásicos
 

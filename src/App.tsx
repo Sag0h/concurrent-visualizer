@@ -32,6 +32,13 @@ import { ExamplePicker } from './components/ExamplePicker'
 import { PlaybackControls } from './components/PlaybackControls'
 import { ExecutionFocusPanel } from './components/ExecutionFocusPanel'
 import { CodeEditor } from './components/CodeEditor'
+import { SettingsModal } from './components/SettingsModal'
+import {
+  createDefaultInterfacePreferences,
+  loadInterfacePreferences,
+  saveInterfacePreferences,
+} from './settings/interfacePreferences'
+import { useInterfaceTheme } from './settings/useInterfaceTheme'
 import {
   findProgramExample,
   programExamples,
@@ -73,6 +80,12 @@ type ExplorationSession =
 
 function App() {
   const [code, setCode] = useState(initialCode)
+
+  const [interfacePreferences, setInterfacePreferences] =
+    useState(loadInitialInterfacePreferences)
+
+  const [isSettingsOpen, setIsSettingsOpen] =
+    useState(false)
 
   const [selectedExampleId, setSelectedExampleId] =
     useState('')
@@ -133,8 +146,26 @@ function App() {
       'instructions',
     )
 
+  const displayedHistoryMode =
+    interfacePreferences.panels.microoperations
+      ? historyMode
+      : 'instructions'
+
   const historyRef =
     useRef<HTMLDivElement>(null)
+
+  useInterfaceTheme(interfacePreferences.theme)
+
+  useEffect(() => {
+    try {
+      saveInterfacePreferences(
+        window.localStorage,
+        interfacePreferences,
+      )
+    } catch {
+      // The app remains usable when storage is unavailable.
+    }
+  }, [interfacePreferences])
 
   useEffect(() => {
     if (!isPlaying || !engine) {
@@ -172,7 +203,7 @@ function App() {
     }
 
     history.scrollTop = history.scrollHeight
-  }, [historyMode, snapshot?.stepCount])
+  }, [displayedHistoryMode, snapshot?.stepCount])
 
   function handleBuild() {
     setIsPlaying(false)
@@ -967,7 +998,29 @@ function App() {
             Concurrent programming simulator
           </p>
         </div>
+
+        <button
+          className="settings-button"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={isSettingsOpen}
+          onClick={() => setIsSettingsOpen(true)}
+        >
+          <span aria-hidden="true">⚙</span>
+          <span className="settings-button-label">Settings</span>
+        </button>
       </header>
+
+      {isSettingsOpen && (
+        <SettingsModal
+          preferences={interfacePreferences}
+          onChange={setInterfacePreferences}
+          onReset={() => setInterfacePreferences(
+            createDefaultInterfacePreferences(),
+          )}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
 
       <section className="workspace">
         <div className="editor-panel">
@@ -1042,46 +1095,50 @@ function App() {
             </div>
           </div>
 
-          <ExamplePicker
-            examples={programExamples}
-            selectedExampleId={selectedExampleId}
-            onSelect={(exampleId) => {
-              setSelectedExampleId(exampleId)
-              setPendingExampleId(null)
-            }}
-            onRequestLoad={handleRequestExampleLoad}
-          />
+          {interfacePreferences.panels.examples && (
+            <>
+              <ExamplePicker
+                examples={programExamples}
+                selectedExampleId={selectedExampleId}
+                onSelect={(exampleId) => {
+                  setSelectedExampleId(exampleId)
+                  setPendingExampleId(null)
+                }}
+                onRequestLoad={handleRequestExampleLoad}
+              />
 
-          {pendingExampleId && (
-            <div
-              className="example-replace-warning"
-              role="alert"
-            >
-              <div>
-                <strong>Replace your edited program?</strong>
-                <p>
-                  Loading this example will replace the current editor contents.
-                  The example will not be built or run automatically.
-                </p>
-              </div>
+              {pendingExampleId && (
+                <div
+                  className="example-replace-warning"
+                  role="alert"
+                >
+                  <div>
+                    <strong>Replace your edited program?</strong>
+                    <p>
+                      Loading this example will replace the current editor contents.
+                      The example will not be built or run automatically.
+                    </p>
+                  </div>
 
-              <div className="example-replace-actions">
-                <button
-                  type="button"
-                  onClick={() =>
-                    applySelectedExample(pendingExampleId)
-                  }
-                >
-                  Replace and load
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingExampleId(null)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+                  <div className="example-replace-actions">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        applySelectedExample(pendingExampleId)
+                      }
+                    >
+                      Replace and load
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingExampleId(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <CodeEditor
@@ -1225,27 +1282,29 @@ function App() {
                 focus={snapshot.executionFocus}
               />
 
-              <ExplorationPanel
-                target={explorationTarget}
-                limits={explorationLimits}
-                result={
-                  explorationSession?.result ?? null
-                }
-                replayChoiceIndex={replayChoiceIndex}
-                onTargetChange={
-                  handleExplorationTargetChange
-                }
-                onLimitsChange={setExplorationLimits}
-                onExplore={handleExplore}
-                onStartReplay={
-                  handleStartCounterexampleReplay
-                }
-                onReplayNext={handleReplayNextChoice}
-                onReplayAll={handleReplayAllChoices}
-                onExitReplay={
-                  handleExitCounterexampleReplay
-                }
-              />
+              {interfacePreferences.panels.exploration && (
+                <ExplorationPanel
+                  target={explorationTarget}
+                  limits={explorationLimits}
+                  result={
+                    explorationSession?.result ?? null
+                  }
+                  replayChoiceIndex={replayChoiceIndex}
+                  onTargetChange={
+                    handleExplorationTargetChange
+                  }
+                  onLimitsChange={setExplorationLimits}
+                  onExplore={handleExplore}
+                  onStartReplay={
+                    handleStartCounterexampleReplay
+                  }
+                  onReplayNext={handleReplayNextChoice}
+                  onReplayAll={handleReplayAllChoices}
+                  onExitReplay={
+                    handleExitCounterexampleReplay
+                  }
+                />
+              )}
 
               <section>
                 <h2>Processes</h2>
@@ -1606,7 +1665,8 @@ function App() {
                 </section>
               )}
 
-              {snapshot.runtimeDiagnostics.length > 0 && (
+              {interfacePreferences.panels.diagnostics
+                && snapshot.runtimeDiagnostics.length > 0 && (
                 <section
                   className="runtime-diagnostics"
                   aria-labelledby="runtime-diagnostics-heading"
@@ -1693,7 +1753,7 @@ function App() {
                     <button
                       type="button"
                       className={
-                        historyMode === 'instructions'
+                        displayedHistoryMode === 'instructions'
                           ? 'history-tab active'
                           : 'history-tab'
                       }
@@ -1704,19 +1764,21 @@ function App() {
                       Instructions
                     </button>
 
-                    <button
-                      type="button"
-                      className={
-                        historyMode === 'microoperations'
-                          ? 'history-tab active'
-                          : 'history-tab'
-                      }
-                      onClick={() =>
-                        setHistoryMode('microoperations')
-                      }
-                    >
-                      Micro-operations
-                    </button>
+                    {interfacePreferences.panels.microoperations && (
+                      <button
+                        type="button"
+                        className={
+                          displayedHistoryMode === 'microoperations'
+                            ? 'history-tab active'
+                            : 'history-tab'
+                        }
+                        onClick={() =>
+                          setHistoryMode('microoperations')
+                        }
+                      >
+                        Micro-operations
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1724,7 +1786,7 @@ function App() {
                   className="history"
                   ref={historyRef}
                 >
-                  {historyMode === 'instructions' ? (
+                  {displayedHistoryMode === 'instructions' ? (
                     engine.getState().history.length === 0 ? (
                       <p className="empty">
                         No instructions executed yet.
@@ -2419,6 +2481,14 @@ function errorMessage(
   return value instanceof Error
     ? value.message
     : fallback
+}
+
+function loadInitialInterfacePreferences() {
+  try {
+    return loadInterfacePreferences(window.localStorage)
+  } catch {
+    return createDefaultInterfacePreferences()
+  }
 }
 
 export default App

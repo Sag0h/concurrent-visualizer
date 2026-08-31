@@ -47,6 +47,11 @@ visible durante Step, Play, Run y Step Back. La ubicación proviene de
 rangos conservados por tokenizer, parser, AST y traza; no se infiere a
 partir del program counter.
 
+Settings permite elegir tema System, Light o Dark y ocultar catálogo,
+explorador BFS, diagnósticos o microoperaciones sin modificar ni borrar la
+simulación. Las preferencias visuales se validan y persisten localmente;
+Restore defaults recupera System y todos los paneles.
+
 Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
 comparar soluciones con semáforos, monitores y pasaje de mensajes. El
 escenario general se mantendrá separado de los errores específicos de

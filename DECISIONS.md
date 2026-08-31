@@ -1273,3 +1273,33 @@ scroll en ambos elementos.
 **Motivo:** preservar la correspondencia semántica desde el código hasta
 la ejecución sin reemplazar todavía el editor por una dependencia
 externa de mayor tamaño.
+
+------------------------------------------------------------------------
+
+## ADR-036 --- Settings modifica presentación, no simulación
+
+**Estado:** Aceptada
+
+**Contexto:** temas y paneles opcionales deben personalizar una interfaz
+extensa sin contaminar snapshots, forks, exploración, replay o claves de
+estado concurrente. El almacenamiento del navegador puede faltar,
+corromperse o contener una versión antigua.
+
+**Decisión:** `InterfacePreferences` es un esquema visual versionado que
+se carga y guarda detrás de funciones tolerantes a errores. El tema
+System se resuelve con `prefers-color-scheme`; Light y Dark son explícitos.
+Los switches condicionan únicamente el render y conservan en el padre las
+selecciones y resultados de cada panel.
+
+El modal implementa semántica `dialog`, foco inicial, ciclo de Tab,
+Escape, bloqueo temporal del scroll y devolución del foco. Restore
+defaults crea un objeto nuevo con System y todos los paneles visibles.
+
+**Consecuencia:** recargar conserva preferencias, pero compartir o
+retroceder una simulación nunca las transporta. Datos inválidos vuelven a
+defaults y una falla de `localStorage` no impide usar el programa. Nuevas
+opciones requieren incrementar o migrar la versión cuando dejen de ser
+compatibles.
+
+**Motivo:** separar estrictamente experiencia de usuario y semántica
+concurrente, manteniendo personalización recuperable y predecible.

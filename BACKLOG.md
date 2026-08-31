@@ -958,15 +958,15 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 
 ### Personalización y aprovechamiento del espacio
 
--   [ ] Incorporar temas `Sistema`, `Claro` y `Oscuro` mediante variables
+-   [x] Incorporar temas `Sistema`, `Claro` y `Oscuro` mediante variables
     CSS, respetando inicialmente `prefers-color-scheme`.
--   [ ] Agregar un botón de Settings que abra un modal accesible y
+-   [x] Agregar un botón de Settings que abra un modal accesible y
     permita restaurar la configuración predeterminada.
--   [ ] Permitir mostrar u ocultar mediante switches los paneles
+-   [x] Permitir mostrar u ocultar mediante switches los paneles
     opcionales, comenzando por el catálogo de ejemplos, el explorador
     BFS, los diagnósticos y las microoperaciones. Ocultar una vista no
     debe eliminar sus resultados ni modificar la simulación.
--   [ ] Persistir las preferencias puramente visuales en `localStorage`,
+-   [x] Persistir las preferencias puramente visuales en `localStorage`,
     con versionado y recuperación segura ante datos inválidos.
 -   [ ] Reorganizar escritorio como un workspace que aproveche la altura
     disponible: controles visibles, paneles con scroll independiente y
