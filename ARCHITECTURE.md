@@ -1144,10 +1144,15 @@ lectura `RECORD_FIELD`. Por eso `getID()` sobre `id` conserva la
 granularidad de memoria y no necesita un runtime de objetos paralelo.
 
 También se prevén operaciones educativas simuladas como `print(...)` o
-`procesar(...)`. No realizarán I/O real ni dependerán del navegador,
-red, reloj o máquina anfitriona. Podrán producir eventos estructurados
-en la traza. Antes de implementarlas deberá decidirse su granularidad de
-step y qué información, si alguna, pertenece al estado semántico.
+`procesar(...)`. `print(...)` ya se representa mediante una
+`SimulatedOperationInstruction` y un evento estructurado con valores
+clonados. No realiza I/O real ni depende del navegador, red, reloj o
+máquina anfitriona. Las lecturas compartidas necesarias para evaluar sus
+argumentos conservan sus microoperaciones; la emisión final avanza el
+programa y queda en el historial, pero no agrega estado semántico global
+fuera de la posición normal del proceso. Los métodos simulados ya
+reutilizan este modelo y agregan metadata del receptor: nombre, tipo de
+registro y scope. No ejecutan cuerpos ni modifican campos.
 
 Toda extensión deberá preservar clonación, reproducibilidad y
 compatibilidad con la exploración de interleavings de M9.

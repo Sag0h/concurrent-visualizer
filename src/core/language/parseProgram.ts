@@ -30,6 +30,7 @@ import {
   semaphorePInstruction,
   dataStructureOperationInstruction,
   recordFieldTarget,
+  simulatedOperationInstruction,
 } from '../instructions/instructionFactories'
 import {
   createRecordValue,
@@ -467,6 +468,10 @@ class Parser {
       return this.parseSemaphoreOperation('V')
     }
 
+    if (this.match('PRINT')) {
+      return this.parsePrintInstruction()
+    }
+
     if (this.match('BREAK')) {
       this.consume(
         'SEMICOLON',
@@ -488,7 +493,9 @@ class Parser {
       && this.checkNext('DOT')
       && !this.checkAt(3, 'ASSIGN')
     ) {
-      return this.parseDataStructureOperationStatement()
+      return this.isDataStructureOperationCallStart()
+        ? this.parseDataStructureOperationStatement()
+        : this.parseSimulatedRecordMethodStatement()
     }
 
     if (
@@ -999,6 +1006,85 @@ class Parser {
     throw this.error(
       this.peek(),
       'Expected literal value',
+    )
+  }
+
+  private parsePrintInstruction(): Instruction {
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after "print"',
+    )
+
+    const args: Expression[] = []
+
+    if (!this.check('RIGHT_PAREN')) {
+      do {
+        args.push(this.parseExpression())
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after print arguments',
+    )
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after print operation',
+    )
+
+    return simulatedOperationInstruction(
+      'print',
+      args,
+    )
+  }
+
+  private parseSimulatedRecordMethodStatement(): Instruction {
+    const receiver = this.consume(
+      'IDENTIFIER',
+      'Expected record name',
+    )
+    this.consume(
+      'DOT',
+      'Expected "." after record name',
+    )
+    const method = this.consume(
+      'IDENTIFIER',
+      'Expected simulated method name',
+    )
+
+    if (method.lexeme.startsWith('get')) {
+      throw this.error(
+        method,
+        `Getter "${method.lexeme}" returns a value and cannot be used as a statement`,
+      )
+    }
+
+    this.consume(
+      'LEFT_PAREN',
+      `Expected "(" after "${method.lexeme}"`,
+    )
+
+    const args: Expression[] = []
+
+    if (!this.check('RIGHT_PAREN')) {
+      do {
+        args.push(this.parseExpression())
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      `Expected ")" after "${method.lexeme}" arguments`,
+    )
+    this.consume(
+      'SEMICOLON',
+      `Expected ";" after "${method.lexeme}" operation`,
+    )
+
+    return simulatedOperationInstruction(
+      method.lexeme,
+      args,
+      receiver.lexeme,
     )
   }
 

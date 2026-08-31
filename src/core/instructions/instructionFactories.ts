@@ -19,6 +19,7 @@ import type {
   DataStructureOperationInstruction,
   DataStructureOperation,
   DataStructureResultTarget,
+  SimulatedOperationInstruction,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -241,5 +242,18 @@ export function dataStructureOperationInstruction(
     argument: options.argument,
     priorityArgument: options.priorityArgument,
     resultTarget: options.resultTarget,
+  }
+}
+
+export function simulatedOperationInstruction(
+  operationName: SimulatedOperationInstruction['operationName'],
+  args: Expression[],
+  receiverName?: string,
+): SimulatedOperationInstruction {
+  return {
+    type: 'SIMULATED_OPERATION',
+    operationName,
+    receiverName,
+    arguments: args,
   }
 }

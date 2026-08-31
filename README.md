@@ -16,9 +16,9 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M10.2 --- **Registros y operaciones educativas**.
+**Milestone actual:** M11 --- **Visualización avanzada y catálogo educativo**.
 
-**Último milestone completado:** M10.1 --- **Estructuras académicas**.
+**Último milestone completado:** M10.2 --- **Registros y operaciones educativas**.
 
 M7 está completado en sus siete fases:
 
@@ -683,14 +683,12 @@ expresar
 directamente estructuras utilizadas en ejercicios académicos, sin
 adaptarlas artificialmente con arrays e índices. Los procesos
 parametrizados completan M10.1. M10.2 ya incorporó su primera vertical:
-registros con campos primitivos, acceso directo de lectura/escritura y
-getters automáticos como `getNivel()` o `getID()`.
+registros con campos primitivos, acceso directo de lectura/escritura,
+getters automáticos y métodos simulados.
 
-Como evolución posterior se evaluarán métodos simulados sobre esos
-registros, además de operaciones globales simuladas
-como `print(...)`. Estas podrán representar una acción observable sin
-realizar I/O real, preservando la reproducibilidad y la exploración
-determinista.
+`print(...)` y métodos como `fallo.procesar()` representan acciones
+observables sin realizar I/O real: capturan argumentos y dejan eventos
+deterministas en la traza.
 
 ------------------------------------------------------------------------
 
@@ -718,16 +716,16 @@ Análisis y errores
         ↓
 Exploración acotada
         ↓
-Estructuras de datos académicas  ← actual
+Estructuras de datos académicas
         ↓
 Monitores
         ↓
 Pasaje de mensajes
         ↓
-Visualización y análisis avanzado
+Visualización y análisis avanzado  ← actual
 ```
 
-### Último milestone completado --- M10.1: Estructuras académicas
+### Último milestone completado --- M10.2: Registros y operaciones simuladas
 
 Completado:
 
@@ -742,12 +740,13 @@ M7.7  Casos académicos reproducibles
 M8    Detector de errores y diagnósticos
 M9    Exploración de ejecuciones
 M10.1 Colas FIFO, colas de prioridad, pilas y procesos parametrizados
+M10.2 Registros, campos, getters y operaciones simuladas
 ```
 
-En curso:
+Próximo:
 
 ``` text
-M10.2  Registros y getters implementados; operaciones simuladas pendientes
+M11  Visualización avanzada y catálogo educativo
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

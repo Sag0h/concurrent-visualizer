@@ -5,9 +5,9 @@
 
 ## Estado actual
 
-**Fase:** M10.2 --- Registros, objetos y operaciones educativas simuladas.
+**Fase:** M11 --- Visualización avanzada y catálogo educativo.
 
-**Último milestone completado:** M10.1 --- Estructuras de datos académicas.
+**Último milestone completado:** M10.2 --- Registros y operaciones educativas simuladas.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -25,10 +25,9 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** comenzar M10.2 con una representación mínima de
-registros y acceso a campos. Las colas FIFO, colas de prioridad estables,
-pilas y procesos parametrizados ya están implementados. Las assertions
-explícitas se evaluaron y quedaron como extensión futura del lenguaje.
+**Próximo objetivo:** revisar y continuar M11, priorizando el catálogo
+educativo cargable desde la interfaz. Las assertions explícitas se
+evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** incorporar en M11 un catálogo
 educativo cargable desde la interfaz. Comenzará con los nueve casos de
@@ -2013,5 +2012,41 @@ asignación local cuyo lado derecho necesita microoperaciones de lectura
 compartida. Antes el motor intentaba resolver incorrectamente el destino
 local como una escritura compartida.
 
-Los métodos simulados con comportamiento y `print(...)` continúan como
-el siguiente ticket de M10.2.
+`print(...)` fue el siguiente ticket de M10.2; los métodos simulados con
+receptor permanecen como evolución posterior.
+
+## 2026-08-30 --- M10.2: `print(...)` simulado
+
+Se incorporó `print(...)` como una instrucción simulada determinista. No
+escribe en la consola anfitriona: evalúa sus argumentos, clona los
+valores observados y produce un `SimulatedOperationExecutionEvent` en el
+historial. La UI lo etiqueta como `SIMULATED · DETERMINISTIC`.
+
+Las expresiones se evalúan de izquierda a derecha. Sus lecturas
+compartidas conservan la granularidad ordinaria de microoperaciones; por
+ejemplo, `print(fallo.getID())` registra una lectura de `fallo.id`. Una
+vez capturados todos los argumentos, la emisión final consume una
+transición y no modifica memoria. Los eventos quedan desacoplados de
+cambios posteriores mediante clonación.
+
+La implementación admite cero o más argumentos primitivos, arrays,
+estructuras o registros. Las llamadas a funciones suspendidas dentro de
+los argumentos permanecen pospuestas. El siguiente paso es reutilizar
+este modelo para métodos simulados como `fallo.procesar()`.
+
+## 2026-08-30 --- M10.2: métodos simulados sobre registros
+
+La infraestructura de `print(...)` se generalizó a sentencias como
+`fallo.procesar()` y `fallo.notificar("crítico")`. No requieren declarar
+un método ni ejecutar un cuerpo: representan una acción educativa con
+nombre y argumentos, sin modificar el registro.
+
+El runtime valida que el receptor sea un `RecordValue` y congela en el
+evento su nombre, tipo y scope local o compartido. Los argumentos se
+evalúan con la misma semántica determinista de `print`; si contienen
+getters compartidos, sus lecturas permanecen visibles e intercalables.
+Los nombres que comienzan con `get` quedan reservados para getters con
+resultado y no pueden descartarse como sentencia.
+
+**Estado:** M10.2 COMPLETADO. El siguiente frente es M11, con prioridad
+en el catálogo educativo documentado previamente.

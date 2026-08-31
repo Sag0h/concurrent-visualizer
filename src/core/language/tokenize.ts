@@ -11,6 +11,7 @@ const keywords: Record<string, TokenType> = {
   priority_queue: 'PRIORITY_QUEUE',
   stack: 'STACK',
   record: 'RECORD',
+  print: 'PRINT',
   true: 'BOOLEAN',
   false: 'BOOLEAN',
   if: 'IF',

@@ -40,6 +40,7 @@ import type {
   LoopConditionExecutionEvent,
   DataStructureExecutionEvent,
   SemaphoreExecutionEvent,
+  SimulatedOperationExecutionEvent,
 } from './ExecutionEvent'
 import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
 import type { ExecutionDiagnostic } from '../deadlock/DeadlockDiagnostic'
@@ -236,6 +237,9 @@ export class SimulationEngine {
 
     let dataStructureEvent:
       DataStructureExecutionEvent | undefined
+
+    let simulatedOperationEvent:
+      SimulatedOperationExecutionEvent | undefined
 
     switch (instruction.type) {
       case 'NO_OP':
@@ -795,6 +799,18 @@ export class SimulationEngine {
         break
       }
 
+      case 'SIMULATED_OPERATION': {
+        const result =
+          this.executeSimulatedOperation(
+            process,
+            instruction,
+          )
+
+        simulatedOperationEvent = result.event
+        executionDescription = result.description
+        break
+      }
+
     }
 
     const executionEvent: ExecutionEvent = {
@@ -805,6 +821,7 @@ export class SimulationEngine {
       semaphoreEvent,
       loopConditionEvent,
       dataStructureEvent,
+      simulatedOperationEvent,
       description: executionDescription,
     }
 
@@ -3249,8 +3266,9 @@ export class SimulationEngine {
 
   private resolveMicroOperationTargetLocation(
     process: Process,
-    runtime: NonNullable<
-      Process['microOperationRuntime']
+    runtime: Extract<
+      NonNullable<Process['microOperationRuntime']>,
+      { type: 'SHARED_ASSIGNMENT' }
     >,
   ): MemoryLocation | undefined {
     const target = runtime.instruction.target
@@ -3544,6 +3562,172 @@ export class SimulationEngine {
         return this.getSemaphore(
           reason.semaphoreName,
         ).value > 0
+    }
+  }
+
+  private executeSimulatedOperation(
+    process: Process,
+    instruction: Extract<
+      Instruction,
+      { type: 'SIMULATED_OPERATION' }
+    >,
+  ): {
+    readonly event?: SimulatedOperationExecutionEvent
+    readonly description?: string
+  } {
+    let runtime = process.microOperationRuntime
+
+    if (!runtime) {
+      if (instruction.arguments.some(
+        (argument) => this.containsFunctionCall(argument),
+      )) {
+        throw new Error(
+          `Function calls inside ${instruction.operationName}() are not supported yet`,
+        )
+      }
+
+      const receiver = instruction.receiverName
+        ? this.resolveSimulatedOperationReceiver(
+            process,
+            instruction.receiverName,
+            instruction.operationName,
+          )
+        : undefined
+
+      runtime = {
+        type: 'SIMULATED_OPERATION',
+        instruction,
+        pendingArguments:
+          structuredClone(instruction.arguments),
+        argumentIndex: 0,
+        argumentValues: [],
+        receiver,
+      }
+      process.microOperationRuntime = runtime
+    }
+
+    if (runtime.type !== 'SIMULATED_OPERATION') {
+      throw new Error(
+        'Invalid simulated-operation runtime',
+      )
+    }
+
+    while (
+      runtime.argumentIndex
+      < runtime.pendingArguments.length
+    ) {
+      const argument = runtime.pendingArguments[
+        runtime.argumentIndex
+      ]
+      const read = this.findNextSharedMemoryRead(
+        process,
+        argument,
+      )
+
+      if (read) {
+        const value = this.readSharedMemoryLocation(
+          read.location,
+        )
+        const locationDescription =
+          this.formatMemoryLocation(read.location)
+
+        this.recordMicroOperation(
+          process,
+          'SHARED_READ',
+          `${locationDescription} = ${JSON.stringify(value)}`,
+          read.location,
+        )
+        runtime.pendingArguments[
+          runtime.argumentIndex
+        ] = this.replaceExpressionWithValue(
+          argument,
+          read.expression,
+          value,
+        )
+
+        return {}
+      }
+
+      const value = evaluateExpression(
+        argument,
+        {
+          localMemory:
+            this.getActiveLocalMemory(process),
+          sharedMemory:
+            this.state.program.sharedMemory,
+        },
+      )
+
+      runtime.argumentValues.push(
+        structuredClone(value),
+      )
+      this.recordMicroOperation(
+        process,
+        'COMPUTE',
+        `argument ${runtime.argumentIndex + 1} = ${JSON.stringify(value)}`,
+      )
+      runtime.argumentIndex++
+    }
+
+    const argumentValues = structuredClone(
+      runtime.argumentValues,
+    )
+    const description = `${runtime.receiver
+      ? `${runtime.receiver.name}.`
+      : ''}${instruction.operationName}(${argumentValues
+      .map((value) => JSON.stringify(value))
+      .join(', ')})`
+
+    this.recordMicroOperation(
+      process,
+      'INSTRUCTION',
+      description,
+    )
+    process.microOperationRuntime = undefined
+    this.advanceProcess(process)
+
+    return {
+      event: {
+        operationName: instruction.operationName,
+        arguments: argumentValues,
+        receiver: runtime.receiver,
+      },
+      description,
+    }
+  }
+
+  private resolveSimulatedOperationReceiver(
+    process: Process,
+    receiverName: string,
+    operationName: string,
+  ): NonNullable<
+    SimulatedOperationExecutionEvent['receiver']
+  > {
+    const localMemory =
+      this.getActiveLocalMemory(process)
+    const scope = receiverName in localMemory
+      ? 'LOCAL'
+      : 'SHARED'
+    const value = scope === 'LOCAL'
+      ? localMemory[receiverName]
+      : this.state.program.sharedMemory[receiverName]
+
+    if (value === undefined) {
+      throw new Error(
+        `Variable "${receiverName}" is not defined`,
+      )
+    }
+
+    if (!isRecordValue(value)) {
+      throw new Error(
+        `Simulated method "${operationName}" requires record receiver "${receiverName}"`,
+      )
+    }
+
+    return {
+      name: receiverName,
+      recordType: value.recordType,
+      scope,
     }
   }
 

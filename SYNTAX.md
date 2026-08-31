@@ -522,9 +522,47 @@ no modifica estado y, si el registro es compartido, conserva la
 ubicación de memoria del campo en las microoperaciones y el análisis.
 No acepta argumentos.
 
-Todavía no se permiten registros dentro de arrays, colas o pilas, ni
-métodos con comportamiento como `fallo.procesar()`. El acceso puede ser
-directo mediante `fallo.nivel` o mediante su getter automático.
+Todavía no se permiten registros dentro de arrays, colas o pilas. El
+acceso puede ser directo mediante `fallo.nivel` o mediante su getter
+automático.
+
+------------------------------------------------------------------------
+
+## Operaciones simuladas
+
+`print(...)` representa una salida educativa observable sin escribir en
+la consola real ni realizar I/O:
+
+``` text
+process Controlador {
+    print("Fallo", fallo.getID(), fallo.getNivel());
+}
+```
+
+Acepta cero o más expresiones. Sus valores se evalúan de izquierda a
+derecha y quedan congelados en un evento `SIMULATED_OPERATION` del
+historial. Si un argumento lee memoria compartida, esas lecturas siguen
+apareciendo como microoperaciones y pueden intercalarse normalmente. La
+emisión final es determinista y no modifica la memoria del programa.
+
+Actualmente no se admiten llamadas a funciones definidas por el usuario
+dentro de `print(...)`. Los getters de registros sí están admitidos
+porque son lecturas de campos y no funciones suspendidas.
+
+Un registro también puede recibir cualquier método simulado que no
+comience con `get`:
+
+``` text
+fallo.procesar();
+fallo.notificar("nivel crítico", fallo.getNivel());
+```
+
+Estos métodos no necesitan una declaración ni tienen cuerpo. El nombre
+representa la acción educativa y el runtime valida que el receptor sea
+un registro. El evento conserva el nombre y tipo del receptor, si era
+local o compartido, y una copia de sus argumentos. No modifica campos.
+Los nombres `getCampo()` están reservados para getters y deben usarse
+dentro de una expresión o asignación.
 
 ------------------------------------------------------------------------
 
@@ -1135,16 +1173,14 @@ También permanecen fuera del alcance actual:
 -   sintaxis especial como `i++`;
 -   arrays anidados;
 -   métodos de registro con comportamiento o parámetros;
--   operaciones educativas simuladas como `print(...)`.
+-   métodos reales con cuerpo y estado interno propio;
 
 Las colas FIFO primitivas, las colas de prioridad estables y las pilas ya
 están implementadas bajo el mismo modelo general.
 
-Los registros con campos primitivos y getters automáticos ya están
-disponibles. Los objetos con comportamiento quedan como mejora
-posterior. Las operaciones como `print(...)` podrán
-modelarse como acciones simuladas y observables en la traza, pero sin
-I/O real; su semántica exacta se definirá antes de implementarlas.
+Los registros con campos primitivos, getters automáticos y `print(...)`
+simulado ya están disponibles. Los objetos con comportamiento quedan
+como mejora posterior.
 
 Las primitivas posteriores se incorporarán incrementalmente y este
 documento se actualizará cuando sean implementadas.

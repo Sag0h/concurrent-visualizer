@@ -12,6 +12,7 @@ export type TokenType =
   | 'PRIORITY_QUEUE'
   | 'STACK'
   | 'RECORD'
+  | 'PRINT'
   | 'LEFT_BRACE'
   | 'RIGHT_BRACE'
   | 'LEFT_BRACKET'

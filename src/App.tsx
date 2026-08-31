@@ -1538,6 +1538,10 @@ function App() {
                                       {entry.dataStructureEvent.scope}
                                       {` · ${entry.dataStructureEvent.structureKind} · ATOMIC`}
                                     </span>
+                                  ) : entry.simulatedOperationEvent ? (
+                                    <span className="data-structure-operation-status">
+                                      SIMULATED · DETERMINISTIC
+                                    </span>
                                   ) : (
                                     '—'
                                   )}

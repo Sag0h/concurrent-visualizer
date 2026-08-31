@@ -1,5 +1,8 @@
 import type { ProcessId } from '../process/ProcessId'
-import type { PrimitiveValue } from '../memory/RuntimeValue'
+import type {
+  PrimitiveValue,
+  RuntimeValue,
+} from '../memory/RuntimeValue'
 
 export type AwaitEventStatus =
   | 'BLOCKED'
@@ -46,6 +49,16 @@ export interface DataStructureExecutionEvent {
   readonly priority?: number
 }
 
+export interface SimulatedOperationExecutionEvent {
+  readonly operationName: string
+  readonly arguments: RuntimeValue[]
+  readonly receiver?: {
+    readonly name: string
+    readonly recordType: string
+    readonly scope: 'LOCAL' | 'SHARED'
+  }
+}
+
 export interface ExecutionEvent {
   readonly step: number
   readonly processId: ProcessId
@@ -55,4 +68,5 @@ export interface ExecutionEvent {
   readonly semaphoreEvent?: SemaphoreExecutionEvent
   readonly loopConditionEvent?: LoopConditionExecutionEvent
   readonly dataStructureEvent?: DataStructureExecutionEvent
+  readonly simulatedOperationEvent?: SimulatedOperationExecutionEvent
 }

@@ -859,16 +859,19 @@ datos primitivas y los procesos parametrizados de M10.1.
 -   [x] Incorporar getters automáticos como azúcar sintáctica, por
     ejemplo `fallo.getNivel()` y `fallo.getID()`, sin requerir
     orientación a objetos completa.
--   [ ] Evaluar métodos simulados con comportamiento observable, por
+-   [x] Incorporar métodos simulados con comportamiento observable, por
     ejemplo `fallo.procesar()`.
--   [ ] Definir operaciones simuladas como `print(...)`, `procesar(...)`
-    o equivalentes para representar trabajo externo del pseudocódigo.
--   [ ] Permitir que una operación simulada deje un evento observable en
-    la traza sin realizar I/O real.
--   [ ] Definir si estas operaciones consumen una transición y qué
-    información afecta al estado semántico.
--   [ ] Mantenerlas deterministas y compatibles con clonación,
+-   [x] Incorporar `print(...)` como primera operación simulada para
+    representar salida del pseudocódigo.
+-   [x] Permitir que `print(...)` deje un evento observable en la traza
+    sin realizar I/O real.
+-   [x] Definir su granularidad: las lecturas compartidas de argumentos
+    son microoperaciones y la emisión final consume una transición.
+-   [x] Mantener `print(...)` determinista y compatible con clonación,
     reproducibilidad y exploración.
+-   [x] Generalizar el mismo modelo a métodos como `fallo.procesar()`.
+
+**Estado:** M10.2 COMPLETADO.
 
 Flujo vigente:
 

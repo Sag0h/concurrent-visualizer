@@ -125,6 +125,13 @@ export interface DataStructureOperationInstruction {
   readonly resultTarget?: DataStructureResultTarget
 }
 
+export interface SimulatedOperationInstruction {
+  readonly type: 'SIMULATED_OPERATION'
+  readonly operationName: string
+  readonly receiverName?: string
+  readonly arguments: Expression[]
+}
+
 export type Instruction =
   | NoOpInstruction
   | FinishInstruction
@@ -144,3 +151,4 @@ export type Instruction =
   | SemaphorePInstruction
   | SemaphoreVInstruction
   | DataStructureOperationInstruction
+  | SimulatedOperationInstruction
