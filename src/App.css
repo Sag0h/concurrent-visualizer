@@ -1,7 +1,11 @@
 .app {
-  max-width: 1500px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(100%, 1800px);
+  height: 100dvh;
   margin: 0 auto;
-  padding: 32px;
+  padding: 20px 24px 24px;
+  overflow: hidden;
 }
 
 .header {
@@ -9,7 +13,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .header h1 {
@@ -265,14 +269,51 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(400px, 1fr) minmax(500px, 1.4fr);
-  gap: 24px;
-  align-items: start;
+  grid-template-columns: minmax(400px, 0.9fr) minmax(560px, 1.45fr);
+  gap: 16px;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .editor-panel,
 .simulation-panel {
   min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgb(25 22 44 / 7%);
+}
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-scroll-region,
+.simulation-panel {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.editor-scroll-region {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 18px 12px;
+}
+
+.editor-controls-dock {
+  flex: 0 0 auto;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 -10px 24px rgb(25 22 44 / 5%);
+}
+
+.simulation-panel {
+  padding: 18px;
 }
 
 .panel-header {
@@ -486,7 +527,7 @@ select {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .control-group {
@@ -602,6 +643,9 @@ button:disabled {
 }
 
 .status-bar {
+  position: sticky;
+  top: -18px;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
@@ -610,6 +654,7 @@ button:disabled {
   border: 1px solid #ddd;
   border-radius: 8px;
   background: #fafafa;
+  box-shadow: 0 8px 18px rgb(25 22 44 / 8%);
 }
 
 .execution-focus-panel {
@@ -1045,9 +1090,40 @@ h2 {
   margin-top: 0;
 }
 
-@media (max-width: 950px) {
+@media (max-width: 1100px) {
+  .app {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    padding: 24px;
+    overflow: visible;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .editor-panel,
+  .simulation-panel {
+    min-height: auto;
+  }
+
+  .editor-panel {
+    display: block;
+    overflow: visible;
+  }
+
+  .editor-scroll-region,
+  .simulation-panel {
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .status-bar {
+    position: static;
+    box-shadow: none;
   }
 }
 
@@ -1677,6 +1753,44 @@ h2 {
 }
 
 @media (max-width: 600px) {
+  .app {
+    padding: 14px;
+  }
+
+  .workspace {
+    gap: 14px;
+  }
+
+  .editor-panel,
+  .simulation-panel {
+    border-radius: 12px;
+  }
+
+  .editor-scroll-region,
+  .simulation-panel {
+    padding: 16px;
+  }
+
+  .editor-controls-dock {
+    padding: 14px 16px 16px;
+  }
+
+  .panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .scheduler-control {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .scheduler-control select {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+
   .exploration-header,
   .counterexample-heading,
   .example-picker-heading,

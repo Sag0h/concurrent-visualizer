@@ -52,6 +52,12 @@ explorador BFS, diagnósticos o microoperaciones sin modificar ni borrar la
 simulación. Las preferencias visuales se validan y persisten localmente;
 Restore defaults recupera System y todos los paneles.
 
+En escritorio, editor y simulación ocupan la altura disponible y tienen
+scroll independiente. Los controles permanecen visibles bajo el editor y
+la barra de estado queda fija sobre procesos, memorias e historial. En
+anchos menores el contenido vuelve a un flujo vertical legible; la
+navegación mobile por pestañas permanece como siguiente mejora de M11.
+
 Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
 comparar soluciones con semáforos, monitores y pasaje de mensajes. El
 escenario general se mantendrá separado de los errores específicos de

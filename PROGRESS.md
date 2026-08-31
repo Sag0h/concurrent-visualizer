@@ -25,11 +25,10 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** continuar M11 reorganizando escritorio como un
-workspace que aproveche mejor la altura disponible y reduzca el scroll
-general. Después se adaptará la navegación mobile mediante pestañas. Las
-assertions explícitas se evaluaron y quedaron como extensión futura del
-lenguaje.
+**Próximo objetivo:** continuar M11 adaptando la navegación mobile
+mediante pestañas para Código, Estado, Procesos e Historial. Después se
+hará la auditoría responsive y de accesibilidad completa. Las assertions
+explícitas se evaluaron y quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2213,3 +2212,23 @@ Restore defaults recupera tema System y todos los paneles. Las pruebas
 automatizadas cubren carga, recuperación segura, persistencia y resolución
 de tema; la validación visual cubrió ambos temas, recarga, switches, Reset
 de preferencias, Escape y conservación de datos.
+
+## 2026-08-31 --- M11: workspace de escritorio
+
+La aplicación utiliza la altura completa de la ventana en escritorio y
+separa editor y simulación en dos superficies con desplazamiento propio.
+El editor conserva Build, Step Back, Step, Run, Reset y Play/Pause en un
+dock siempre visible; ejemplos y código se desplazan sin ocultar esos
+controles.
+
+La simulación mantiene fija su barra de step, scheduler y estado mientras
+procesos, memorias, exploración e historial se recorren dentro del panel
+derecho. Esto permite comparar código y resultado sin desplazar toda la
+página. Por debajo de 1100 px el layout vuelve a un flujo vertical para
+evitar columnas ilegibles; en 600 px o menos ajusta márgenes y apila el
+selector de scheduler.
+
+La validación visual cubrió escritorio de 1440×900 en temas Light y Dark,
+scroll independiente, controles activos y teléfonos de 390 y 320 px. Las
+pestañas mobile siguen siendo el próximo ticket: este cambio sólo asegura
+una base vertical usable y no anticipa su navegación.

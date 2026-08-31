@@ -968,7 +968,7 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
     debe eliminar sus resultados ni modificar la simulación.
 -   [x] Persistir las preferencias puramente visuales en `localStorage`,
     con versionado y recuperación segura ante datos inválidos.
--   [ ] Reorganizar escritorio como un workspace que aproveche la altura
+-   [x] Reorganizar escritorio como un workspace que aproveche la altura
     disponible: controles visibles, paneles con scroll independiente y
     código, estado e historial observables sin recorrer toda la página.
 -   [ ] Evaluar paneles redimensionables después de validar el nuevo

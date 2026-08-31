@@ -1243,11 +1243,17 @@ colores específicos adaptados a ambos fondos. `SettingsModal` mantiene el
 foco dentro del diálogo, admite Escape, bloquea el scroll del documento y
 devuelve el foco al control que lo abrió.
 
-El layout de escritorio evolucionará hacia un workspace que use la
-altura de la ventana, mantenga controles accesibles y asigne scroll
-independiente al editor y a las vistas extensas. En pantallas pequeñas
-las columnas se convertirán en pestañas semánticas, evitando reducir
-editor, procesos e historial hasta volverlos ilegibles.
+El layout de escritorio usa la altura de la ventana y divide la interfaz
+en dos scrollports independientes. `editor-scroll-region` contiene
+catálogo y código, mientras `editor-controls-dock` mantiene siempre
+accesibles los controles de construcción y reproducción. La superficie
+de simulación conserva `status-bar` como encabezado sticky y desplaza el
+resto de las vistas sin mover el editor.
+
+Por debajo de 1100 px se elimina la altura cerrada y ambas superficies
+regresan al flujo vertical del documento. En pantallas pequeñas las
+columnas se convertirán más adelante en pestañas semánticas, evitando
+reducir editor, procesos e historial hasta volverlos ilegibles.
 
 ## 22. Problemas clásicos
 

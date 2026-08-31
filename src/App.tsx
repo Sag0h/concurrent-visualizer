@@ -1024,7 +1024,8 @@ function App() {
 
       <section className="workspace">
         <div className="editor-panel">
-          <div className="panel-header">
+          <div className="editor-scroll-region">
+            <div className="panel-header">
             <h2>Program</h2>
 
             <div className="scheduler-control">
@@ -1093,7 +1094,7 @@ function App() {
                 </>
               )}
             </div>
-          </div>
+            </div>
 
           {interfacePreferences.panels.examples && (
             <>
@@ -1141,98 +1142,101 @@ function App() {
             </>
           )}
 
-          <CodeEditor
-            value={code}
-            activeLine={activeSourceLine}
-            onChange={(event) => {
-              setCode(event.target.value)
-              setHasUserEditedCode(true)
-              setPendingExampleId(null)
-              invalidateBuild()
-            }}
-            onKeyDown={handleEditorKeyDown}
-          />
-
-          <div className="controls">
-            <div className="control-group">
-              <button onClick={handleBuild}>
-                Build
-              </button>
-
-              {isDirty && (
-                <span className="build-required">
-                  Build required
-                </span>
-              )}
-
-              <button onClick={handleAddProcess}>
-                Add Process
-              </button>
-            </div>
-
-            <div className="control-group">
-              <button
-                onClick={handleStepBack}
-                disabled={
-                  !engine
-                  || replayChoiceIndex !== null
-                  || snapshot?.stepCount === 0
-                }
-                title={
-                  replayChoiceIndex !== null
-                    ? 'Step Back is unavailable during counterexample replay'
-                    : 'Reconstruct the previous deterministic step'
-                }
-              >
-                Step Back
-              </button>
-
-              <button
-                onClick={handleStep}
-                disabled={
-                  !canAdvanceSimulation
-                  || isPlaying
-                }
-              >
-                Step
-              </button>
-
-              <button
-                onClick={handleRun}
-                disabled={
-                  !canAdvanceSimulation
-                  || isPlaying
-                }
-              >
-                Run
-              </button>
-
-              <button
-                onClick={handleReset}
-                disabled={!engine}
-              >
-                Reset
-              </button>
-            </div>
+            <CodeEditor
+              value={code}
+              activeLine={activeSourceLine}
+              onChange={(event) => {
+                setCode(event.target.value)
+                setHasUserEditedCode(true)
+                setPendingExampleId(null)
+                invalidateBuild()
+              }}
+              onKeyDown={handleEditorKeyDown}
+            />
           </div>
 
-          <PlaybackControls
-            isPlaying={isPlaying}
-            canPlay={canAdvanceSimulation}
-            speed={playbackSpeed}
-            executionStatus={snapshot?.executionStatus}
-            onToggle={() =>
-              setIsPlaying((current) => !current)
-            }
-            onSpeedChange={setPlaybackSpeed}
-          />
+          <div className="editor-controls-dock">
+            <div className="controls">
+              <div className="control-group">
+                <button onClick={handleBuild}>
+                  Build
+                </button>
 
-          {error && (
-            <div className="error-box">
-              <strong>Error</strong>
-              <pre>{error}</pre>
+                {isDirty && (
+                  <span className="build-required">
+                    Build required
+                  </span>
+                )}
+
+                <button onClick={handleAddProcess}>
+                  Add Process
+                </button>
+              </div>
+
+              <div className="control-group">
+                <button
+                  onClick={handleStepBack}
+                  disabled={
+                    !engine
+                    || replayChoiceIndex !== null
+                    || snapshot?.stepCount === 0
+                  }
+                  title={
+                    replayChoiceIndex !== null
+                      ? 'Step Back is unavailable during counterexample replay'
+                      : 'Reconstruct the previous deterministic step'
+                  }
+                >
+                  Step Back
+                </button>
+
+                <button
+                  onClick={handleStep}
+                  disabled={
+                    !canAdvanceSimulation
+                    || isPlaying
+                  }
+                >
+                  Step
+                </button>
+
+                <button
+                  onClick={handleRun}
+                  disabled={
+                    !canAdvanceSimulation
+                    || isPlaying
+                  }
+                >
+                  Run
+                </button>
+
+                <button
+                  onClick={handleReset}
+                  disabled={!engine}
+                >
+                  Reset
+                </button>
+              </div>
             </div>
-          )}
+
+            <PlaybackControls
+              isPlaying={isPlaying}
+              canPlay={canAdvanceSimulation}
+              speed={playbackSpeed}
+              executionStatus={snapshot?.executionStatus}
+              onToggle={() =>
+                setIsPlaying((current) => !current)
+              }
+              onSpeedChange={setPlaybackSpeed}
+            />
+
+            {error && (
+              <div className="error-box">
+                <strong>Error</strong>
+                <pre>{error}</pre>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="simulation-panel">
