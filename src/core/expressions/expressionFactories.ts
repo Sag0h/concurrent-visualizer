@@ -8,6 +8,7 @@ import type {
   ArrayAccessExpression,
   FunctionCallExpression,
   FieldAccessExpression,
+  RecordGetterExpression,
 } from './Expression'
 
 export function literal(value: RuntimeValue): LiteralExpression {
@@ -78,5 +79,16 @@ export function fieldAccess(
     type: 'FIELD_ACCESS',
     record,
     fieldName,
+  }
+}
+
+export function recordGetter(
+  record: Expression,
+  getterName: string,
+): RecordGetterExpression {
+  return {
+    type: 'RECORD_GETTER',
+    record,
+    getterName,
   }
 }

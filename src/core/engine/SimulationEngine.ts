@@ -12,6 +12,7 @@ import {
   enqueuePriorityItem,
   isDataStructureValue,
   isRecordValue,
+  resolveRecordGetterFieldName,
   isPriorityQueueValue,
   isPrimitiveValue,
   isStackValue,
@@ -975,6 +976,10 @@ export class SimulationEngine {
           visit(candidate.record)
           return
 
+        case 'RECORD_GETTER':
+          visit(candidate.record)
+          return
+
         case 'FUNCTION_CALL':
           candidate.arguments.forEach(visit)
           return
@@ -1485,6 +1490,11 @@ export class SimulationEngine {
           expression.record,
         )
 
+      case 'RECORD_GETTER':
+        return this.containsFunctionCall(
+          expression.record,
+        )
+
       default:
         return false
     }
@@ -1862,6 +1872,11 @@ export class SimulationEngine {
           expression.record,
         )
 
+      case 'RECORD_GETTER':
+        return this.findNextFunctionCall(
+          expression.record,
+        )
+
       default:
         return undefined
     }
@@ -1931,6 +1946,17 @@ export class SimulationEngine {
         }
 
       case 'FIELD_ACCESS':
+        return {
+          ...expression,
+          record:
+            this.replaceFunctionCallWithValue(
+              expression.record,
+              target,
+              value,
+            ),
+        }
+
+      case 'RECORD_GETTER':
         return {
           ...expression,
           record:
@@ -2228,6 +2254,39 @@ export class SimulationEngine {
         )
       }
 
+      case 'RECORD_GETTER': {
+        if (expression.record.type === 'VARIABLE') {
+          const recordName = expression.record.name
+          const localMemory =
+            this.getActiveLocalMemory(process)
+          const sharedValue =
+            this.state.program.sharedMemory[recordName]
+
+          if (
+            !(recordName in localMemory)
+            && isRecordValue(sharedValue)
+          ) {
+            return {
+              expression,
+              location: {
+                type: 'RECORD_FIELD',
+                recordName,
+                fieldName:
+                  resolveRecordGetterFieldName(
+                    sharedValue,
+                    expression.getterName,
+                  ),
+              },
+            }
+          }
+        }
+
+        return this.findNextSharedMemoryRead(
+          process,
+          expression.record,
+        )
+      }
+
       case 'FUNCTION_CALL':
         for (const argument of expression.arguments) {
           const read =
@@ -2305,6 +2364,17 @@ export class SimulationEngine {
         }
 
       case 'FIELD_ACCESS':
+        return {
+          ...expression,
+          record:
+            this.replaceExpressionWithValue(
+              expression.record,
+              target,
+              value,
+            ),
+        }
+
+      case 'RECORD_GETTER':
         return {
           ...expression,
           record:
@@ -2545,12 +2615,6 @@ export class SimulationEngine {
             runtime,
           )
 
-        if (!runtime.targetLocation) {
-          throw new Error(
-            'Shared assignment target could not be resolved',
-          )
-        }
-
         runtime.phase = 'WRITE'
 
         this.executeAssignmentMicroOperation(
@@ -2576,12 +2640,31 @@ export class SimulationEngine {
           )
 
         if (!location) {
-          throw new Error(
-            'Shared assignment target could not be resolved',
-          )
-        }
+          if (
+            !this.isSharedAssignmentTarget(
+              process,
+              runtime.instruction.target,
+            )
+          ) {
+            const localTarget =
+              runtime.instruction.target.type === 'ARRAY_ACCESS'
+              && runtime.pendingTargetIndex
+                ? {
+                    ...runtime.instruction.target,
+                    index: runtime.pendingTargetIndex,
+                  }
+                : runtime.instruction.target
 
-        if (!location) {
+            this.applyAssignment(
+              process,
+              localTarget,
+              runtime.computedValue,
+            )
+            process.microOperationRuntime = undefined
+            this.advanceProcess(process)
+            return
+          }
+
           throw new Error(
             'Shared assignment target could not be resolved',
           )

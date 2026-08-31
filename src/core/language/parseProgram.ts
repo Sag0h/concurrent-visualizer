@@ -7,6 +7,7 @@ import {
   variable,
   functionCall,
   fieldAccess,
+  recordGetter,
 } from '../expressions/expressionFactories'
 import type { Instruction } from '../instructions/Instruction'
 import {
@@ -195,7 +196,10 @@ class Parser {
         'Expected record field name',
       )
 
-      if (fields.some((existing) => existing.name === field.lexeme)) {
+      if (fields.some(
+        (existing) => existing.name.toLocaleLowerCase()
+          === field.lexeme.toLocaleLowerCase(),
+      )) {
         throw this.error(
           field,
           `Field "${field.lexeme}" is already defined in record "${name.lexeme}"`,
@@ -883,17 +887,35 @@ class Parser {
           'Expected field name after "."',
         )
 
-        if (this.check('LEFT_PAREN')) {
-          throw this.error(
-            field,
-            'Record methods are not supported yet; access a field directly',
+        if (this.match('LEFT_PAREN')) {
+          if (!field.lexeme.startsWith('get')) {
+            throw this.error(
+              field,
+              'Only record getters can return a value currently',
+            )
+          }
+
+          if (!this.check('RIGHT_PAREN')) {
+            throw this.error(
+              this.peek(),
+              `Getter "${field.lexeme}" does not accept arguments`,
+            )
+          }
+
+          this.consume(
+            'RIGHT_PAREN',
+            `Expected ")" after getter "${field.lexeme}"`,
+          )
+          expression = recordGetter(
+            expression,
+            field.lexeme,
+          )
+        } else {
+          expression = fieldAccess(
+            expression,
+            field.lexeme,
           )
         }
-
-        expression = fieldAccess(
-          expression,
-          field.lexeme,
-        )
       }
 
       return expression
@@ -1850,6 +1872,9 @@ class Parser {
       this.check('IDENTIFIER')
       && this.checkNext('DOT')
       && this.checkAt(3, 'LEFT_PAREN')
+      && isDataStructureMethodName(
+        this.tokens[this.current + 2]?.lexeme,
+      )
     )
   }
 
@@ -2104,6 +2129,21 @@ function parseDataStructureOperationName(
     default:
       throw createError()
   }
+}
+
+function isDataStructureMethodName(
+  methodName: string | undefined,
+): boolean {
+  return methodName !== undefined && [
+    'enqueue',
+    'dequeue',
+    'front',
+    'push',
+    'pop',
+    'top',
+    'isEmpty',
+    'size',
+  ].includes(methodName)
 }
 
 function dataStructureMethodName(

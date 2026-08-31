@@ -52,6 +52,12 @@ export interface FieldAccessExpression {
   readonly fieldName: string
 }
 
+export interface RecordGetterExpression {
+  readonly type: 'RECORD_GETTER'
+  readonly record: Expression
+  readonly getterName: string
+}
+
 export type Expression =
   | LiteralExpression
   | VariableExpression
@@ -60,3 +66,4 @@ export type Expression =
   | ArrayAccessExpression
   | FunctionCallExpression
   | FieldAccessExpression
+  | RecordGetterExpression

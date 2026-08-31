@@ -47,6 +47,9 @@ export function formatExpression(
 
     case 'FIELD_ACCESS':
       return `${formatExpression(expression.record)}.${expression.fieldName}`
+
+    case 'RECORD_GETTER':
+      return `${formatExpression(expression.record)}.${expression.getterName}()`
   }
 }
 

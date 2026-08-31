@@ -856,9 +856,11 @@ datos primitivas y los procesos parametrizados de M10.1.
 -   [x] Incorporar acceso de lectura y escritura a campos como
     `fallo.nivel` y `fallo.id`, con granularidad independiente para
     memoria compartida.
--   [ ] Evaluar métodos simples o azúcar sintáctica equivalente, por
+-   [x] Incorporar getters automáticos como azúcar sintáctica, por
     ejemplo `fallo.getNivel()` y `fallo.getID()`, sin requerir
     orientación a objetos completa.
+-   [ ] Evaluar métodos simulados con comportamiento observable, por
+    ejemplo `fallo.procesar()`.
 -   [ ] Definir operaciones simuladas como `print(...)`, `procesar(...)`
     o equivalentes para representar trabajo externo del pseudocódigo.
 -   [ ] Permitir que una operación simulada deje un evento observable en

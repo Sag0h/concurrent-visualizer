@@ -683,10 +683,11 @@ expresar
 directamente estructuras utilizadas en ejercicios académicos, sin
 adaptarlas artificialmente con arrays e índices. Los procesos
 parametrizados completan M10.1. M10.2 ya incorporó su primera vertical:
-registros con campos primitivos y acceso directo de lectura/escritura.
+registros con campos primitivos, acceso directo de lectura/escritura y
+getters automáticos como `getNivel()` o `getID()`.
 
-Como evolución posterior se evaluarán métodos simples sobre esos
-registros, además de operaciones simuladas
+Como evolución posterior se evaluarán métodos simulados sobre esos
+registros, además de operaciones globales simuladas
 como `print(...)`. Estas podrán representar una acción observable sin
 realizar I/O real, preservando la reproducibilidad y la exploración
 determinista.
@@ -746,7 +747,7 @@ M10.1 Colas FIFO, colas de prioridad, pilas y procesos parametrizados
 En curso:
 
 ``` text
-M10.2  Registros implementados; métodos y operaciones simuladas pendientes
+M10.2  Registros y getters implementados; operaciones simuladas pendientes
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

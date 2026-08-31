@@ -1,5 +1,6 @@
 import {
   isRecordValue,
+  resolveRecordGetterFieldName,
   type RuntimeValue,
 } from '../memory/RuntimeValue'
 import type { Expression } from './Expression'
@@ -47,6 +48,24 @@ export function evaluateExpression(
       }
 
       return record.fields[expression.fieldName]
+    }
+
+    case 'RECORD_GETTER': {
+      const record = evaluateExpression(
+        expression.record,
+        context,
+      )
+
+      if (!isRecordValue(record)) {
+        throw new Error('Record getter requires a record')
+      }
+
+      return record.fields[
+        resolveRecordGetterFieldName(
+          record,
+          expression.getterName,
+        )
+      ]
     }
     
   }

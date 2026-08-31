@@ -148,16 +148,75 @@ describe('record operations', () => {
     )
   })
 
-  it('rejects record methods until simulated methods are implemented', () => {
+  it('uses automatic getters as field reads', () => {
+    const engine = runToCompletion(`
+      record Fallo { int id; int nivel; }
+      shared Fallo fallo = Fallo { id: 25, nivel: 3 };
+
+      process P1 {
+        Fallo copia = Fallo { id: 9, nivel: 1 };
+        int nivel = 0;
+        int id = 0;
+        nivel = fallo.getNivel() + 1;
+        id = fallo.getID();
+        int idLocal = copia.getId();
+      }
+    `)
+    const process = engine.getState().program.processes[0]
+    const readLocations = engine.getSnapshot()
+      .microOperationHistory
+      .filter((event) => event.type === 'SHARED_READ')
+      .map((event) => event.location)
+
+    expect(process.localMemory).toMatchObject({
+      nivel: 4,
+      id: 25,
+      idLocal: 9,
+    })
+    expect(readLocations).toContainEqual({
+      type: 'RECORD_FIELD',
+      recordName: 'fallo',
+      fieldName: 'nivel',
+    })
+    expect(readLocations).toContainEqual({
+      type: 'RECORD_FIELD',
+      recordName: 'fallo',
+      fieldName: 'id',
+    })
+  })
+
+  it('rejects invalid or unsupported record methods', () => {
     expect(() => parseProgram(`
       record Fallo { int nivel; }
       shared Fallo fallo = Fallo { nivel: 3 };
 
       process P1 {
-        int nivel = fallo.getNivel();
+        int nivel = fallo.getNivel(1);
       }
     `)).toThrow(
-      'Unknown data structure method "getNivel"',
+      'Getter "getNivel" does not accept arguments',
+    )
+
+    expect(() => parseProgram(`
+      record Fallo { int nivel; }
+      shared Fallo fallo = Fallo { nivel: 3 };
+
+      process P1 {
+        int nivel = fallo.procesar();
+      }
+    `)).toThrow(
+      'Only record getters can return a value currently',
+    )
+
+    expect(() => runToCompletion(`
+      record Fallo { int nivel; }
+      shared Fallo fallo = Fallo { nivel: 3 };
+
+      process P1 {
+        int id = fallo.getID();
+      }
+    `)).toThrow(
+      'Record "Fallo" has no field for getter "getID"',
     )
   })
 })

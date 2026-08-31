@@ -196,6 +196,36 @@ export function isRecordValue(
   )
 }
 
+export function resolveRecordGetterFieldName(
+  record: RecordValue,
+  getterName: string,
+): string {
+  if (
+    !getterName.startsWith('get')
+    || getterName.length === 3
+  ) {
+    throw new Error(
+      `Record method "${getterName}" is not a getter`,
+    )
+  }
+
+  const requestedField = getterName
+    .slice(3)
+    .toLocaleLowerCase()
+  const fieldName = Object.keys(record.fields).find(
+    (candidate) =>
+      candidate.toLocaleLowerCase() === requestedField,
+  )
+
+  if (!fieldName) {
+    throw new Error(
+      `Record "${record.recordType}" has no field for getter "${getterName}"`,
+    )
+  }
+
+  return fieldName
+}
+
 export function isAnyQueueValue(
   value: unknown,
 ): value is QueueValue | PriorityQueueValue {

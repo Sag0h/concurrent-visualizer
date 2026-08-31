@@ -494,6 +494,7 @@ shared Fallo fallo = Fallo {
 
 process Controlador {
     int nivelAnterior = fallo.nivel;
+    int id = fallo.getID();
     fallo.nivel = 2;
 }
 ```
@@ -507,9 +508,23 @@ Cada campo compartido tiene granularidad propia para microoperaciones y
 análisis. Por ejemplo, `fallo.id` y `fallo.nivel` son ubicaciones de
 memoria diferentes.
 
+Cada campo también expone automáticamente un getter sin argumentos. El
+nombre comienza con `get` y se resuelve sin distinguir mayúsculas:
+
+``` text
+fallo.getNivel()  // equivale a leer fallo.nivel
+fallo.getId()     // equivale a leer fallo.id
+fallo.getID()     // también equivale a leer fallo.id
+```
+
+Un getter es sólo azúcar sintáctica para una lectura. No tiene cuerpo,
+no modifica estado y, si el registro es compartido, conserva la
+ubicación de memoria del campo en las microoperaciones y el análisis.
+No acepta argumentos.
+
 Todavía no se permiten registros dentro de arrays, colas o pilas, ni
-métodos como `fallo.getNivel()`. El acceso vigente es directo mediante
-`fallo.nivel`.
+métodos con comportamiento como `fallo.procesar()`. El acceso puede ser
+directo mediante `fallo.nivel` o mediante su getter automático.
 
 ------------------------------------------------------------------------
 
@@ -1119,14 +1134,15 @@ También permanecen fuera del alcance actual:
 -   fairness formal/FIFO para semáforos;
 -   sintaxis especial como `i++`;
 -   arrays anidados;
--   métodos como `fallo.getNivel()`;
+-   métodos de registro con comportamiento o parámetros;
 -   operaciones educativas simuladas como `print(...)`.
 
 Las colas FIFO primitivas, las colas de prioridad estables y las pilas ya
 están implementadas bajo el mismo modelo general.
 
-Los registros con campos primitivos ya están disponibles. Los métodos y
-objetos con comportamiento quedan como mejora posterior. Las operaciones como `print(...)` podrán
+Los registros con campos primitivos y getters automáticos ya están
+disponibles. Los objetos con comportamiento quedan como mejora
+posterior. Las operaciones como `print(...)` podrán
 modelarse como acciones simuladas y observables en la traza, pero sin
 I/O real; su semántica exacta se definirá antes de implementarlas.
 

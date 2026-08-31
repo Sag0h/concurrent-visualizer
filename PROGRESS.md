@@ -1993,3 +1993,25 @@ La UI representa los registros en memoria y muestra sus campos en el
 historial y el análisis. La suite quedó en 258 tests, con lint y build
 correctos. Los métodos como `getNivel()` y las operaciones simuladas
 como `print(...)` permanecen pendientes dentro de M10.2.
+
+## 2026-08-30 --- M10.2: getters automáticos de registros
+
+Los campos de un registro exponen getters sin argumentos mediante la
+convención `getCampo()`. La resolución ignora mayúsculas para admitir
+tanto `getId()` como la forma académica `getID()` sobre el campo `id`.
+Las definiciones rechazan campos que sólo difieren en mayúsculas para
+que esta resolución nunca sea ambigua.
+
+El getter no es una función ni un método con cuerpo: el AST conserva el
+receptor y el nombre solicitado, y el evaluador lo reduce a la lectura
+del campo. Sobre registros compartidos genera la misma ubicación
+`RECORD_FIELD` que el acceso directo, por lo que historial, conflictos y
+exploración mantienen su semántica.
+
+Durante esta integración también se corrigió la finalización de una
+asignación local cuyo lado derecho necesita microoperaciones de lectura
+compartida. Antes el motor intentaba resolver incorrectamente el destino
+local como una escritura compartida.
+
+Los métodos simulados con comportamiento y `print(...)` continúan como
+el siguiente ticket de M10.2.

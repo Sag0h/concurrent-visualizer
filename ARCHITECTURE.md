@@ -1138,7 +1138,10 @@ su nombre de tipo y sus campos. Un acceso compartido se traduce a una
 su propia historia y granularidad de conflicto. El objetivo es
 representar datos como un `Fallo` con `id` y `nivel`, no construir un
 sistema orientado a objetos completo. Métodos simples como `getNivel()`
-podrán incorporarse luego como azúcar sintáctica.
+se resuelven como `RecordGetterExpression`: no ejecutan un cuerpo, sino
+que buscan el campo sin distinguir mayúsculas y reutilizan la misma
+lectura `RECORD_FIELD`. Por eso `getID()` sobre `id` conserva la
+granularidad de memoria y no necesita un runtime de objetos paralelo.
 
 También se prevén operaciones educativas simuladas como `print(...)` o
 `procesar(...)`. No realizarán I/O real ni dependerán del navegador,
