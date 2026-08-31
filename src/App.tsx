@@ -308,6 +308,29 @@ function App() {
     }
   }
 
+  function handleStepBack() {
+    if (
+      !engine
+      || replayChoiceIndex !== null
+    ) {
+      return
+    }
+
+    setIsPlaying(false)
+
+    try {
+      engine.stepBack()
+      setSnapshot(engine.getSnapshot())
+      setError(null)
+    } catch (rewindError) {
+      setError(errorMessage(
+        rewindError,
+        'Unknown rewind error',
+      ))
+      setSnapshot(engine.getSnapshot())
+    }
+  }
+
   function handleReset() {
     if (!engine) {
       return
@@ -1071,46 +1094,66 @@ function App() {
           />
 
           <div className="controls">
-            <button onClick={handleBuild}>
-              Build
-            </button>
+            <div className="control-group">
+              <button onClick={handleBuild}>
+                Build
+              </button>
 
-            {isDirty && (
-              <span className="build-required">
-                Build required
-              </span>
-            )}
+              {isDirty && (
+                <span className="build-required">
+                  Build required
+                </span>
+              )}
 
-            <button onClick={handleAddProcess}>
-              Add Process
-            </button>
+              <button onClick={handleAddProcess}>
+                Add Process
+              </button>
+            </div>
 
-            <button
-              onClick={handleStep}
-              disabled={
-                !canAdvanceSimulation
-                || isPlaying
-              }
-            >
-              Step
-            </button>
+            <div className="control-group">
+              <button
+                onClick={handleStepBack}
+                disabled={
+                  !engine
+                  || replayChoiceIndex !== null
+                  || snapshot?.stepCount === 0
+                }
+                title={
+                  replayChoiceIndex !== null
+                    ? 'Step Back is unavailable during counterexample replay'
+                    : 'Reconstruct the previous deterministic step'
+                }
+              >
+                Step Back
+              </button>
 
-            <button
-              onClick={handleRun}
-              disabled={
-                !canAdvanceSimulation
-                || isPlaying
-              }
-            >
-              Run
-            </button>
+              <button
+                onClick={handleStep}
+                disabled={
+                  !canAdvanceSimulation
+                  || isPlaying
+                }
+              >
+                Step
+              </button>
 
-            <button
-              onClick={handleReset}
-              disabled={!engine}
-            >
-              Reset
-            </button>
+              <button
+                onClick={handleRun}
+                disabled={
+                  !canAdvanceSimulation
+                  || isPlaying
+                }
+              >
+                Run
+              </button>
+
+              <button
+                onClick={handleReset}
+                disabled={!engine}
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
           <PlaybackControls

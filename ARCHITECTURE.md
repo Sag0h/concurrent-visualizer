@@ -1186,6 +1186,26 @@ step ejecutado” de “próxima instrucción”; todavía no intenta inferir un
 línea del editor desde el program counter. Esa segunda capacidad requiere
 preservar rangos de origen en tokens y AST.
 
+### 21.3. Retroceso determinista
+
+`SimulationEngine.rewindToStep(targetStep)` no modifica el engine actual
+mientras reconstruye. Crea un candidato desde `initialState`, resetea un
+clon del scheduler y ejecuta `step()` hasta el destino, comparando proceso
+y tipo de instrucción con la traza original. Al completar, adopta tanto
+el estado reconstruido como el scheduler avanzado; si existe una
+divergencia, lanza error y conserva el engine original.
+
+`stepBack()` especializa esta operación para `stepCount - 1`. Reproducir
+el flujo normal en lugar de invertir instrucciones restaura de forma
+uniforme memoria, recursos, frames, evaluaciones suspendidas, análisis y
+metadata visual. También deja Round Robin y Random en la posición exacta
+necesaria para continuar hacia adelante con la misma elección.
+
+El replay manual de contraejemplos usa `stepTransition()` y por eso la UI
+deshabilita temporalmente Step Back en ese modo. La implementación actual
+es O(targetStep); checkpoints semánticos son una optimización futura, no
+parte del contrato inicial.
+
 ## 22. Problemas clásicos
 
 Los problemas clásicos no se codifican como animaciones especiales.

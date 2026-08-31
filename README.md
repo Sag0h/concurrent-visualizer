@@ -37,6 +37,11 @@ del historial quedan resaltadas; la vista de microoperaciones marca
 también el último acceso, cómputo o escritura y sigue automáticamente el
 avance durante Play.
 
+`Step Back` permite regresar un paso desde ejecuciones en curso,
+finalizadas o bloqueadas. El motor reconstruye determinísticamente el
+estado anterior desde el inicio y restaura también scheduler, historial,
+diagnósticos y foco; no intenta invertir manualmente cada operación.
+
 Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
 comparar soluciones con semáforos, monitores y pasaje de mensajes. El
 escenario general se mantendrá separado de los errores específicos de

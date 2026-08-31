@@ -1214,3 +1214,31 @@ semántico, schedulers, claves de exploración ni contraejemplos.
 **Motivo:** mantener la explicación visual fiel a los eventos reales y
 reservar el resaltado del editor para una implementación con posiciones
 de origen correctas.
+
+------------------------------------------------------------------------
+
+## ADR-034 --- Step Back reconstruye en lugar de invertir
+
+**Estado:** Aceptada
+
+**Contexto:** retroceder una instrucción debería restaurar no sólo
+memoria, sino semáforos, procesos bloqueados, frames, evaluaciones
+pendientes, scheduler, historial, análisis y foco. Implementar una
+operación inversa para cada efecto duplicaría la semántica del engine.
+
+**Decisión:** el retroceso crea un engine candidato desde el estado
+inicial y reproduce `step()` hasta el destino con un clon reseteado del
+scheduler. La traza esperada valida proceso y tipo de instrucción. El
+engine visible adopta candidato y scheduler sólo después de una
+reproducción completa; una divergencia no modifica el estado original.
+
+La UI deshabilita esta operación durante el replay de contraejemplos,
+donde las elecciones se fuerzan mediante `stepTransition()`.
+
+**Consecuencia:** los schedulers deterministas y Random con seed regresan
+a una posición reproducible y el próximo Step repite la elección
+original. El costo es lineal respecto del paso destino; checkpoints
+podrán optimizarlo sin cambiar el contrato.
+
+**Motivo:** reutilizar una única semántica forward y preservar todos los
+componentes del estado sin mantener lógica de undo por instrucción.

@@ -936,6 +936,11 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 
 -   [x] Play / Pause continuo.
 -   [x] Control de velocidad.
+-   [x] `Step Back` mediante reconstrucción determinista desde el estado
+    inicial, restaurando engine, scheduler, historial, diagnósticos y
+    foco sin implementar operaciones inversas por instrucción.
+-   [ ] Incorporar checkpoints internos si las ejecuciones largas hacen
+    costosa la reconstrucción desde el inicio.
 -   [x] Resaltar el proceso y la instrucción asociados al último step,
     además de la microoperación más reciente en el historial.
 -   [ ] Conservar posiciones de origen desde el tokenizer/parser y

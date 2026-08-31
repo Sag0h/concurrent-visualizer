@@ -55,7 +55,7 @@ import {
 
 export class SimulationEngine {
   private state: ExecutionState
-  private readonly scheduler: Scheduler
+  private scheduler: Scheduler
   private readonly initialState: ExecutionState
   private readonly maxSteps: number
 
@@ -106,6 +106,79 @@ export class SimulationEngine {
       this.initialState,
     )
     this.scheduler.reset()
+  }
+
+  stepBack(): boolean {
+    if (this.state.stepCount === 0) {
+      return false
+    }
+
+    this.rewindToStep(
+      this.state.stepCount - 1,
+    )
+
+    return true
+  }
+
+  rewindToStep(targetStep: number): void {
+    if (!Number.isInteger(targetStep)) {
+      throw new Error(
+        'Rewind target step must be an integer',
+      )
+    }
+
+    if (
+      targetStep < 0
+      || targetStep > this.state.stepCount
+    ) {
+      throw new Error(
+        `Cannot rewind from step ${this.state.stepCount} to step ${targetStep}`,
+      )
+    }
+
+    if (targetStep === this.state.stepCount) {
+      return
+    }
+
+    const expectedTrace = this.state.history
+      .slice(0, targetStep)
+    const replayScheduler = this.scheduler.clone()
+
+    replayScheduler.reset()
+
+    const replayEngine = new SimulationEngine(
+      cloneExecutionState(this.initialState),
+      replayScheduler,
+      this.maxSteps,
+    )
+
+    for (const expectedEvent of expectedTrace) {
+      const progressed = replayEngine.step()
+      const actualEvent = replayEngine
+        .getState()
+        .history[
+          replayEngine.getState().history.length - 1
+        ]
+
+      if (
+        !progressed
+        || !actualEvent
+        || actualEvent.processId
+          !== expectedEvent.processId
+        || actualEvent.instructionType
+          !== expectedEvent.instructionType
+      ) {
+        throw new Error(
+          `Cannot reproduce execution trace at step ${expectedEvent.step}`,
+        )
+      }
+    }
+
+    this.state = cloneExecutionState(
+      replayEngine.state,
+    )
+    this.scheduler =
+      replayEngine.scheduler.clone()
   }
 
   fork(): SimulationEngine {

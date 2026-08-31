@@ -2141,3 +2141,24 @@ Este foco explica el último paso real. Resaltar la línea exacta del
 pseudocódigo queda como ticket separado porque requiere conservar
 posiciones de origen en tokenizer, parser y AST; el editor actual no
 dispone todavía de esa correspondencia.
+
+## 2026-08-31 --- M11: Step Back determinista
+
+`SimulationEngine.stepBack()` reconstruye el paso anterior mediante
+`rewindToStep()`. Se crea un engine candidato desde el estado inicial,
+se resetea un clon del scheduler y se reproduce la traza hasta el destino.
+Sólo si cada proceso e instrucción coincide se reemplazan el estado y el
+scheduler visibles; un fallo de reproducción conserva intacta la
+simulación original.
+
+Este enfoque restaura conjuntamente memoria, semáforos, bloqueos, call
+stacks, evaluaciones pendientes, microoperaciones, análisis, diagnósticos
+y foco. Round Robin y Random recuperan también su posición interna, por
+lo que volver a avanzar produce la misma elección que antes.
+
+La UI habilita `Step Back` desde el paso 1, incluso después de `Run`,
+finalización o deadlock. Pulsarlo pausa Play. Durante el replay manual de
+un contraejemplo queda deshabilitado porque esa ejecución utiliza
+transiciones explícitas y no el scheduler ordinario. La reconstrucción
+actual cuesta O(step destino); checkpoints quedan como optimización
+futura si el límite de ejecución crece.
