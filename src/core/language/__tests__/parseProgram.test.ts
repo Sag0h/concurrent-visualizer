@@ -369,6 +369,56 @@ describe('parseProgram', () => {
     })
   })
 
+  it('uses parentheses to override arithmetic precedence', () => {
+    const program = parseProgram(`
+      process P1 {
+        int result = (1 + 2) * 3;
+      }
+    `)
+
+    const instruction =
+      program.processes[0].instructions[0]
+
+    expect(instruction).toMatchObject({
+      type: 'DECLARE',
+      initialValue: {
+        type: 'BINARY',
+        operator: '*',
+        left: {
+          type: 'BINARY',
+          operator: '+',
+        },
+      },
+    })
+  })
+
+  it('parses modulo with multiplication-level precedence', () => {
+    const program = parseProgram(`
+      process P1 {
+        int position = (5 + 2) % 4 * 3;
+      }
+    `)
+
+    const instruction =
+      program.processes[0].instructions[0]
+
+    expect(instruction).toMatchObject({
+      type: 'DECLARE',
+      initialValue: {
+        type: 'BINARY',
+        operator: '*',
+        left: {
+          type: 'BINARY',
+          operator: '%',
+          left: {
+            type: 'BINARY',
+            operator: '+',
+          },
+        },
+      },
+    })
+  })
+
   it('parses a complete executable program', () => {
     const program = parseProgram(`
       shared int counter = 0;

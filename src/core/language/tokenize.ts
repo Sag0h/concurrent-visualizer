@@ -172,6 +172,10 @@ export function tokenize(source: string): Token[] {
         addToken('SLASH', character, tokenLine, tokenColumn)
         continue
 
+      case '%':
+        addToken('PERCENT', character, tokenLine, tokenColumn)
+        continue
+
       case '=':
         if (peek() === '=') {
           advance()

@@ -62,6 +62,22 @@ function runSourceProgram(
 }
 
 describe('SimulationEngine', () => {
+  it('executes grouped arithmetic and modulo from source', () => {
+    const program = runSourceProgram(`
+      process P1 {
+        int position = (5 + 2) % 4;
+        int result = position * (2 + 1);
+      }
+    `)
+
+    expect(
+      program.processes[0].localMemory,
+    ).toMatchObject({
+      position: 3,
+      result: 9,
+    })
+  })
+
   it('starts with stepCount equal to 0', () => {
     const process = createProcess('P1', [noOp(), finish()])
 

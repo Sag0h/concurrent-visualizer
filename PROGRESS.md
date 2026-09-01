@@ -5,7 +5,7 @@
 
 ## Estado actual
 
-**Fase:** M11 --- Visualización avanzada y catálogo educativo.
+**Fase:** transición de M11 a M12.1 --- Semántica de monitores.
 
 **Último milestone completado:** M10.2 --- Registros y operaciones educativas simuladas.
 
@@ -25,10 +25,12 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** la vertical de personalización de M11 está cerrada.
-Corresponde decidir si se priorizan las visualizaciones opcionales aún
-pendientes de M11 o si comienza M12 con monitores. Las assertions
-explícitas se evaluaron y quedaron como extensión futura del lenguaje.
+**Próximo objetivo:** la vertical principal de M11 está cerrada y sus
+mejoras restantes son opcionales. M12.1 comenzó con la semántica de
+monitores alineada con la cátedra. El siguiente ticket es diseñar el AST
+de `monitor`, `procedure`, `cond`, `wait`, `signal`, `signal_all` y las
+llamadas calificadas, incluyendo el contrato de parámetros `in`/`out`.
+Las assertions explícitas quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2282,3 +2284,24 @@ fijo por `--text-muted` y quedó en 5.98:1 sobre blanco. El soporte de
 movimiento reducido elimina las únicas transiciones existentes —tema y
 switches— y el seguimiento del editor utiliza desplazamiento inmediato,
 no animado.
+
+## 2026-09-01 --- Operador módulo y comienzo de M12.1
+
+El lenguaje incorporó `%` de extremo a extremo: token `PERCENT`, operador
+binario del AST, parsing en el mismo nivel que multiplicación/división y
+evaluación numérica. Se agregaron regresiones para agrupación mediante
+paréntesis, precedencia, tokenizer, evaluador y ejecución completa desde
+código fuente. Expresiones académicas como
+`position = (position + 1) % M;` quedan representables directamente.
+
+M12.1 comenzó contrastando el diseño con la explicación práctica de
+monitores de la cátedra. El contrato adoptado es signal-and-continue:
+`wait` libera el monitor y encola FIFO en una condición; `signal` despierta
+al primero pero el señalador conserva el monitor; el despertado vuelve a
+competir por entrar; `signal_all` despierta a todos. La entrada general al
+monitor no garantiza FIFO y una llamada anidada conserva ocupado el
+monitor exterior.
+
+Antes de implementar tokenizer o runtime se diseñarán el AST, los
+parámetros `in`/`out`, la inicialización y la representación explícita de
+propietario, competidores y colas por condición.

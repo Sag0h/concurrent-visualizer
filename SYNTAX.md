@@ -573,7 +573,27 @@ a + b
 a - b
 a * b
 a / b
+a % b
 ```
+
+`%` calcula el resto de la división. Es útil para recorridos circulares,
+por ejemplo:
+
+``` text
+next = (current + 1) % M;
+```
+
+`*`, `/` y `%` comparten nivel de precedencia y se evalúan de izquierda
+a derecha. Los paréntesis pueden modificar la precedencia de cualquier
+expresión aritmética:
+
+``` text
+result = (a + b) * 3;
+position = (position + 1) % M;
+```
+
+El divisor de `/` y `%` debe ser distinto de cero. En recorridos como el
+anterior esto implica la precondición `M > 0`.
 
 También se soporta el menos unario:
 

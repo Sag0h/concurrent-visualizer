@@ -984,13 +984,37 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 
 ## M12 --- Monitores
 
+### M12.1 --- Semántica académica y modelo mínimo
+
+-   [x] Contrastar la semántica con la explicación práctica de
+    monitores de la cátedra.
+-   [x] Definir exclusión mutua implícita por instancia de monitor.
+-   [x] Adoptar `signal and continue`: el proceso que ejecuta `signal`
+    conserva el monitor y el despertado vuelve a competir para entrar.
+-   [x] Definir cola FIFO por variable condición y entrada no FIFO al
+    monitor.
+-   [x] Definir que `wait` libera el monitor y que el proceso reanuda
+    después del `wait` sólo tras readquirirlo.
+-   [x] Adoptar los nombres académicos `wait`, `signal` y `signal_all`.
+-   [x] Definir que una llamada anidada a otro monitor conserva ocupado
+    el monitor exterior hasta que la llamada interior finaliza.
+-   [ ] Diseñar tipos de AST para monitores, procedures, condiciones y
+    llamadas calificadas.
+-   [ ] Definir parámetros `in`/`out` de procedures sin reutilizar
+    incorrectamente el paso por valor de las funciones actuales.
+-   [ ] Definir inicialización de monitores antes de admitir llamadas.
+-   [ ] Definir la representación de propietario, competidores y colas
+    de condición en `ExecutionState` y snapshots.
+
+### M12.2 --- Lenguaje, runtime y visualización
+
 -   [ ] Declaración `monitor`.
--   [ ] Procedures.
+-   [ ] Procedures y llamadas `monitor.procedure(...)`.
 -   [ ] Exclusión mutua implícita.
 -   [ ] Variables condición.
 -   [ ] `wait`.
 -   [ ] `signal`.
--   [ ] `broadcast`.
+-   [ ] `signal_all` (broadcast académico).
 -   [ ] Colas asociadas.
 -   [ ] Visualización.
 -   [ ] Buffer limitado con monitor.

@@ -30,6 +30,7 @@ export type TokenType =
   | 'MINUS'
   | 'STAR'
   | 'SLASH'
+  | 'PERCENT'
   | 'EQUAL_EQUAL'
   | 'NOT_EQUAL'
   | 'LESS'

@@ -764,12 +764,16 @@ class Parser {
       this.match(
         'STAR',
         'SLASH',
+        'PERCENT',
       )
     ) {
+      const operatorToken = this.previous()
       const operator =
-        this.previous().type === 'STAR'
+        operatorToken.type === 'STAR'
           ? '*'
-          : '/'
+          : operatorToken.type === 'SLASH'
+            ? '/'
+            : '%'
 
       expression = binary(
         operator,

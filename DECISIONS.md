@@ -1303,3 +1303,51 @@ compatibles.
 
 **Motivo:** separar estrictamente experiencia de usuario y semántica
 concurrente, manteniendo personalización recuperable y predecible.
+
+------------------------------------------------------------------------
+
+## ADR-037 --- Monitores con semántica signal-and-continue
+
+**Estado:** Aceptada
+
+**Contexto:** M12 debe representar los monitores enseñados por la
+cátedra. La semántica de una variable condición no puede inferirse sólo
+de los nombres `wait` y `signal`: con transferencia inmediata del monitor
+el proceso despertado continúa antes que el señalador, mientras que con
+signal-and-continue debe volver a competir por entrar.
+
+**Decisión:** cada instancia de monitor tendrá exclusión mutua implícita.
+Una llamada a un procedure adquiere el monitor y lo conserva hasta que el
+procedure termina o ejecuta `wait`. Los procesos que llaman a un monitor
+ocupado quedan como competidores de entrada sin garantía FIFO.
+
+Cada variable `cond` mantiene su propia cola FIFO. `wait(condicion)`
+encola al proceso, libera el monitor y lo bloquea. `signal(condicion)`
+despierta como máximo al proceso más antiguo de esa cola, pero el
+señalador continúa y conserva el monitor. El despertado pasa a competir
+por la entrada y reanuda en la instrucción posterior al `wait` únicamente
+cuando readquiere el monitor. `signal_all(condicion)` mueve a todos los
+esperadores a la competencia de entrada. Señalizar una cola vacía no
+produce efecto acumulable.
+
+El estado permanente del monitor será privado y sólo sus procedures
+podrán accederlo. Una llamada desde un monitor hacia otro mantendrá
+ocupado el monitor exterior hasta que el procedure interior termine. La
+primera vertical implementará monitores escalares; arrays o familias de
+monitores serán una extensión posterior.
+
+**Consecuencia:** después de despertar, una condición puede haber dejado
+de cumplirse antes de que el proceso readquiera el monitor. Los
+algoritmos con varios consumidores deberán volver a comprobarla con
+`while` cuando corresponda. El runtime deberá distinguir propietario,
+competidores de entrada y esperadores por condición. Los snapshots,
+deadlocks y `Step Back` deberán transportar esas estructuras.
+
+Los parámetros `out` de los procedures requieren referencias controladas
+y no se modelarán como parámetros por valor. Su contrato se definirá
+antes del parser para poder expresar fielmente los ejercicios de la
+cátedra.
+
+**Motivo:** reproducir el modelo académico documentado: exclusión mutua
+implícita, condiciones FIFO y procesos señalados que vuelven a competir
+por el monitor.

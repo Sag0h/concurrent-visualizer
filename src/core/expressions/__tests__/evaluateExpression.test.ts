@@ -98,6 +98,25 @@ describe('evaluateExpression', () => {
     ).toBe(7)
   })
 
+  it('evaluates modulo expressions', () => {
+    const expression = binary(
+      '%',
+      binary(
+        '+',
+        literal(5),
+        literal(2),
+      ),
+      literal(4),
+    )
+
+    expect(
+      evaluateExpression(expression, {
+        localMemory: {},
+        sharedMemory: {},
+      }),
+    ).toBe(3)
+  })
+
   it('evaluates comparison expressions', () => {
     const expression: Expression = {
       type: 'BINARY',

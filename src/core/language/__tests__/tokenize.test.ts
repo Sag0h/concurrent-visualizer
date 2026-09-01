@@ -173,7 +173,7 @@ describe('tokenize', () => {
 
   it('tokenizes operators', () => {
     const tokens = tokenize(
-      'a == b && c != d || x <= y;',
+      'a == b && c != d || x <= y; z = x % 3;',
     )
 
     expect(
@@ -195,6 +195,10 @@ describe('tokenize', () => {
     expect(
       tokens.map((token) => token.type),
     ).toContain('LESS_EQUAL')
+
+    expect(
+      tokens.map((token) => token.type),
+    ).toContain('PERCENT')
   })
 
   it('tokenizes array syntax', () => {

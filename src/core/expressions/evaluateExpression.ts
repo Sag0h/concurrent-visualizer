@@ -106,6 +106,9 @@ function evaluateBinaryExpression(
     case '/':
       return requireNumber(left) / requireNumber(right)
 
+    case '%':
+      return requireNumber(left) % requireNumber(right)
+
     case '==':
       return left === right
 
