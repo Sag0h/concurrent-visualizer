@@ -54,21 +54,7 @@ import { ParserError } from './ParserError'
 import { tokenize } from './tokenize'
 import type { FunctionDefinition } from './FunctionDefinition'
 import type { RecordDefinition } from './RecordDefinition'
-
-type ParsedType =
-  | {
-    readonly container:
-    | 'SCALAR'
-    | 'ARRAY'
-    | 'QUEUE'
-    | 'PRIORITY_QUEUE'
-    | 'STACK'
-    readonly primitiveType: PrimitiveType
-  }
-  | {
-    readonly container: 'RECORD'
-    readonly recordType: string
-  }
+import type { DeclaredType } from './DeclaredType'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 
@@ -1403,7 +1389,7 @@ class Parser {
     throw this.error(this.peek(), message)
   }
 
-  private parseType(): ParsedType {
+  private parseType(): DeclaredType {
     if (
       this.check('IDENTIFIER')
       && this.recordDefinitions[this.peek().lexeme]

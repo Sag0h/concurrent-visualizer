@@ -968,6 +968,12 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
     debe eliminar sus resultados ni modificar la simulación.
 -   [x] Persistir las preferencias puramente visuales en `localStorage`,
     con versionado y recuperación segura ante datos inválidos.
+-   [ ] Persistir en `localStorage` un borrador versionado del último
+    código editado y restaurarlo al volver a abrir la aplicación. El
+    guardado debe usar debounce, conservar la confirmación antes de
+    reemplazarlo con un ejemplo y ofrecer una acción para limpiar el
+    borrador. Es almacenamiento local por navegador/dispositivo, no
+    sincronización en la nube.
 -   [x] Reorganizar escritorio como un workspace que aproveche la altura
     disponible: controles visibles, paneles con scroll independiente y
     código, estado e historial observables sin recorrer toda la página.
@@ -998,12 +1004,12 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [x] Adoptar los nombres académicos `wait`, `signal` y `signal_all`.
 -   [x] Definir que una llamada anidada a otro monitor conserva ocupado
     el monitor exterior hasta que la llamada interior finaliza.
--   [ ] Diseñar tipos de AST para monitores, procedures, condiciones y
+-   [x] Diseñar tipos de AST para monitores, procedures, condiciones y
     llamadas calificadas.
--   [ ] Definir parámetros `in`/`out` de procedures sin reutilizar
+-   [x] Definir parámetros `in`/`out` de procedures sin reutilizar
     incorrectamente el paso por valor de las funciones actuales.
--   [ ] Definir inicialización de monitores antes de admitir llamadas.
--   [ ] Definir la representación de propietario, competidores y colas
+-   [x] Definir inicialización de monitores antes de admitir llamadas.
+-   [x] Definir la representación de propietario, competidores y colas
     de condición en `ExecutionState` y snapshots.
 
 ### M12.2 --- Lenguaje, runtime y visualización

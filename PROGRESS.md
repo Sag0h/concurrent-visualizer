@@ -27,10 +27,10 @@ pasos.
 
 **Próximo objetivo:** la vertical principal de M11 está cerrada y sus
 mejoras restantes son opcionales. M12.1 comenzó con la semántica de
-monitores alineada con la cátedra. El siguiente ticket es diseñar el AST
-de `monitor`, `procedure`, `cond`, `wait`, `signal`, `signal_all` y las
-llamadas calificadas, incluyendo el contrato de parámetros `in`/`out`.
-Las assertions explícitas quedaron como extensión futura del lenguaje.
+monitores alineada con la cátedra y ya dispone del AST base y del contrato
+de parámetros `in`/`out`. El siguiente ticket es una primera vertical
+ejecutable de tokenizer, parser y runtime para monitores. Las assertions
+explícitas quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -45,6 +45,12 @@ independiente. En mobile se priorizarán pestañas para Código, Estado,
 Procesos e Historial en lugar de comprimir las columnas de escritorio.
 Los paneles ocultos conservarán su estado y los separadores
 redimensionables se evaluarán sólo después de validar el layout base.
+
+También queda registrado un borrador local persistente para el editor:
+guardado con debounce en `localStorage`, esquema versionado, restauración
+al abrir, confirmación antes de cargar ejemplos y acción para limpiar el
+borrador. Será local al navegador y dispositivo, sin sincronización en la
+nube.
 
 ------------------------------------------------------------------------
 
@@ -2305,3 +2311,23 @@ monitor exterior.
 Antes de implementar tokenizer o runtime se diseñarán el AST, los
 parámetros `in`/`out`, la inicialización y la representación explícita de
 propietario, competidores y colas por condición.
+
+## 2026-09-01 --- M12.1: AST y contrato de parámetros de monitor
+
+Se extrajo `DeclaredType` desde el parser para que funciones actuales y
+monitores compartan una única representación de tipos. `Program` admite
+definiciones opcionales de monitores sin modificar todavía el estado de
+las ejecuciones existentes.
+
+`MonitorDefinition` separa estado privado, condiciones, procedures y
+código de inicialización. `MonitorRuntimeState` prepara la instancia
+mutable con memoria, propietario, competidores de entrada y colas FIFO.
+La llamada calificada tiene un modelo independiente con argumentos `IN`
+basados en expresiones y `OUT` basados en `AssignmentTarget`.
+
+Los `IN` se capturarán antes de competir por el monitor. Los `OUT` estarán
+limitados inicialmente a memoria local, conservarán la ubicación concreta
+y harán write-back al finalizar el procedure, antes de liberar el monitor.
+No se agregó aún esta llamada a `Instruction`: el siguiente ticket debe
+incorporar tokenizer/parser y runtime juntos hasta una primera vertical
+ejecutable.

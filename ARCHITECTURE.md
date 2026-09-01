@@ -775,6 +775,26 @@ Memoria compartida soporta actualmente:
 
 Quedan previstos monitores y variables condición.
 
+M12 separa dos niveles. `MonitorDefinition` describe estado privado,
+variables condición, procedures, parámetros y cuerpo de inicialización.
+`MonitorRuntimeState` representa cada instancia durante la ejecución:
+memoria, propietario, competidores de entrada y colas FIFO por condición.
+La definición forma parte de `Program`; el estado mutable pertenecerá a
+`ExecutionState` cuando se conecte el runtime.
+
+Las llamadas calificadas se modelan como
+`MONITOR_PROCEDURE_CALL`. Sus argumentos son discriminados:
+
+``` text
+IN  -> Expression
+OUT -> AssignmentTarget
+```
+
+Un argumento `IN` captura un valor. Un argumento `OUT` conserva una
+referencia controlada a una variable, posición de array o campo del
+llamador; no es una expresión arbitraria. Esta separación evita reutilizar
+incorrectamente el paso por valor de las funciones existentes.
+
 Pasaje de mensajes permanece futuro: canales, `send`, `receive`,
 comunicación asincrónica/sincrónica, RPC y Rendezvous.
 
