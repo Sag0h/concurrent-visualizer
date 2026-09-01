@@ -8,7 +8,8 @@ Esta versión documenta las características actualmente soportadas por el
 lenguaje y el motor al cierre de M6 y durante M7.5.
 
 Además de la capa secuencial, `atomic`, `await` y semáforos, la sintaxis
-incorpora colas FIFO primitivas locales y compartidas.
+incorpora arrays, colas FIFO, colas de prioridad y pilas de valores
+primitivos o registros homogéneos.
 
 La sintaxis crecerá junto con el simulador. Las nuevas primitivas
 concurrentes se incorporarán siguiendo prioritariamente la terminología
@@ -317,8 +318,8 @@ variables antes del `WRITE`.
 
 ## Colas FIFO
 
-Las colas almacenan valores primitivos de un único tipo y pueden ser
-locales o compartidas:
+Las colas almacenan valores homogéneos de un único tipo, primitivo o
+registro, y pueden ser locales o compartidas:
 
 ``` text
 shared queue<int> trabajos = queue[10, 20];
@@ -334,6 +335,7 @@ Tipos de elemento disponibles:
 queue<int>
 queue<bool>
 queue<string>
+queue<Fallo>
 ```
 
 La notación `queue[...]` enumera los elementos desde el frente hacia el
@@ -410,7 +412,7 @@ cola vacía producen un error de runtime; no bloquean automáticamente.
 ### Colas de prioridad estables
 
 Las colas de prioridad son una estructura separada. Cada elemento tiene
-un valor primitivo y una prioridad entera:
+un valor primitivo o registro y una prioridad entera:
 
 ``` text
 shared priority_queue<string> fallos =
@@ -439,6 +441,20 @@ Una inserción requiere valor y prioridad:
 pendientes.enqueue(42, 5);
 ```
 
+También pueden priorizar registros. El valor y la prioridad se escriben
+como un par dentro del literal:
+
+``` text
+record Fallo { int id; int nivel; }
+
+priority_queue<Fallo> urgentes = priority_queue[
+    (Fallo { id: 1, nivel: 3 }, 10),
+    (Fallo { id: 2, nivel: 2 }, 5)
+];
+urgentes.enqueue(Fallo { id: 3, nivel: 3 }, 10);
+Fallo siguiente = urgentes.dequeue();
+```
+
 `dequeue`, `front`, `size` e `isEmpty` se utilizan igual que en una cola
 FIFO y retornan el valor, no la prioridad. Todas las operaciones siguen
 siendo atómicas individualmente y admiten las mismas restricciones sobre
@@ -446,7 +462,7 @@ resultados locales, llamadas a funciones y lecturas compartidas.
 
 ### Pilas
 
-Las pilas almacenan valores primitivos en orden LIFO. La notación
+Las pilas almacenan valores primitivos o registros en orden LIFO. La notación
 literal enumera los elementos desde el fondo hacia la cima:
 
 ``` text
@@ -470,7 +486,15 @@ atómico y sigue las mismas restricciones que las colas: los resultados
 se escriben directamente en memoria local y `push` no admite llamadas a
 funciones ni lecturas compartidas dentro de su argumento.
 
-Las pilas de registros/objetos todavía no están soportadas.
+Para registros se usa el mismo tipo nominal y la misma sintaxis literal:
+
+``` text
+stack<Fallo> historial = stack[
+    Fallo { id: 1, nivel: 1 }
+];
+historial.push(Fallo { id: 2, nivel: 3 });
+Fallo ultimo = historial.pop();
+```
 
 ------------------------------------------------------------------------
 
@@ -504,6 +528,49 @@ orden y deben incluirlos exactamente una vez con el tipo declarado. Los
 registros pueden ser locales o compartidos; actualmente sus campos sólo
 pueden ser `int`, `bool` o `string`.
 
+Los registros también pueden utilizarse como elementos de arrays locales o
+compartidos:
+
+``` text
+shared Fallo[] fallos = [
+    Fallo { id: 7, nivel: 3, mensaje: "temperatura" },
+    Fallo { id: 8, nivel: 1, mensaje: "red" }
+];
+
+process Controlador {
+    Fallo[] locales = [
+        Fallo { id: 1, nivel: 1, mensaje: "local" }
+    ];
+
+    int nivel = fallos[0].nivel;
+    int id = fallos[1].getID();
+    fallos[0].nivel = 2;
+    fallos[1] = Fallo { id: 9, nivel: 3, mensaje: "nuevo" };
+    Fallo copia = fallos[0];
+}
+```
+
+Se admiten arrays vacíos mediante `Fallo[] fallos = [];`. Los elementos
+deben pertenecer exactamente al tipo de registro declarado. El acceso y
+la sustitución validan límites, y las copias de registros usan semántica
+por valor para no crear alias accidentales entre variables y elementos.
+
+`foreach` también puede recorrer un array de registros:
+
+``` text
+foreach (fallo in fallos) {
+    print(fallo.getID(), fallo.getNivel());
+}
+```
+
+También se admiten como elementos homogéneos de `queue`,
+`priority_queue` y `stack`. Las inserciones, consultas y extracciones
+usan copia por valor: modificar el registro original después de
+insertarlo, o modificar el resultado de `front()` / `top()`, no altera
+el elemento almacenado. El tipo se valida nominalmente; por ejemplo,
+`queue<Fallo>` no acepta un registro `Persona` aunque tenga los mismos
+campos.
+
 Cada campo compartido tiene granularidad propia para microoperaciones y
 análisis. Por ejemplo, `fallo.id` y `fallo.nivel` son ubicaciones de
 memoria diferentes.
@@ -522,9 +589,14 @@ no modifica estado y, si el registro es compartido, conserva la
 ubicación de memoria del campo en las microoperaciones y el análisis.
 No acepta argumentos.
 
-Todavía no se permiten registros dentro de arrays, colas o pilas. El
-acceso puede ser directo mediante `fallo.nivel` o mediante su getter
-automático.
+Cada campo de un elemento compartido conserva granularidad propia. Por
+ejemplo, `fallos[0].id`, `fallos[0].nivel` y `fallos[1].nivel` son tres
+ubicaciones diferentes para el historial y el análisis de carreras.
+
+Todavía no se permiten arrays anidados ni campos compuestos dentro de un
+registro. Los métodos simulados sobre un
+elemento indexado también quedan como extensión posterior; el acceso
+directo y los getters sí están soportados.
 
 ------------------------------------------------------------------------
 
@@ -1195,8 +1267,8 @@ También permanecen fuera del alcance actual:
 -   métodos de registro con comportamiento o parámetros;
 -   métodos reales con cuerpo y estado interno propio;
 
-Las colas FIFO primitivas, las colas de prioridad estables y las pilas ya
-están implementadas bajo el mismo modelo general.
+Las colas FIFO, las colas de prioridad estables y las pilas ya están
+implementadas bajo el mismo modelo general para primitivos y registros.
 
 Los registros con campos primitivos, getters automáticos y `print(...)`
 simulado ya están disponibles. Los objetos con comportamiento quedan

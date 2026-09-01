@@ -8,7 +8,8 @@ import type { CallInstruction, DataStructureOperationInstruction, ForeachInstruc
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import {
   assertPriority,
-  assertPrimitiveType,
+  assertArrayElementCompatible,
+  assertCollectionElementType,
   enqueuePriorityItem,
   isDataStructureValue,
   isRecordValue,
@@ -17,7 +18,7 @@ import {
   isPrimitiveValue,
   isStackValue,
   type PriorityQueueValue,
-  type PrimitiveValue,
+  type CollectionElementValue,
   type QueueValue,
   type RuntimeValue,
   type StackValue,
@@ -30,6 +31,7 @@ import type {
 } from '../expressions/Expression'
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { FunctionDefinition } from '../language/FunctionDefinition'
+import type { DeclaredValueType } from '../language/DeclaredType'
 import type { PendingEvaluation } from '../process/PendingEvaluation'
 import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
@@ -426,11 +428,11 @@ export class SimulationEngine {
         if (instruction.scope === 'LOCAL') {
           this.getActiveLocalMemory(process)[
             instruction.name
-          ] = value
+          ] = structuredClone(value)
         } else {
           this.state.program.sharedMemory[
             instruction.name
-          ] = value
+          ] = structuredClone(value)
         }
 
         this.advanceProcess(process)
@@ -1375,7 +1377,7 @@ export class SimulationEngine {
 
     this.getActiveLocalMemory(process)[
       loop.itemName
-    ] = loop.values[loop.index]
+    ] = structuredClone(loop.values[loop.index])
 
     process.executionStack.push({
       instructions: loop.body,
@@ -1860,11 +1862,11 @@ export class SimulationEngine {
         if (pending.scope === 'LOCAL') {
           this.getActiveLocalMemory(process)[
             pending.name
-          ] = value
+          ] = structuredClone(value)
         } else {
           this.state.program.sharedMemory[
             pending.name
-          ] = value
+          ] = structuredClone(value)
         }
 
         this.advanceProcess(process)
@@ -1941,12 +1943,22 @@ export class SimulationEngine {
         return
 
       case 'ASSIGN_TARGET_INDEX':
-        this.applyArrayAssignment(
-          process,
-          pending.arrayName,
-          value,
-          pending.value,
-        )
+        if (pending.target.type === 'ARRAY_RECORD_FIELD') {
+          this.applyArrayRecordFieldAssignment(
+            process,
+            pending.target.arrayName,
+            value,
+            pending.target.fieldName,
+            pending.value,
+          )
+        } else {
+          this.applyArrayAssignment(
+            process,
+            pending.target.arrayName,
+            value,
+            pending.value,
+          )
+        }
 
         this.advanceProcess(process)
         return
@@ -2214,6 +2226,45 @@ export class SimulationEngine {
       )
     }
 
+    if (location.type === 'ARRAY_RECORD_FIELD') {
+      const array = this.state.program.sharedMemory[
+        location.arrayName
+      ]
+
+      if (!Array.isArray(array)) {
+        throw new Error(
+          `Shared variable "${location.arrayName}" is not an array`,
+        )
+      }
+
+      if (
+        location.index < 0
+        || location.index >= array.length
+      ) {
+        throw new Error(
+          `Array index ${location.index} is out of bounds`,
+        )
+      }
+
+      const record = array[location.index]
+
+      if (!isRecordValue(record)) {
+        throw new Error(
+          `Array element "${location.arrayName}[${location.index}]" is not a record`,
+        )
+      }
+
+      if (!(location.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${location.fieldName}"`,
+        )
+      }
+
+      return structuredClone(
+        record.fields[location.fieldName],
+      )
+    }
+
     const array =
       this.state.program.sharedMemory[
         location.arrayName
@@ -2254,6 +2305,10 @@ export class SimulationEngine {
 
     if (location.type === 'RECORD_FIELD') {
       return `${location.recordName}.${location.fieldName}`
+    }
+
+    if (location.type === 'ARRAY_RECORD_FIELD') {
+      return `${location.arrayName}[${location.index}].${location.fieldName}`
     }
 
     return `${location.arrayName}[${location.index}]`
@@ -2361,6 +2416,46 @@ export class SimulationEngine {
       }
 
       case 'FIELD_ACCESS': {
+        if (
+          expression.record.type === 'ARRAY_ACCESS'
+          && expression.record.array.type === 'VARIABLE'
+        ) {
+          const arrayName = expression.record.array.name
+          const localMemory =
+            this.getActiveLocalMemory(process)
+
+          if (
+            !(arrayName in localMemory)
+            && arrayName in this.state.program.sharedMemory
+          ) {
+            const indexRead = this.findNextSharedMemoryRead(
+              process,
+              expression.record.index,
+            )
+
+            if (indexRead) {
+              return indexRead
+            }
+
+            const index = this.evaluateArrayIndex(
+              process,
+              expression.record.index,
+            )
+
+            if (index !== undefined) {
+              return {
+                expression,
+                location: {
+                  type: 'ARRAY_RECORD_FIELD',
+                  arrayName,
+                  index,
+                  fieldName: expression.fieldName,
+                },
+              }
+            }
+          }
+        }
+
         if (expression.record.type === 'VARIABLE') {
           const recordName = expression.record.name
           const localMemory =
@@ -2388,6 +2483,59 @@ export class SimulationEngine {
       }
 
       case 'RECORD_GETTER': {
+        if (
+          expression.record.type === 'ARRAY_ACCESS'
+          && expression.record.array.type === 'VARIABLE'
+        ) {
+          const arrayName = expression.record.array.name
+          const localMemory =
+            this.getActiveLocalMemory(process)
+          const sharedArray =
+            this.state.program.sharedMemory[arrayName]
+
+          if (
+            !(arrayName in localMemory)
+            && Array.isArray(sharedArray)
+          ) {
+            const indexRead = this.findNextSharedMemoryRead(
+              process,
+              expression.record.index,
+            )
+
+            if (indexRead) {
+              return indexRead
+            }
+
+            const index = this.evaluateArrayIndex(
+              process,
+              expression.record.index,
+            )
+
+            if (index !== undefined) {
+              const record = sharedArray[index]
+
+              if (!isRecordValue(record)) {
+                throw new Error(
+                  `Array element "${arrayName}[${index}]" is not a record`,
+                )
+              }
+
+              return {
+                expression,
+                location: {
+                  type: 'ARRAY_RECORD_FIELD',
+                  arrayName,
+                  index,
+                  fieldName: resolveRecordGetterFieldName(
+                    record,
+                    expression.getterName,
+                  ),
+                },
+              }
+            }
+          }
+        }
+
         if (expression.record.type === 'VARIABLE') {
           const recordName = expression.record.name
           const localMemory =
@@ -2556,6 +2704,7 @@ export class SimulationEngine {
 
         pendingTargetIndex:
           instruction.target.type === 'ARRAY_ACCESS'
+          || instruction.target.type === 'ARRAY_RECORD_FIELD'
             ? structuredClone(
                 instruction.target.index,
               )
@@ -2601,6 +2750,8 @@ export class SimulationEngine {
           if (
             runtime.instruction.target.type
             === 'ARRAY_ACCESS'
+            || runtime.instruction.target.type
+            === 'ARRAY_RECORD_FIELD'
           ) {
             runtime.phase = 'TARGET_READ'
           } else {
@@ -2675,6 +2826,8 @@ export class SimulationEngine {
         if (
           runtime.instruction.target.type
           === 'ARRAY_ACCESS'
+          || runtime.instruction.target.type
+          === 'ARRAY_RECORD_FIELD'
         ) {
           runtime.phase = 'TARGET_READ'
         } else {
@@ -2694,6 +2847,8 @@ export class SimulationEngine {
         if (
           runtime.instruction.target.type
           !== 'ARRAY_ACCESS'
+          && runtime.instruction.target.type
+          !== 'ARRAY_RECORD_FIELD'
         ) {
           throw new Error(
             'TARGET_READ requires an array assignment target',
@@ -2780,7 +2935,8 @@ export class SimulationEngine {
             )
           ) {
             const localTarget =
-              runtime.instruction.target.type === 'ARRAY_ACCESS'
+              (runtime.instruction.target.type === 'ARRAY_ACCESS'
+              || runtime.instruction.target.type === 'ARRAY_RECORD_FIELD')
               && runtime.pendingTargetIndex
                 ? {
                     ...runtime.instruction.target,
@@ -2838,6 +2994,7 @@ export class SimulationEngine {
     const variableName = target.type === 'VARIABLE'
       ? target.name
       : target.type === 'ARRAY_ACCESS'
+        || target.type === 'ARRAY_RECORD_FIELD'
         ? target.arrayName
         : target.recordName
 
@@ -2908,6 +3065,17 @@ export class SimulationEngine {
           this.state.program.sharedMemory,
       },
     )
+
+    if (target.type === 'ARRAY_RECORD_FIELD') {
+      this.applyArrayRecordFieldAssignment(
+        process,
+        target.arrayName,
+        index,
+        target.fieldName,
+        value,
+      )
+      return
+    }
 
     this.applyArrayAssignment(
       process,
@@ -3239,7 +3407,7 @@ export class SimulationEngine {
 
     this.getActiveLocalMemory(process)[
       instruction.itemName
-    ] = collection[0]
+    ] = structuredClone(collection[0])
 
     process.executionStack.push({
       instructions: instruction.body,
@@ -3247,7 +3415,7 @@ export class SimulationEngine {
       completionMode: 'FOREACH_NEXT',
       foreachLoop: {
         itemName: instruction.itemName,
-        values: [...collection],
+        values: structuredClone(collection),
         body: instruction.body,
         index: 0,
       },
@@ -3294,17 +3462,68 @@ export class SimulationEngine {
       )
     }
 
+    assertArrayElementCompatible(
+      array[index],
+      value,
+      `${arrayName}[${index}]`,
+    )
+
+    array[index] = structuredClone(value)
+  }
+
+  private applyArrayRecordFieldAssignment(
+    process: Process,
+    arrayName: string,
+    index: RuntimeValue,
+    fieldName: string,
+    value: RuntimeValue,
+  ): void {
     if (
-      Array.isArray(value)
-      || isDataStructureValue(value)
-      || isRecordValue(value)
+      typeof index !== 'number'
+      || !Number.isInteger(index)
     ) {
+      throw new Error('Array index must be an integer')
+    }
+
+    const localMemory = this.getActiveLocalMemory(process)
+    const array = arrayName in localMemory
+      ? localMemory[arrayName]
+      : this.state.program.sharedMemory[arrayName]
+
+    if (!Array.isArray(array)) {
+      throw new Error(`Variable "${arrayName}" is not an array`)
+    }
+
+    if (index < 0 || index >= array.length) {
+      throw new Error(`Array index ${index} is out of bounds`)
+    }
+
+    const record = array[index]
+
+    if (!isRecordValue(record)) {
       throw new Error(
-        'Nested collection values are not supported yet',
+        `Array element "${arrayName}[${index}]" is not a record`,
       )
     }
 
-    array[index] = value
+    if (!(fieldName in record.fields)) {
+      throw new Error(
+        `Record "${record.recordType}" has no field "${fieldName}"`,
+      )
+    }
+
+    const previousValue = record.fields[fieldName]
+
+    if (
+      !isPrimitiveValue(value)
+      || typeof value !== typeof previousValue
+    ) {
+      throw new Error(
+        `Field "${arrayName}[${index}].${fieldName}" requires ${typeof previousValue} but received ${typeof value}`,
+      )
+    }
+
+    record.fields[fieldName] = structuredClone(value)
   }
 
   private completeAssignmentValue(
@@ -3313,7 +3532,8 @@ export class SimulationEngine {
     value: RuntimeValue,
   ): void {
     if (
-      target.type === 'ARRAY_ACCESS'
+      (target.type === 'ARRAY_ACCESS'
+      || target.type === 'ARRAY_RECORD_FIELD')
       && this.containsFunctionCall(
         target.index,
       )
@@ -3323,7 +3543,7 @@ export class SimulationEngine {
         target.index,
         {
           type: 'ASSIGN_TARGET_INDEX',
-          arrayName: target.arrayName,
+          target,
           value,
         },
       )
@@ -3417,6 +3637,15 @@ export class SimulationEngine {
       return undefined
     }
 
+    if (target.type === 'ARRAY_RECORD_FIELD') {
+      return {
+        type: 'ARRAY_RECORD_FIELD',
+        arrayName: target.arrayName,
+        index,
+        fieldName: target.fieldName,
+      }
+    }
+
     return {
       type: 'ARRAY_ELEMENT',
       arrayName: target.arrayName,
@@ -3505,6 +3734,15 @@ export class SimulationEngine {
       return undefined
     }
 
+    if (target.type === 'ARRAY_RECORD_FIELD') {
+      return {
+        type: 'ARRAY_RECORD_FIELD',
+        arrayName: target.arrayName,
+        index,
+        fieldName: target.fieldName,
+      }
+    }
+
     return {
       type: 'ARRAY_ELEMENT',
       arrayName: target.arrayName,
@@ -3576,17 +3814,43 @@ export class SimulationEngine {
       )
     }
 
-    if (
-      Array.isArray(value)
-      || isDataStructureValue(value)
-      || isRecordValue(value)
-    ) {
-      throw new Error(
-        'Nested collection values are not supported yet',
-      )
+    if (location.type === 'ARRAY_RECORD_FIELD') {
+      const record = array[location.index]
+
+      if (!isRecordValue(record)) {
+        throw new Error(
+          `Array element "${location.arrayName}[${location.index}]" is not a record`,
+        )
+      }
+
+      if (!(location.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${location.fieldName}"`,
+        )
+      }
+
+      const previousValue = record.fields[location.fieldName]
+
+      if (
+        !isPrimitiveValue(value)
+        || typeof value !== typeof previousValue
+      ) {
+        throw new Error(
+          `Field "${location.arrayName}[${location.index}].${location.fieldName}" requires ${typeof previousValue} but received ${typeof value}`,
+        )
+      }
+
+      record.fields[location.fieldName] = structuredClone(value)
+      return
     }
 
-    array[location.index] = value
+    assertArrayElementCompatible(
+      array[location.index],
+      value,
+      `${location.arrayName}[${location.index}]`,
+    )
+
+    array[location.index] = structuredClone(value)
   }
 
   private evaluateAwaitCondition(
@@ -3866,11 +4130,12 @@ export class SimulationEngine {
       this.validateDataStructureResultTarget(
         process,
         instruction,
+        resolved.structure,
       )
     }
 
     const sizeBefore = resolved.structure.items.length
-    let value: PrimitiveValue
+    let value: RuntimeValue
     let priority: number | undefined
 
     switch (instruction.operation) {
@@ -3884,7 +4149,7 @@ export class SimulationEngine {
           instruction,
           'enqueue',
         )
-        assertPrimitiveType(
+        assertCollectionElementType(
           evaluated,
           resolved.structure.elementType,
           isPriorityQueueValue(resolved.structure)
@@ -3919,7 +4184,9 @@ export class SimulationEngine {
             )
           }
 
-          resolved.structure.items.push(value)
+          resolved.structure.items.push(
+            structuredClone(value),
+          )
         }
 
         this.advanceProcess(process)
@@ -3936,13 +4203,15 @@ export class SimulationEngine {
           instruction,
           'push',
         )
-        assertPrimitiveType(
+        assertCollectionElementType(
           evaluated,
           resolved.structure.elementType,
           'Stack',
         )
         value = evaluated
-        resolved.structure.items.push(value)
+        resolved.structure.items.push(
+          structuredClone(value),
+        )
         this.advanceProcess(process)
         break
       }
@@ -4099,7 +4368,7 @@ export class SimulationEngine {
     queueName: string,
     queue: QueueValue | PriorityQueueValue,
     method: 'dequeue' | 'front',
-  ): PrimitiveValue {
+  ): CollectionElementValue {
     if (isPriorityQueueValue(queue)) {
       const item = queue.items[0]
 
@@ -4127,7 +4396,7 @@ export class SimulationEngine {
     stackName: string,
     stack: StackValue,
     method: 'pop' | 'top',
-  ): PrimitiveValue {
+  ): CollectionElementValue {
     const value = stack.items.at(-1)
 
     if (value === undefined) {
@@ -4181,7 +4450,7 @@ export class SimulationEngine {
   private completeDataStructureResult(
     process: Process,
     instruction: DataStructureOperationInstruction,
-    value: PrimitiveValue,
+    value: RuntimeValue,
   ): void {
     const target = instruction.resultTarget
 
@@ -4209,6 +4478,7 @@ export class SimulationEngine {
   private validateDataStructureResultTarget(
     process: Process,
     instruction: DataStructureOperationInstruction,
+    structure: QueueValue | PriorityQueueValue | StackValue,
   ): void {
     const target = instruction.resultTarget
 
@@ -4229,6 +4499,24 @@ export class SimulationEngine {
         'Data structure operation results must be assigned to local memory',
       )
     }
+
+    if (target.type === 'DECLARE') {
+      const expectedType =
+        instruction.operation === 'SIZE'
+          ? { kind: 'PRIMITIVE', primitiveType: 'int' } as const
+          : instruction.operation === 'IS_EMPTY'
+            ? { kind: 'PRIMITIVE', primitiveType: 'bool' } as const
+            : structure.elementType
+
+      if (!declaredValueTypeMatches(
+        target.valueType,
+        expectedType,
+      )) {
+        throw new Error(
+          `Variable "${target.name}" is declared as ${formatDeclaredValueType(target.valueType)} but ${dataStructureMethodName(instruction.operation)}() returns ${formatDeclaredValueType(expectedType)}`,
+        )
+      }
+    }
   }
 
   private getSemaphore(
@@ -4247,6 +4535,38 @@ export class SimulationEngine {
 
     return semaphore
   }
+}
+
+function declaredValueTypeMatches(
+  declared: DeclaredValueType,
+  actual:
+    | DeclaredValueType
+    | QueueValue['elementType'],
+): boolean {
+  if (typeof actual === 'string') {
+    return declared.kind === 'PRIMITIVE'
+      && declared.primitiveType === actual
+  }
+
+  if (actual.kind === 'PRIMITIVE') {
+    return declared.kind === 'PRIMITIVE'
+      && declared.primitiveType === actual.primitiveType
+  }
+
+  return declared.kind === 'RECORD'
+    && declared.recordType === actual.recordType
+}
+
+function formatDeclaredValueType(
+  type: DeclaredValueType | QueueValue['elementType'],
+): string {
+  if (typeof type === 'string') {
+    return type
+  }
+
+  return type.kind === 'PRIMITIVE'
+    ? type.primitiveType
+    : type.recordType
 }
 
 function dataStructureMethodName(

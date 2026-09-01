@@ -7,7 +7,7 @@
 
 **Fase:** transición de M11 a M12.1 --- Semántica de monitores.
 
-**Último milestone completado:** M10.2 --- Registros y operaciones educativas simuladas.
+**Último milestone completado:** M10.3 --- Colecciones de registros.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -2331,3 +2331,36 @@ y harán write-back al finalizar el procedure, antes de liberar el monitor.
 No se agregó aún esta llamada a `Instruction`: el siguiente ticket debe
 incorporar tokenizer/parser y runtime juntos hasta una primera vertical
 ejecutable.
+
+## 2026-09-01 --- M10.3: colecciones de registros
+
+Los arrays dejaron de estar limitados a primitivos y ahora aceptan
+registros homogéneos mediante declaraciones como `Fallo[]`. Se soportan
+literales locales y compartidos, arrays vacíos, lectura directa, getters,
+escritura de campos, reemplazo completo de elementos y recorrido con
+`foreach`.
+
+`DeclaredType` separa ahora el contenedor del tipo de valor o elemento.
+`RuntimeValue` admite arrays de primitivos o registros, pero mantiene
+fuera de alcance arrays anidados y campos compuestos. Las declaraciones,
+asignaciones y variables de `foreach`
+clonan valores compuestos para conservar semántica por valor.
+
+Se incorporó `ARRAY_RECORD_FIELD(arrayName, index, fieldName)` como
+ubicación concreta. Así dos campos del mismo elemento no generan un
+conflicto falso, mientras dos accesos incompatibles al mismo campo sí son
+detectados. La UI muestra arrays de registros recursivamente y presenta
+las ubicaciones indexadas completas.
+
+La validación cubre parser, runtime, arrays locales/compartidos, getters,
+reemplazos incompatibles, `foreach`, granularidad y conflictos. Con el
+hot ticket cerrado, el mismo descriptor de elemento se extendió a
+`queue`, `priority_queue` y `stack`. Las tres estructuras aceptan ahora
+registros homogéneos en literales e inserciones, retornan registros a
+variables locales, validan el tipo nominal y clonan valores al entrar y
+salir. Las pruebas adicionales cubren FIFO, desempate estable de
+prioridad, LIFO, getters, copia por valor y rechazo de tipos distintos.
+
+La UI formatea cada registro dentro de la estructura en vez de mostrar
+`[object Object]`. El próximo frente vuelve a ser la primera vertical
+ejecutable de M12 para monitores.

@@ -1,9 +1,6 @@
 import type { ProcessId } from '../process/ProcessId'
 import type { SourceRange } from '../language/SourceRange'
-import type {
-  PrimitiveValue,
-  RuntimeValue,
-} from '../memory/RuntimeValue'
+import type { RuntimeValue } from '../memory/RuntimeValue'
 
 export type AwaitEventStatus =
   | 'BLOCKED'
@@ -46,7 +43,7 @@ export interface DataStructureExecutionEvent {
   readonly scope: 'LOCAL' | 'SHARED'
   readonly sizeBefore: number
   readonly sizeAfter: number
-  readonly value?: PrimitiveValue
+  readonly value?: RuntimeValue
   readonly priority?: number
 }
 

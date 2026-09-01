@@ -873,6 +873,40 @@ datos primitivas y los procesos parametrizados de M10.1.
 
 **Estado:** M10.2 COMPLETADO.
 
+### M10.3 --- Colecciones homogéneas de registros
+
+Extensión prioritaria surgida al reproducir ejercicios académicos con
+colecciones de datos compuestos.
+
+-   [x] Generalizar arrays para almacenar primitivos o registros sin
+    habilitar arrays anidados.
+-   [x] Parsear arrays locales y compartidos como `Fallo[]`.
+-   [x] Parsear literales nombrados de registros dentro del array.
+-   [x] Leer campos y getters mediante `fallos[i].campo` y
+    `fallos[i].getCampo()`.
+-   [x] Escribir campos mediante `fallos[i].campo = valor`.
+-   [x] Reemplazar elementos completos con validación del tipo de
+    registro.
+-   [x] Permitir `foreach` sobre registros y conservar semántica de copia
+    por valor.
+-   [x] Representar cada campo indexado como `ARRAY_RECORD_FIELD` para
+    microoperaciones, conflictos y visualización.
+-   [x] Formatear arrays de registros legiblemente en la interfaz.
+-   [x] Agregar tests de parser, runtime, getters, reemplazos, errores y
+    granularidad compartida.
+-   [x] Generalizar `queue`, `priority_queue` y `stack` para almacenar
+    registros sin perder compatibilidad con elementos primitivos.
+-   [x] Permitir literales, inserciones, consultas y extracciones de
+    registros en las tres estructuras.
+-   [x] Validar nominalmente el registro declarado por cada colección.
+-   [x] Clonar registros al insertarlos y devolverlos para preservar
+    semántica por valor.
+-   [x] Formatear colecciones de registros legiblemente en la interfaz.
+-   [x] Agregar tests de FIFO, prioridad estable, LIFO, getters, copia por
+    valor y tipos incompatibles.
+
+**Estado:** M10.3 COMPLETADO.
+
 Flujo vigente:
 
 `Pseudocódigo → Tokenizer → Parser → AST/Program → Simulation Engine`

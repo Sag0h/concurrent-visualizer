@@ -1,5 +1,6 @@
 import type { Expression } from '../expressions/Expression'
 import type { SourceRange } from '../language/SourceRange'
+import type { DeclaredValueType } from '../language/DeclaredType'
 import type { AssignmentTarget } from './AssignmentTarget'
 export interface NoOpInstruction {
   readonly type: 'NO_OP'
@@ -111,6 +112,7 @@ export type DataStructureResultTarget =
       readonly type: 'DECLARE'
       readonly scope: 'LOCAL'
       readonly name: string
+      readonly valueType: DeclaredValueType
     }
   | {
       readonly type: 'ASSIGN'

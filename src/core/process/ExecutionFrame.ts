@@ -1,6 +1,6 @@
 import type { Expression } from '../expressions/Expression'
 import type { Instruction } from '../instructions/Instruction'
-import type { PrimitiveValue } from '../memory/RuntimeValue'
+import type { ArrayElementValue } from '../memory/RuntimeValue'
 
 export type FrameCompletionMode =
   | 'ADVANCE_PARENT'
@@ -20,7 +20,7 @@ export interface ForLoopRuntime {
 
 export interface ForeachLoopRuntime {
   readonly itemName: string
-  readonly values: PrimitiveValue[]
+  readonly values: ArrayElementValue[]
   readonly body: Instruction[]
   index: number
 }

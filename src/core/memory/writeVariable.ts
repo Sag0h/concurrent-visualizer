@@ -8,12 +8,12 @@ export function writeVariable(
   sharedMemory: Memory,
 ): void {
   if (name in localMemory) {
-    localMemory[name] = value
+    localMemory[name] = structuredClone(value)
     return
   }
 
   if (name in sharedMemory) {
-    sharedMemory[name] = value
+    sharedMemory[name] = structuredClone(value)
     return
   }
 

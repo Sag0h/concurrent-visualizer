@@ -1408,3 +1408,55 @@ ejecutable.
 
 **Motivo:** preparar un AST fiel a la cátedra sin contaminar funciones
 por valor ni introducir ramas incompletas en `SimulationEngine`.
+
+------------------------------------------------------------------------
+
+## ADR-039 --- Colecciones homogéneas de registros
+
+**Estado:** Aceptada
+
+**Contexto:** los ejercicios académicos usan colecciones de fallos,
+pedidos y otros datos compuestos. Reemplazarlas por arrays paralelos
+deforma el algoritmo y pierde la relación entre los campos de cada
+elemento.
+
+**Decisión:** `DeclaredType` separa contenedor y tipo de elemento. Arrays,
+colas FIFO, colas de prioridad y pilas pueden contener valores primitivos
+o registros de un único tipo nominal. Se mantienen fuera de alcance
+arrays anidados y campos compuestos.
+
+Los literales conservan la sintaxis nombrada existente:
+
+``` text
+Fallo[] fallos = [
+    Fallo { id: 1, nivel: 3 },
+    Fallo { id: 2, nivel: 1 }
+];
+```
+
+El lenguaje admite lectura y escritura de campos indexados, getters,
+reemplazo completo y `foreach`. Un registro copiado desde un elemento,
+asignado a otro destino o entregado como ítem de `foreach` se clona para
+preservar semántica por valor y evitar alias accidentales.
+
+En memoria compartida un campo se representa mediante
+`ARRAY_RECORD_FIELD(arrayName, index, fieldName)`. Leer
+`fallos[0].nivel` no registra una lectura del registro entero. Sustituir
+`fallos[0]` sí utiliza `ARRAY_ELEMENT` porque modifica el elemento
+completo.
+
+**Consecuencia:** el detector distingue campos e índices y evita falsos
+conflictos entre `fallos[0].id` y `fallos[0].nivel`. El runtime valida
+límites, existencia del campo, tipo primitivo del valor y tipo nominal
+del registro al reemplazar un elemento. La UI debe formatear arrays de
+manera recursiva.
+
+`queue<Fallo>`, `priority_queue<Fallo>` y `stack<Fallo>` reutilizan las
+operaciones atómicas existentes. Los registros se clonan al insertarse y
+al retornarse, y el runtime rechaza un `recordType` nominal distinto. La
+prioridad continúa siendo un entero separado del valor y conserva FIFO
+entre registros empatados.
+
+**Motivo:** representar fielmente ejercicios de la cátedra manteniendo
+la granularidad concurrente que ya tenían arrays y registros por
+separado, sin introducir aliasing al extender las demás colecciones.

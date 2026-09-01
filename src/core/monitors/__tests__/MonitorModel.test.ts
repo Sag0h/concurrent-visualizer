@@ -17,7 +17,10 @@ describe('monitor model', () => {
           name: 'count',
           declaredType: {
             container: 'SCALAR',
-            primitiveType: 'int',
+            valueType: {
+              kind: 'PRIMITIVE',
+              primitiveType: 'int',
+            },
           },
           initialValue: literal(0),
         },

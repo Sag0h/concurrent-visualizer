@@ -57,6 +57,13 @@ export type PendingInstruction =
   }
   | {
     readonly type: 'ASSIGN_TARGET_INDEX'
-    readonly arrayName: string
+    readonly target: Extract<
+      AssignmentTarget,
+      {
+        readonly type:
+          | 'ARRAY_ACCESS'
+          | 'ARRAY_RECORD_FIELD'
+      }
+    >
     readonly value: RuntimeValue
   }

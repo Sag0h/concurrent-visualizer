@@ -10,6 +10,7 @@ import { SimulationEngine } from './core/engine/SimulationEngine'
 import type { SimulationSnapshot } from './core/engine/SimulationSnapshot'
 import { parseProgram } from './core/language/parseProgram'
 import {
+  formatCollectionElementType,
   isPriorityQueueValue,
   isQueueValue,
   isStackValue,
@@ -2247,7 +2248,9 @@ function App() {
                                     ? summary.location.name
                                     : summary.location.type === 'ARRAY_ELEMENT'
                                       ? `${summary.location.arrayName}[${summary.location.index}]`
-                                      : `${summary.location.recordName}.${summary.location.fieldName}`
+                                      : summary.location.type === 'RECORD_FIELD'
+                                        ? `${summary.location.recordName}.${summary.location.fieldName}`
+                                        : `${summary.location.arrayName}[${summary.location.index}].${summary.location.fieldName}`
 
                                 return (
                                   <div
@@ -2317,6 +2320,8 @@ function App() {
                                           ? `${location.arrayName}[${location.index}]`
                                           : location?.type === 'RECORD_FIELD'
                                             ? `${location.recordName}.${location.fieldName}`
+                                            : location?.type === 'ARRAY_RECORD_FIELD'
+                                              ? `${location.arrayName}[${location.index}].${location.fieldName}`
                                           : 'Unknown'
 
                                     return (
@@ -2430,6 +2435,8 @@ function App() {
                                             ? `${location.arrayName}[${location.index}]`
                                             : location?.type === 'RECORD_FIELD'
                                               ? `${location.recordName}.${location.fieldName}`
+                                              : location?.type === 'ARRAY_RECORD_FIELD'
+                                                ? `${location.arrayName}[${location.index}].${location.fieldName}`
                                             : 'Unknown'
 
                                       return (
@@ -2540,29 +2547,41 @@ function formatValue(
   value: RuntimeValue,
 ): string {
   if (isQueueValue(value)) {
+    const elementType = formatCollectionElementType(
+      value.elementType,
+    )
+
     if (value.items.length === 0) {
-      return `queue<${value.elementType}> [empty]`
+      return `queue<${elementType}> [empty]`
     }
 
-    return `queue<${value.elementType}> [front → ${value.items.join(', ')} ← back]`
+    return `queue<${elementType}> [front → ${value.items.map(formatValue).join(', ')} ← back]`
   }
 
   if (isPriorityQueueValue(value)) {
+    const elementType = formatCollectionElementType(
+      value.elementType,
+    )
+
     if (value.items.length === 0) {
-      return `priority_queue<${value.elementType}> [empty]`
+      return `priority_queue<${elementType}> [empty]`
     }
 
-    return `priority_queue<${value.elementType}> [highest → ${value.items
-      .map((item) => `${String(item.value)} (p=${item.priority})`)
+    return `priority_queue<${elementType}> [highest → ${value.items
+      .map((item) => `${formatValue(item.value)} (p=${item.priority})`)
       .join(', ')} ← lowest]`
   }
 
   if (isStackValue(value)) {
+    const elementType = formatCollectionElementType(
+      value.elementType,
+    )
+
     if (value.items.length === 0) {
-      return `stack<${value.elementType}> [empty]`
+      return `stack<${elementType}> [empty]`
     }
 
-    return `stack<${value.elementType}> [bottom → ${value.items.join(', ')} ← top]`
+    return `stack<${elementType}> [bottom → ${value.items.map(formatValue).join(', ')} ← top]`
   }
 
   if (isRecordValue(value)) {
@@ -2572,7 +2591,7 @@ function formatValue(
   }
 
   if (Array.isArray(value)) {
-    return `[${value.join(', ')}]`
+    return `[${value.map(formatValue).join(', ')}]`
   }
 
   return String(value)

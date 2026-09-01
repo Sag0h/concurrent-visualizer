@@ -35,5 +35,16 @@ export function sameMemoryLocation(
     )
   }
 
+  if (
+    left.type === 'ARRAY_RECORD_FIELD'
+    && right.type === 'ARRAY_RECORD_FIELD'
+  ) {
+    return (
+      left.arrayName === right.arrayName
+      && left.index === right.index
+      && left.fieldName === right.fieldName
+    )
+  }
+
   return false
 }

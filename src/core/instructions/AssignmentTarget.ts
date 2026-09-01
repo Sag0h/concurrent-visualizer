@@ -17,7 +17,15 @@ export interface RecordFieldAssignmentTarget {
   readonly fieldName: string
 }
 
+export interface ArrayRecordFieldAssignmentTarget {
+  readonly type: 'ARRAY_RECORD_FIELD'
+  readonly arrayName: string
+  readonly index: Expression
+  readonly fieldName: string
+}
+
 export type AssignmentTarget =
   | VariableAssignmentTarget
   | ArrayAssignmentTarget
   | RecordFieldAssignmentTarget
+  | ArrayRecordFieldAssignmentTarget

@@ -226,6 +226,19 @@ export function recordFieldTarget(
   }
 }
 
+export function arrayRecordFieldTarget(
+  arrayName: string,
+  index: Expression,
+  fieldName: string,
+): AssignmentTarget {
+  return {
+    type: 'ARRAY_RECORD_FIELD',
+    arrayName,
+    index,
+    fieldName,
+  }
+}
+
 export function dataStructureOperationInstruction(
   structureName: string,
   operation: DataStructureOperation,

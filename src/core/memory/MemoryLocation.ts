@@ -15,7 +15,15 @@ export interface RecordFieldMemoryLocation {
   readonly fieldName: string
 }
 
+export interface ArrayRecordFieldMemoryLocation {
+  readonly type: 'ARRAY_RECORD_FIELD'
+  readonly arrayName: string
+  readonly index: number
+  readonly fieldName: string
+}
+
 export type MemoryLocation =
   | VariableMemoryLocation
   | ArrayElementMemoryLocation
   | RecordFieldMemoryLocation
+  | ArrayRecordFieldMemoryLocation

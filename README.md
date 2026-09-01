@@ -18,7 +18,7 @@ scheduler y de los interleavings producidos por el motor.
 
 **Milestone actual:** M11 --- **Visualización avanzada y catálogo educativo**.
 
-**Último milestone completado:** M10.2 --- **Registros y operaciones educativas**.
+**Último milestone completado:** M10.3 --- **Colecciones de registros**.
 
 M11 comenzó con un catálogo cargable de los nueve temas académicos de
 semáforos. Cada tema ofrece el código con un problema reproducible y su
@@ -124,7 +124,7 @@ observados con mutex incompatibles; una advertencia `POTENTIAL_RACE` por
 sí sola no se presenta como infracción demostrada.
 
 M10 incluye colas FIFO, colas de prioridad estables y pilas de valores
-primitivos. Pueden declararse como memoria local o compartida. Las colas
+primitivos o registros homogéneos. Pueden declararse como memoria local o compartida. Las colas
 ofrecen `enqueue`, `dequeue`, `front`, `size` e `isEmpty`. En una
 `priority_queue<T>`, el número más alto tiene mayor prioridad y los
 empates conservan FIFO. Las pilas ofrecen `push`, `pop`, `top`, `size` e
@@ -136,6 +136,18 @@ Los procesos parametrizados permiten declarar familias mediante rangos
 inclusivos, por ejemplo `process Worker[i:0..3]`. El parser los expande
 en procesos independientes con identificadores `Worker[0]` a `Worker[3]`
 y una copia local del índice.
+
+Los registros pueden agruparse en arrays locales o compartidos mediante
+`Fallo[]`. Se soportan literales nombrados, acceso directo y getters sobre
+elementos, modificación de campos, reemplazo completo, `foreach` y copia
+por valor. En memoria compartida cada ubicación
+`array[indice].campo` conserva granularidad independiente para
+microoperaciones y conflictos.
+
+También pueden almacenarse en `queue<Fallo>`,
+`priority_queue<Fallo>` y `stack<Fallo>`. Las colecciones validan el tipo
+nominal y clonan cada registro al insertarlo y retornarlo, preservando
+FIFO, prioridad estable o LIFO sin aliases accidentales.
 
 ------------------------------------------------------------------------
 
@@ -790,6 +802,7 @@ M8    Detector de errores y diagnósticos
 M9    Exploración de ejecuciones
 M10.1 Colas FIFO, colas de prioridad, pilas y procesos parametrizados
 M10.2 Registros, campos, getters y operaciones simuladas
+M10.3 Arrays, colas y pilas de registros homogéneos
 ```
 
 Próximo:

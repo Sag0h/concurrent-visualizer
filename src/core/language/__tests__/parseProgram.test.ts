@@ -238,7 +238,7 @@ describe('parseProgram', () => {
         queue<int> invalid = jobs.dequeue();
       }
     `)).toThrow(
-      'Data structure operation results require a primitive scalar declaration',
+      'Data structure operation results require a scalar declaration',
     )
   })
 

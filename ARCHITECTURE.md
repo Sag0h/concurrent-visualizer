@@ -341,9 +341,14 @@ Los accesos compartidos se representan mediante ubicaciones concretas:
 ``` text
 VARIABLE(name)
 ARRAY_ELEMENT(arrayName, index)
+RECORD_FIELD(recordName, fieldName)
+ARRAY_RECORD_FIELD(arrayName, index, fieldName)
 ```
 
 Por lo tanto `values[0]` y `values[1]` son ubicaciones diferentes.
+En arrays de registros, `fallos[0].id` y `fallos[0].nivel` también son
+ubicaciones distintas; leer o escribir un campo no se registra como
+acceso al elemento compuesto completo.
 
 `MemoryLocation` es utilizada por eventos de microoperación, historial
 de accesos, detección y agrupación de conflictos, visualización y
@@ -1112,7 +1117,7 @@ quedan fuera del alcance inicial.
 
 El lenguaje representa las estructuras usadas en ejercicios académicos
 sin convertirlas en casos especiales del visualizador. La primera
-extensión implementada fue una cola FIFO de valores primitivos. Las colas
+extensión implementada fue una cola FIFO de valores homogéneos. Las colas
 de prioridad estables y las pilas reutilizan el mismo modelo general.
 
 Una cola local pertenece al estado privado del proceso. Si es compartida,
@@ -1126,8 +1131,10 @@ prioridad. Esa atomicidad no se extiende a secuencias compuestas de
 consultas, extracciones y otras variables; esas invariantes siguen
 requiriendo `P` / `V` u otro protocolo.
 
-`QueueValue` es un valor etiquetado de `RuntimeValue`, con tipo primitivo
-de elemento y un array ordenado desde frente hacia fondo. Esto permite
+`QueueValue` es un valor etiquetado de `RuntimeValue`, con un descriptor
+de elemento primitivo o registro nominal y un array ordenado desde frente
+hacia fondo. `PriorityQueueValue` y `StackValue` reutilizan el mismo
+descriptor. Esto permite
 que memoria, snapshots, `structuredClone` y la serialización canónica lo
 traten como estado ordinario del programa. `dequeue` y `front` sobre una
 cola vacía producen un error explícito; no introducen bloqueo implícito.
@@ -1144,6 +1151,12 @@ pero no se filtra al código consumidor.
 `push` agrega al final, `top` consulta el último valor y `pop` lo elimina.
 El contenido y su orden forman parte del estado semántico y se clonan de
 forma independiente en snapshots y forks.
+
+Los registros insertados y retornados por cualquiera de estas
+estructuras se clonan. La validación compara el nombre nominal del tipo,
+por lo que una colección `queue<Fallo>` sólo acepta `RecordValue` cuyo
+`recordType` sea `Fallo`; no se crean aliases entre la colección, el
+argumento de inserción y el resultado local.
 
 Los resultados se escriben inicialmente sólo en memoria local y los
 argumentos de `enqueue` no leen memoria compartida directamente. Esta

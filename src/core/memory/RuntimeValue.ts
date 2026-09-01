@@ -8,6 +8,13 @@ export type PrimitiveType =
   | 'bool'
   | 'string'
 
+export type CollectionElementType =
+  | PrimitiveType
+  | {
+      readonly kind: 'RECORD'
+      readonly recordType: string
+    }
+
 export function isPrimitiveValue(
   value: unknown,
 ): value is PrimitiveValue {
@@ -20,25 +27,25 @@ export function isPrimitiveValue(
 
 export interface QueueValue {
   readonly kind: 'QUEUE'
-  readonly elementType: PrimitiveType
-  readonly items: PrimitiveValue[]
+  readonly elementType: CollectionElementType
+  readonly items: CollectionElementValue[]
 }
 
 export interface PriorityQueueItem {
-  readonly value: PrimitiveValue
+  readonly value: CollectionElementValue
   readonly priority: number
 }
 
 export interface PriorityQueueValue {
   readonly kind: 'PRIORITY_QUEUE'
-  readonly elementType: PrimitiveType
+  readonly elementType: CollectionElementType
   readonly items: PriorityQueueItem[]
 }
 
 export interface StackValue {
   readonly kind: 'STACK'
-  readonly elementType: PrimitiveType
-  readonly items: PrimitiveValue[]
+  readonly elementType: CollectionElementType
+  readonly items: CollectionElementValue[]
 }
 
 export interface RecordValue {
@@ -47,9 +54,19 @@ export interface RecordValue {
   readonly fields: Record<string, PrimitiveValue>
 }
 
+export type CollectionElementValue =
+  | PrimitiveValue
+  | RecordValue
+
+export type ArrayElementValue =
+  | PrimitiveValue
+  | RecordValue
+
+export type ArrayValue = ArrayElementValue[]
+
 export type RuntimeValue =
   | PrimitiveValue
-  | PrimitiveValue[]
+  | ArrayValue
   | QueueValue
   | PriorityQueueValue
   | StackValue
@@ -67,11 +84,11 @@ export function createRecordValue(
 }
 
 export function createQueueValue(
-  elementType: PrimitiveType,
-  items: PrimitiveValue[] = [],
+  elementType: CollectionElementType,
+  items: CollectionElementValue[] = [],
 ): QueueValue {
   items.forEach((item) => {
-    assertPrimitiveType(item, elementType)
+    assertCollectionElementType(item, elementType)
   })
 
   return {
@@ -82,11 +99,11 @@ export function createQueueValue(
 }
 
 export function createPriorityQueueValue(
-  elementType: PrimitiveType,
+  elementType: CollectionElementType,
   items: PriorityQueueItem[] = [],
 ): PriorityQueueValue {
   items.forEach((item) => {
-    assertPrimitiveType(
+    assertCollectionElementType(
       item.value,
       elementType,
       'PriorityQueue',
@@ -108,11 +125,11 @@ export function createPriorityQueueValue(
 }
 
 export function createStackValue(
-  elementType: PrimitiveType,
-  items: PrimitiveValue[] = [],
+  elementType: CollectionElementType,
+  items: CollectionElementValue[] = [],
 ): StackValue {
   items.forEach((item) => {
-    assertPrimitiveType(item, elementType, 'Stack')
+    assertCollectionElementType(item, elementType, 'Stack')
   })
 
   return {
@@ -131,11 +148,7 @@ export function isQueueValue(
     && 'kind' in value
     && value.kind === 'QUEUE'
     && 'elementType' in value
-    && (
-      value.elementType === 'int'
-      || value.elementType === 'bool'
-      || value.elementType === 'string'
-    )
+    && isCollectionElementType(value.elementType)
     && 'items' in value
     && Array.isArray(value.items)
   )
@@ -150,11 +163,7 @@ export function isPriorityQueueValue(
     && 'kind' in value
     && value.kind === 'PRIORITY_QUEUE'
     && 'elementType' in value
-    && (
-      value.elementType === 'int'
-      || value.elementType === 'bool'
-      || value.elementType === 'string'
-    )
+    && isCollectionElementType(value.elementType)
     && 'items' in value
     && Array.isArray(value.items)
   )
@@ -169,11 +178,7 @@ export function isStackValue(
     && 'kind' in value
     && value.kind === 'STACK'
     && 'elementType' in value
-    && (
-      value.elementType === 'int'
-      || value.elementType === 'bool'
-      || value.elementType === 'string'
-    )
+    && isCollectionElementType(value.elementType)
     && 'items' in value
     && Array.isArray(value.items)
   )
@@ -242,7 +247,7 @@ export function enqueuePriorityItem(
   queue: PriorityQueueValue,
   item: PriorityQueueItem,
 ): void {
-  assertPrimitiveType(
+  assertCollectionElementType(
     item.value,
     queue.elementType,
     'PriorityQueue',
@@ -260,6 +265,52 @@ export function enqueuePriorityItem(
   }
 
   queue.items.splice(insertionIndex, 0, detachedItem)
+}
+
+export function isCollectionElementType(
+  value: unknown,
+): value is CollectionElementType {
+  return (
+    value === 'int'
+    || value === 'bool'
+    || value === 'string'
+    || (
+      typeof value === 'object'
+      && value !== null
+      && 'kind' in value
+      && value.kind === 'RECORD'
+      && 'recordType' in value
+      && typeof value.recordType === 'string'
+    )
+  )
+}
+
+export function formatCollectionElementType(
+  elementType: CollectionElementType,
+): string {
+  return typeof elementType === 'string'
+    ? elementType
+    : elementType.recordType
+}
+
+export function assertCollectionElementType(
+  value: RuntimeValue,
+  expectedType: CollectionElementType,
+  containerName = 'Queue',
+): asserts value is CollectionElementValue {
+  if (typeof expectedType === 'string') {
+    assertPrimitiveType(value, expectedType, containerName)
+    return
+  }
+
+  if (
+    !isRecordValue(value)
+    || value.recordType !== expectedType.recordType
+  ) {
+    throw new Error(
+      `${containerName}<${expectedType.recordType}> cannot store ${describeRuntimeType(value)}`,
+    )
+  }
 }
 
 export function assertPriority(
@@ -298,15 +349,15 @@ export function describeRuntimeType(
   }
 
   if (isQueueValue(value)) {
-    return `queue<${value.elementType}>`
+    return `queue<${formatCollectionElementType(value.elementType)}>`
   }
 
   if (isPriorityQueueValue(value)) {
-    return `priority_queue<${value.elementType}>`
+    return `priority_queue<${formatCollectionElementType(value.elementType)}>`
   }
 
   if (isStackValue(value)) {
-    return `stack<${value.elementType}>`
+    return `stack<${formatCollectionElementType(value.elementType)}>`
   }
 
   if (isRecordValue(value)) {
@@ -322,4 +373,32 @@ export function describeRuntimeType(
   }
 
   return 'string'
+}
+
+export function assertArrayElementCompatible(
+  previousValue: ArrayElementValue,
+  value: RuntimeValue,
+  locationDescription: string,
+): asserts value is ArrayElementValue {
+  if (isRecordValue(previousValue)) {
+    if (
+      !isRecordValue(value)
+      || value.recordType !== previousValue.recordType
+    ) {
+      throw new Error(
+        `${locationDescription} requires ${previousValue.recordType} but received ${describeRuntimeType(value)}`,
+      )
+    }
+
+    return
+  }
+
+  if (
+    !isPrimitiveValue(value)
+    || typeof value !== typeof previousValue
+  ) {
+    throw new Error(
+      `${locationDescription} requires ${describeRuntimeType(previousValue)} but received ${describeRuntimeType(value)}`,
+    )
+  }
 }

@@ -12,6 +12,7 @@ import {
 import type { Instruction } from '../instructions/Instruction'
 import {
   arrayTarget,
+  arrayRecordFieldTarget,
   assign,
   breakInstruction,
   callInstruction,
@@ -38,6 +39,10 @@ import {
   createQueueValue,
   createStackValue,
   type PriorityQueueItem,
+  type ArrayValue,
+  type CollectionElementType,
+  type CollectionElementValue,
+  type RecordValue,
   type PrimitiveType,
   type PrimitiveValue,
   type RuntimeValue,
@@ -54,7 +59,10 @@ import { ParserError } from './ParserError'
 import { tokenize } from './tokenize'
 import type { FunctionDefinition } from './FunctionDefinition'
 import type { RecordDefinition } from './RecordDefinition'
-import type { DeclaredType } from './DeclaredType'
+import type {
+  DeclaredType,
+  DeclaredValueType,
+} from './DeclaredType'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 
@@ -229,21 +237,27 @@ class Parser {
 
     const value = declaredType.container === 'QUEUE'
       ? this.parseQueueLiteral(
-          declaredType.primitiveType,
+          declaredType.elementType,
         )
       : declaredType.container === 'PRIORITY_QUEUE'
         ? this.parsePriorityQueueLiteral(
-            declaredType.primitiveType,
+            declaredType.elementType,
           )
         : declaredType.container === 'STACK'
           ? this.parseStackLiteral(
-              declaredType.primitiveType,
+              declaredType.elementType,
             )
-          : declaredType.container === 'RECORD'
-            ? this.parseRecordLiteral(
-                declaredType.recordType,
+          : declaredType.container === 'ARRAY'
+            ? this.parseArrayLiteral(
+                declaredType.elementType,
               )
-            : this.parseLiteralOrArrayValue()
+            : declaredType.valueType.kind === 'RECORD'
+              ? this.parseRecordLiteral(
+                  declaredType.valueType.recordType,
+                )
+              : this.parsePrimitiveLiteral(
+                  'Expected primitive literal value',
+                )
 
     this.consume(
       'SEMICOLON',
@@ -528,10 +542,12 @@ class Parser {
     )
 
     if (this.isDataStructureOperationCallStart()) {
-      if (declaredType.container !== 'SCALAR') {
+      if (
+        declaredType.container !== 'SCALAR'
+      ) {
         throw this.error(
           this.peek(),
-          'Data structure operation results require a primitive scalar declaration',
+          'Data structure operation results require a scalar declaration',
         )
       }
 
@@ -558,6 +574,7 @@ class Parser {
             type: 'DECLARE',
             scope: 'LOCAL',
             name: name.lexeme,
+            valueType: declaredType.valueType,
           },
         },
       )
@@ -567,28 +584,39 @@ class Parser {
       declaredType.container === 'QUEUE'
         ? literal(
             this.parseQueueLiteral(
-              declaredType.primitiveType,
+              declaredType.elementType,
             ),
           )
         : declaredType.container === 'PRIORITY_QUEUE'
           ? literal(
               this.parsePriorityQueueLiteral(
-                declaredType.primitiveType,
+                declaredType.elementType,
               ),
             )
           : declaredType.container === 'STACK'
             ? literal(
                 this.parseStackLiteral(
-                  declaredType.primitiveType,
+                  declaredType.elementType,
                 ),
               )
-            : declaredType.container === 'RECORD'
+            : declaredType.container === 'ARRAY'
               ? literal(
-                  this.parseRecordLiteral(
-                    declaredType.recordType,
+                  this.parseArrayLiteral(
+                    declaredType.elementType,
                   ),
                 )
-              : this.parseExpression()
+              : declaredType.valueType.kind === 'RECORD'
+                ? this.check('IDENTIFIER')
+                  && this.peek().lexeme
+                    === declaredType.valueType.recordType
+                  && this.checkNext('LEFT_BRACE')
+                    ? literal(
+                        this.parseRecordLiteral(
+                          declaredType.valueType.recordType,
+                        ),
+                      )
+                    : this.parseExpression()
+                : this.parseExpression()
 
     this.consume(
       'SEMICOLON',
@@ -849,6 +877,18 @@ class Parser {
       return literal(values)
     }
 
+    if (
+      this.check('IDENTIFIER')
+      && this.recordDefinitions[this.peek().lexeme]
+      && this.checkNext('LEFT_BRACE')
+    ) {
+      return literal(
+        this.parseRecordLiteral(
+          this.peek().lexeme,
+        ),
+      )
+    }
+
     if (this.match('IDENTIFIER')) {
       const name = this.previous().lexeme
 
@@ -948,68 +988,52 @@ class Parser {
     )
   }
 
-  private parseLiteralOrArrayValue(): RuntimeValue {
-    if (this.match('NUMBER')) {
-      return Number(this.previous().lexeme)
-    }
-
-    if (this.match('STRING')) {
-      return this.previous().lexeme
-    }
-
-    if (this.match('BOOLEAN')) {
-      return this.previous().lexeme === 'true'
-    }
-
-    if (this.match('LEFT_BRACKET')) {
-      const values: Array<
-        number | boolean | string
-      > = []
-
-      if (!this.check('RIGHT_BRACKET')) {
-        do {
-          const token = this.peek()
-
-          if (this.match('NUMBER')) {
-            values.push(
-              Number(this.previous().lexeme),
-            )
-            continue
-          }
-
-          if (this.match('STRING')) {
-            values.push(
-              this.previous().lexeme,
-            )
-            continue
-          }
-
-          if (this.match('BOOLEAN')) {
-            values.push(
-              this.previous().lexeme === 'true',
-            )
-            continue
-          }
-
-          throw this.error(
-            token,
-            'Expected array literal value',
-          )
-        } while (this.match('COMMA'))
-      }
-
-      this.consume(
-        'RIGHT_BRACKET',
-        'Expected "]" after array literal',
-      )
-
-      return values
-    }
-
-    throw this.error(
-      this.peek(),
-      'Expected literal value',
+  private parseArrayLiteral(
+    elementType: DeclaredValueType,
+  ): ArrayValue {
+    this.consume(
+      'LEFT_BRACKET',
+      'Expected "[" before array literal',
     )
+
+    const values: ArrayValue = []
+
+    if (!this.check('RIGHT_BRACKET')) {
+      do {
+        if (elementType.kind === 'RECORD') {
+          values.push(
+            this.parseRecordLiteral(
+              elementType.recordType,
+            ),
+          )
+          continue
+        }
+
+        const valueToken = this.peek()
+        const value = this.parsePrimitiveLiteral(
+          'Expected primitive array element',
+        )
+
+        if (!matchesPrimitiveType(
+          value,
+          elementType.primitiveType,
+        )) {
+          throw this.error(
+            valueToken,
+            `Array element must be ${elementType.primitiveType}`,
+          )
+        }
+
+        values.push(value)
+      } while (this.match('COMMA'))
+    }
+
+    this.consume(
+      'RIGHT_BRACKET',
+      'Expected "]" after array literal',
+    )
+
+    return values
   }
 
   private parsePrintInstruction(): Instruction {
@@ -1092,7 +1116,7 @@ class Parser {
   }
 
   private parseQueueLiteral(
-    elementType: PrimitiveType,
+    elementType: DeclaredValueType,
   ): RuntimeValue {
     this.consume(
       'QUEUE',
@@ -1104,34 +1128,14 @@ class Parser {
       'Expected "[" after "queue"',
     )
 
-    const items: PrimitiveValue[] = []
+    const items: CollectionElementValue[] = []
 
     if (!this.check('RIGHT_BRACKET')) {
       do {
-        const token = this.peek()
-        let value: PrimitiveValue
-
-        if (this.match('NUMBER')) {
-          value = Number(this.previous().lexeme)
-        } else if (this.match('STRING')) {
-          value = this.previous().lexeme
-        } else if (this.match('BOOLEAN')) {
-          value = this.previous().lexeme === 'true'
-        } else {
-          throw this.error(
-            token,
-            'Expected primitive queue item',
-          )
-        }
-
-        if (!matchesPrimitiveType(value, elementType)) {
-          throw this.error(
-            token,
-            `Queue<${elementType}> item has the wrong type`,
-          )
-        }
-
-        items.push(value)
+        items.push(this.parseCollectionLiteralItem(
+          elementType,
+          'Queue',
+        ))
       } while (this.match('COMMA'))
     }
 
@@ -1141,13 +1145,13 @@ class Parser {
     )
 
     return createQueueValue(
-      elementType,
+      toCollectionElementType(elementType),
       items,
     )
   }
 
   private parsePriorityQueueLiteral(
-    elementType: PrimitiveType,
+    elementType: DeclaredValueType,
   ): RuntimeValue {
     this.consume(
       'PRIORITY_QUEUE',
@@ -1167,28 +1171,10 @@ class Parser {
           'Expected "(" before priority queue item',
         )
 
-        const token = this.peek()
-        let value: PrimitiveValue
-
-        if (this.match('NUMBER')) {
-          value = Number(this.previous().lexeme)
-        } else if (this.match('STRING')) {
-          value = this.previous().lexeme
-        } else if (this.match('BOOLEAN')) {
-          value = this.previous().lexeme === 'true'
-        } else {
-          throw this.error(
-            token,
-            'Expected primitive priority queue item',
-          )
-        }
-
-        if (!matchesPrimitiveType(value, elementType)) {
-          throw this.error(
-            token,
-            `PriorityQueue<${elementType}> item has the wrong type`,
-          )
-        }
+        const value = this.parseCollectionLiteralItem(
+          elementType,
+          'PriorityQueue',
+        )
 
         this.consume(
           'COMMA',
@@ -1215,13 +1201,13 @@ class Parser {
     )
 
     return createPriorityQueueValue(
-      elementType,
+      toCollectionElementType(elementType),
       items,
     )
   }
 
   private parseStackLiteral(
-    elementType: PrimitiveType,
+    elementType: DeclaredValueType,
   ): RuntimeValue {
     this.consume(
       'STACK',
@@ -1232,34 +1218,14 @@ class Parser {
       'Expected "[" after "stack"',
     )
 
-    const items: PrimitiveValue[] = []
+    const items: CollectionElementValue[] = []
 
     if (!this.check('RIGHT_BRACKET')) {
       do {
-        const token = this.peek()
-        let value: PrimitiveValue
-
-        if (this.match('NUMBER')) {
-          value = Number(this.previous().lexeme)
-        } else if (this.match('STRING')) {
-          value = this.previous().lexeme
-        } else if (this.match('BOOLEAN')) {
-          value = this.previous().lexeme === 'true'
-        } else {
-          throw this.error(
-            token,
-            'Expected primitive stack item',
-          )
-        }
-
-        if (!matchesPrimitiveType(value, elementType)) {
-          throw this.error(
-            token,
-            `Stack<${elementType}> item has the wrong type`,
-          )
-        }
-
-        items.push(value)
+        items.push(this.parseCollectionLiteralItem(
+          elementType,
+          'Stack',
+        ))
       } while (this.match('COMMA'))
     }
 
@@ -1268,12 +1234,43 @@ class Parser {
       'Expected "]" after stack literal',
     )
 
-    return createStackValue(elementType, items)
+    return createStackValue(
+      toCollectionElementType(elementType),
+      items,
+    )
+  }
+
+  private parseCollectionLiteralItem(
+    elementType: DeclaredValueType,
+    containerName: 'Queue' | 'PriorityQueue' | 'Stack',
+  ): CollectionElementValue {
+    if (elementType.kind === 'RECORD') {
+      return this.parseRecordLiteral(
+        elementType.recordType,
+      )
+    }
+
+    const token = this.peek()
+    const value = this.parsePrimitiveLiteral(
+      `Expected ${elementType.primitiveType} ${containerName.toLocaleLowerCase()} item`,
+    )
+
+    if (!matchesPrimitiveType(
+      value,
+      elementType.primitiveType,
+    )) {
+      throw this.error(
+        token,
+        `${containerName}<${elementType.primitiveType}> item has the wrong type`,
+      )
+    }
+
+    return value
   }
 
   private parseRecordLiteral(
     recordType: string,
-  ): RuntimeValue {
+  ): RecordValue {
     const definition = this.recordDefinitions[recordType]
 
     if (!definition) {
@@ -1396,9 +1393,27 @@ class Parser {
     ) {
       const recordType = this.advance().lexeme
 
+      if (this.match('LEFT_BRACKET')) {
+        this.consume(
+          'RIGHT_BRACKET',
+          'Expected "]" in array type',
+        )
+
+        return {
+          container: 'ARRAY',
+          elementType: {
+            kind: 'RECORD',
+            recordType,
+          },
+        }
+      }
+
       return {
-        container: 'RECORD',
-        recordType,
+        container: 'SCALAR',
+        valueType: {
+          kind: 'RECORD',
+          recordType,
+        },
       }
     }
 
@@ -1408,7 +1423,7 @@ class Parser {
         'Expected "<" after "stack"',
       )
 
-      const primitiveType = this.parsePrimitiveType()
+      const elementType = this.parseDeclaredValueType()
 
       this.consume(
         'GREATER',
@@ -1417,7 +1432,7 @@ class Parser {
 
       return {
         container: 'STACK',
-        primitiveType,
+        elementType,
       }
     }
 
@@ -1427,8 +1442,8 @@ class Parser {
         'Expected "<" after "priority_queue"',
       )
 
-      const primitiveType =
-        this.parsePrimitiveType()
+      const elementType =
+        this.parseDeclaredValueType()
 
       this.consume(
         'GREATER',
@@ -1437,7 +1452,7 @@ class Parser {
 
       return {
         container: 'PRIORITY_QUEUE',
-        primitiveType,
+        elementType,
       }
     }
 
@@ -1447,8 +1462,8 @@ class Parser {
         'Expected "<" after "queue"',
       )
 
-      const primitiveType =
-        this.parsePrimitiveType()
+      const elementType =
+        this.parseDeclaredValueType()
 
       this.consume(
         'GREATER',
@@ -1457,7 +1472,7 @@ class Parser {
 
       return {
         container: 'QUEUE',
-        primitiveType,
+        elementType,
       }
     }
 
@@ -1472,13 +1487,36 @@ class Parser {
 
       return {
         container: 'ARRAY',
-        primitiveType,
+        elementType: {
+          kind: 'PRIMITIVE',
+          primitiveType,
+        },
       }
     }
 
     return {
       container: 'SCALAR',
-      primitiveType,
+      valueType: {
+        kind: 'PRIMITIVE',
+        primitiveType,
+      },
+    }
+  }
+
+  private parseDeclaredValueType(): DeclaredValueType {
+    if (
+      this.check('IDENTIFIER')
+      && this.recordDefinitions[this.peek().lexeme]
+    ) {
+      return {
+        kind: 'RECORD',
+        recordType: this.advance().lexeme,
+      }
+    }
+
+    return {
+      kind: 'PRIMITIVE',
+      primitiveType: this.parsePrimitiveType(),
     }
   }
 
@@ -1520,7 +1558,10 @@ class Parser {
       || (
         this.check('IDENTIFIER')
         && Boolean(this.recordDefinitions[this.peek().lexeme])
-        && this.checkNext('IDENTIFIER')
+        && (
+          this.checkNext('IDENTIFIER')
+          || this.checkNext('LEFT_BRACKET')
+        )
       )
     )
   }
@@ -1795,6 +1836,27 @@ class Parser {
         'RIGHT_BRACKET',
         'Expected "]" after array index',
       )
+
+      if (this.match('DOT')) {
+        const field = this.consume(
+          'IDENTIFIER',
+          'Expected record field name after "."',
+        )
+
+        this.consume(
+          'ASSIGN',
+          'Expected "=" after assignment target',
+        )
+
+        return assign(
+          arrayRecordFieldTarget(
+            name.lexeme,
+            index,
+            field.lexeme,
+          ),
+          this.parseExpression(),
+        )
+      }
 
       this.consume(
         'ASSIGN',
@@ -2217,6 +2279,14 @@ function matchesPrimitiveType(
     || (type === 'bool' && typeof value === 'boolean')
     || (type === 'string' && typeof value === 'string')
   )
+}
+
+function toCollectionElementType(
+  type: DeclaredValueType,
+): CollectionElementType {
+  return type.kind === 'PRIMITIVE'
+    ? type.primitiveType
+    : type
 }
 
 function parseDataStructureOperationName(
