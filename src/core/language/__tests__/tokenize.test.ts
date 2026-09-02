@@ -2,6 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { tokenize } from '../tokenize'
 
 describe('tokenize', () => {
+  it('tokenizes monitor declarations and parameter modes', () => {
+    const tokens = tokenize(
+      'monitor Buffer { procedure take(in int id, out int value) { } }',
+    )
+
+    expect(tokens.map((token) => token.type)).toEqual([
+      'MONITOR',
+      'IDENTIFIER',
+      'LEFT_BRACE',
+      'PROCEDURE',
+      'IDENTIFIER',
+      'LEFT_PAREN',
+      'IN',
+      'INT',
+      'IDENTIFIER',
+      'COMMA',
+      'OUT',
+      'INT',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'LEFT_BRACE',
+      'RIGHT_BRACE',
+      'RIGHT_BRACE',
+      'EOF',
+    ])
+  })
+
   it('tokenizes parameterized process ranges', () => {
     const tokens = tokenize(
       'process Worker[i:-1..2] { }',

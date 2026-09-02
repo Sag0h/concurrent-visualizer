@@ -3,7 +3,10 @@ import type { ExecutionState } from '../engine/ExecutionState'
 export function createSemanticStateKey(
   state: ExecutionState,
 ): string {
-  return createCanonicalValueKey(state.program)
+  return createCanonicalValueKey({
+    program: state.program,
+    monitorStates: state.monitorStates ?? {},
+  })
 }
 
 export function createCanonicalValueKey(

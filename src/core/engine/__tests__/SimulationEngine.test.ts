@@ -543,7 +543,7 @@ describe('SimulationEngine', () => {
         counter: 10,
       },
       semaphores: [],
-      
+      monitors: [],
       microOperationHistory: [],
       memoryAccessConflicts: [],
       memoryConflictSummaries: [],
@@ -556,6 +556,7 @@ describe('SimulationEngine', () => {
             x: 5,
           },
           callStack: [],
+          monitorCallStack: [],
           blockingReason: undefined,
         },
       ],

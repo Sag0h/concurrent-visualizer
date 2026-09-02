@@ -784,8 +784,23 @@ M12 separa dos niveles. `MonitorDefinition` describe estado privado,
 variables condición, procedures, parámetros y cuerpo de inicialización.
 `MonitorRuntimeState` representa cada instancia durante la ejecución:
 memoria, propietario, competidores de entrada y colas FIFO por condición.
-La definición forma parte de `Program`; el estado mutable pertenecerá a
-`ExecutionState` cuando se conecte el runtime.
+La definición forma parte de `Program`; el estado mutable ya vive en
+`ExecutionState.monitorStates`, se clona en snapshots/forks y forma parte
+de la clave semántica de exploración.
+
+La primera vertical ejecutable usa `MonitorCallFrame` y un frame de
+ejecución `MONITOR_RETURN`. Al adquirir una instancia, el proceso recibe
+una vista aislada de su estado privado. Cada step sincroniza únicamente
+las variables declaradas del monitor; variables locales del procedure no
+se vuelven persistentes. Al completar el frame se sincroniza el estado,
+se libera el propietario y se avanza la llamada del proceso.
+
+Si la instancia está ocupada, el proceso conserva su program counter,
+queda `BLOCKED` con razón `MONITOR_ENTRY` y aparece una sola vez en
+`entryContenderProcessIds`. La reactivación no reserva la entrada: cuando
+la instancia queda libre el proceso vuelve a `READY` y el scheduler
+decide quién ejecuta la llamada. Esto implementa exclusión mutua sin
+inventar fairness FIFO.
 
 Las llamadas calificadas se modelan como
 `MONITOR_PROCEDURE_CALL`. Sus argumentos son discriminados:

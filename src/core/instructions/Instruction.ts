@@ -2,6 +2,7 @@ import type { Expression } from '../expressions/Expression'
 import type { SourceRange } from '../language/SourceRange'
 import type { DeclaredValueType } from '../language/DeclaredType'
 import type { AssignmentTarget } from './AssignmentTarget'
+import type { MonitorProcedureCall } from '../monitors/MonitorDefinition'
 export interface NoOpInstruction {
   readonly type: 'NO_OP'
 }
@@ -155,6 +156,7 @@ type InstructionWithoutSourceRange =
   | SemaphoreVInstruction
   | DataStructureOperationInstruction
   | SimulatedOperationInstruction
+  | MonitorProcedureCall
 
 export type Instruction = InstructionWithoutSourceRange & {
   /** Present for instructions parsed from source code. */

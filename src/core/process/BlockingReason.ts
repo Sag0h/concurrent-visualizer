@@ -9,3 +9,7 @@ export type BlockingReason =
       readonly type: 'SEMAPHORE_P'
       readonly semaphoreName: string
     }
+  | {
+      readonly type: 'MONITOR_ENTRY'
+      readonly monitorName: string
+    }

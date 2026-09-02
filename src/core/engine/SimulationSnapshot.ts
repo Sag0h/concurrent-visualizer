@@ -20,6 +20,7 @@ export interface SimulationSnapshot {
   readonly runtimeDiagnostics: RuntimeDiagnostic[]
   readonly sharedMemory: Memory
   readonly semaphores: SemaphoreSnapshot[]
+  readonly monitors: MonitorSnapshot[]
   readonly processes: ProcessSnapshot[]
   readonly microOperationHistory: MicroOperationEvent[]
   readonly memoryAccessConflicts: MemoryAccessConflict[]
@@ -41,6 +42,23 @@ export interface SemaphoreSnapshot {
   readonly waitingProcessIds: ProcessId[]
 }
 
+export interface MonitorSnapshot {
+  readonly name: string
+  readonly memory: Memory
+  readonly ownerProcessId?: ProcessId
+  readonly entryContenderProcessIds: ProcessId[]
+  readonly conditions: Array<{
+    readonly name: string
+    readonly waitingProcessIds: ProcessId[]
+  }>
+}
+
+export interface MonitorCallSnapshot {
+  readonly monitorName: string
+  readonly procedureName: string
+  readonly localMemory: Memory
+}
+
 export interface FunctionCallSnapshot {
   readonly functionName: string
   readonly localMemory: Memory
@@ -52,5 +70,6 @@ export interface ProcessSnapshot {
   readonly programCounter: number
   readonly localMemory: Memory
   readonly callStack: FunctionCallSnapshot[]
+  readonly monitorCallStack: MonitorCallSnapshot[]
   readonly blockingReason?: BlockingReason
 }

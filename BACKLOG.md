@@ -1048,15 +1048,19 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 
 ### M12.2 --- Lenguaje, runtime y visualización
 
--   [ ] Declaración `monitor`.
--   [ ] Procedures y llamadas `monitor.procedure(...)`.
--   [ ] Exclusión mutua implícita.
+-   [x] Declaración `monitor`.
+-   [x] Primera vertical de procedures sin parámetros y llamadas
+    `monitor.procedure()`.
+-   [x] Exclusión mutua implícita con propietario y competidores de
+    entrada sin prioridad FIFO.
 -   [ ] Variables condición.
 -   [ ] `wait`.
 -   [ ] `signal`.
 -   [ ] `signal_all` (broadcast académico).
 -   [ ] Colas asociadas.
--   [ ] Visualización.
+-   [x] Visualización base de estado privado, propietario, competidores
+    y stack de procedures activos.
+-   [ ] Parámetros `in` / `out` ejecutables y write-back de salidas.
 -   [ ] Buffer limitado con monitor.
 
 ------------------------------------------------------------------------

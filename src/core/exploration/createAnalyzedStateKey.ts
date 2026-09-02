@@ -6,7 +6,10 @@ export function createAnalyzedStateKey(
   state: ExecutionState,
 ): string {
   return createCanonicalValueKey({
-    semanticState: state.program,
+    semanticState: {
+      program: state.program,
+      monitorStates: state.monitorStates ?? {},
+    },
     analysisState:
       projectExplorationAnalysisState(state),
   })

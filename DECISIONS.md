@@ -1460,3 +1460,40 @@ entre registros empatados.
 **Motivo:** representar fielmente ejercicios de la cátedra manteniendo
 la granularidad concurrente que ya tenían arrays y registros por
 separado, sin introducir aliasing al extender las demás colecciones.
+
+------------------------------------------------------------------------
+
+## ADR-040 --- Primera vertical de monitor mediante frames de propiedad
+
+**Estado:** Aceptada
+
+**Contexto:** implementar `wait` y `signal` antes de tener adquisición,
+estado privado y liberación ejecutables mezclaría dos fuentes de bloqueo
+sin una base comprobable. También sería incorrecto simular todo el
+procedure como un único step, porque ocultaría su evolución educativa.
+
+**Decisión:** la primera vertical ejecuta procedures sin parámetros en
+varios steps. `MonitorRuntimeState` vive en `ExecutionState`; un proceso
+que adquiere la instancia crea un `MonitorCallFrame` y un frame de control
+`MONITOR_RETURN`. El propietario se conserva hasta completar el cuerpo.
+
+La memoria activa comienza como copia del estado privado. Después de cada
+step y al salir se copian de vuelta sólo los nombres declarados por el
+monitor, de modo que las variables locales del procedure no persisten.
+Una llamada sobre una instancia ocupada bloquea mediante
+`MONITOR_ENTRY`; los competidores forman un conjunto sin prioridad FIFO y
+el scheduler decide nuevamente tras la liberación.
+
+El estado mutable de monitores participa en snapshots, forks, Reset,
+Step Back y claves semánticas. El grafo de deadlock puede representar un
+monitor como recurso y a su propietario como holder. La UI expone memoria
+privada, propietario, competidores y frames activos.
+
+**Consecuencia:** la exclusión mutua implícita puede observarse con el
+procedure desplegado step a step sin exponer su memoria como shared. Los
+parámetros `in/out`, condiciones y operaciones signal-and-continue siguen
+pendientes explícitamente; la sintaxis actual los rechaza en lugar de
+aceptarlos sin semántica.
+
+**Motivo:** validar primero el ciclo completo adquirir–ejecutar–liberar y
+dar a las variables condición una base clonable, explorable y visible.

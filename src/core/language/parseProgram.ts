@@ -63,6 +63,11 @@ import type {
   DeclaredType,
   DeclaredValueType,
 } from './DeclaredType'
+import type {
+  MonitorDefinition,
+  MonitorProcedureDefinition,
+} from '../monitors/MonitorDefinition'
+import { monitorProcedureCall } from '../monitors/monitorFactories'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 
@@ -80,6 +85,10 @@ class Parser {
   private readonly recordDefinitions: Record<
     string,
     RecordDefinition
+  > = {}
+  private readonly monitorDefinitions: Record<
+    string,
+    MonitorDefinition
   > = {}
 
   constructor(tokens: Token[]) {
@@ -102,6 +111,11 @@ class Parser {
     while (!this.isAtEnd()) {
       if (this.match('RECORD')) {
         this.parseRecordDefinition()
+        continue
+      }
+
+      if (this.match('MONITOR')) {
+        this.parseMonitorDefinition()
         continue
       }
 
@@ -152,7 +166,7 @@ class Parser {
 
       throw this.error(
         this.peek(),
-        'Expected "record", "shared", "sem", "function" or "process"'
+        'Expected "record", "monitor", "shared", "sem", "function" or "process"'
       )
     }
 
@@ -162,6 +176,7 @@ class Parser {
       functions,
       semaphores,
       recordDefinitions: this.recordDefinitions,
+      monitors: this.monitorDefinitions,
     }
   }
 
@@ -218,6 +233,164 @@ class Parser {
       name: name.lexeme,
       fields,
     }
+  }
+
+  private parseMonitorDefinition(): void {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected monitor name',
+    )
+
+    if (this.monitorDefinitions[name.lexeme]) {
+      throw this.error(
+        name,
+        `Monitor "${name.lexeme}" is already defined`,
+      )
+    }
+
+    const definition: MonitorDefinition = {
+      name: name.lexeme,
+      state: [],
+      conditions: [],
+      procedures: {},
+      initializationBody: [],
+    }
+    this.monitorDefinitions[name.lexeme] = definition
+
+    this.consume(
+      'LEFT_BRACE',
+      'Expected "{" after monitor name',
+    )
+
+    while (!this.check('RIGHT_BRACE') && !this.isAtEnd()) {
+      if (this.match('PROCEDURE')) {
+        const procedure = this.parseMonitorProcedureDefinition()
+
+        if (definition.procedures[procedure.name]) {
+          throw this.error(
+            this.previous(),
+            `Procedure "${procedure.name}" is already defined in monitor "${name.lexeme}"`,
+          )
+        }
+
+        definition.procedures[procedure.name] = procedure
+        continue
+      }
+
+      if (!this.isLocalDeclarationStart()) {
+        throw this.error(
+          this.peek(),
+          'Expected private state declaration or "procedure" inside monitor',
+        )
+      }
+
+      const declaredType = this.parseType()
+      const stateName = this.consume(
+        'IDENTIFIER',
+        'Expected monitor state variable name',
+      )
+
+      if (definition.state.some(
+        (state) => state.name === stateName.lexeme,
+      )) {
+        throw this.error(
+          stateName,
+          `Monitor state "${stateName.lexeme}" is already defined`,
+        )
+      }
+
+      this.consume(
+        'ASSIGN',
+        'Expected "=" after monitor state variable name',
+      )
+      const initialValue = this.parseDeclaredInitialValue(
+        declaredType,
+      )
+      this.consume(
+        'SEMICOLON',
+        'Expected ";" after monitor state declaration',
+      )
+      definition.state.push({
+        name: stateName.lexeme,
+        declaredType,
+        initialValue,
+      })
+    }
+
+    this.consume(
+      'RIGHT_BRACE',
+      'Expected "}" after monitor definition',
+    )
+  }
+
+  private parseMonitorProcedureDefinition(): MonitorProcedureDefinition {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected procedure name',
+    )
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after procedure name',
+    )
+
+    if (!this.check('RIGHT_PAREN')) {
+      throw this.error(
+        this.peek(),
+        'Monitor procedure parameters are not executable yet',
+      )
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after procedure parameters',
+    )
+
+    return {
+      name: name.lexeme,
+      parameters: [],
+      body: this.parseInstructionBlock(),
+    }
+  }
+
+  private parseDeclaredInitialValue(
+    declaredType: DeclaredType,
+  ): Expression {
+    if (declaredType.container === 'QUEUE') {
+      return literal(this.parseQueueLiteral(
+        declaredType.elementType,
+      ))
+    }
+
+    if (declaredType.container === 'PRIORITY_QUEUE') {
+      return literal(this.parsePriorityQueueLiteral(
+        declaredType.elementType,
+      ))
+    }
+
+    if (declaredType.container === 'STACK') {
+      return literal(this.parseStackLiteral(
+        declaredType.elementType,
+      ))
+    }
+
+    if (declaredType.container === 'ARRAY') {
+      return literal(this.parseArrayLiteral(
+        declaredType.elementType,
+      ))
+    }
+
+    if (
+      declaredType.valueType.kind === 'RECORD'
+      && this.check('IDENTIFIER')
+      && this.peek().lexeme === declaredType.valueType.recordType
+      && this.checkNext('LEFT_BRACE')
+    ) {
+      return literal(this.parseRecordLiteral(
+        declaredType.valueType.recordType,
+      ))
+    }
+
+    return this.parseExpression()
   }
 
   private parseSharedDeclaration(
@@ -390,6 +563,7 @@ class Parser {
       localMemory,
       executionStack: [],
       callStack: [],
+      monitorCallStack: [],
       expressionRuntimeStatus: 'IDLE',
       pendingEvaluations: [],
       atomicDepth: 0,
@@ -506,6 +680,10 @@ class Parser {
       && this.checkNext('DOT')
       && !this.checkAt(3, 'ASSIGN')
     ) {
+      if (this.monitorDefinitions[this.peek().lexeme]) {
+        return this.parseMonitorProcedureCallStatement()
+      }
+
       return this.isDataStructureOperationCallStart()
         ? this.parseDataStructureOperationStatement()
         : this.parseSimulatedRecordMethodStatement()
@@ -1034,6 +1212,58 @@ class Parser {
     )
 
     return values
+  }
+
+  private parseMonitorProcedureCallStatement(): Instruction {
+    const monitor = this.consume(
+      'IDENTIFIER',
+      'Expected monitor name',
+    )
+    this.consume(
+      'DOT',
+      'Expected "." after monitor name',
+    )
+    const procedure = this.consume(
+      'IDENTIFIER',
+      'Expected monitor procedure name',
+    )
+    const definition = this.monitorDefinitions[monitor.lexeme]
+    const procedureDefinition =
+      definition?.procedures[procedure.lexeme]
+
+    if (!procedureDefinition) {
+      throw this.error(
+        procedure,
+        `Monitor "${monitor.lexeme}" has no procedure "${procedure.lexeme}"`,
+      )
+    }
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after monitor procedure name',
+    )
+
+    if (!this.check('RIGHT_PAREN')) {
+      throw this.error(
+        this.peek(),
+        'Monitor procedure arguments are not executable yet',
+      )
+    }
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after monitor procedure arguments',
+    )
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after monitor procedure call',
+    )
+
+    return monitorProcedureCall(
+      monitor.lexeme,
+      procedure.lexeme,
+      [],
+    )
   }
 
   private parsePrintInstruction(): Instruction {

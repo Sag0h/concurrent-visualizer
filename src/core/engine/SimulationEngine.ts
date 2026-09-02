@@ -32,6 +32,7 @@ import type {
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { FunctionDefinition } from '../language/FunctionDefinition'
 import type { DeclaredValueType } from '../language/DeclaredType'
+import type { MonitorRuntimeState } from '../monitors/MonitorRuntimeState'
 import type { PendingEvaluation } from '../process/PendingEvaluation'
 import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
@@ -886,6 +887,19 @@ export class SimulationEngine {
         break
       }
 
+      case 'MONITOR_PROCEDURE_CALL': {
+        const result = this.executeMonitorProcedureCall(
+          process,
+          instruction,
+        )
+        executionDescription = result.description
+        break
+      }
+
+    }
+
+    if (process.state !== 'BLOCKED') {
+      this.syncActiveMonitorState(process)
     }
 
     const executionEvent: ExecutionEvent = {
@@ -1018,6 +1032,24 @@ export class SimulationEngine {
             )
             .map((process) => process.id),
       })),
+      monitors: Object.entries(
+        this.state.monitorStates ?? {},
+      ).map(([name, monitor]) => ({
+        name,
+        memory: structuredClone(monitor.memory),
+        ownerProcessId: monitor.ownerProcessId,
+        entryContenderProcessIds: structuredClone(
+          monitor.entryContenderProcessIds,
+        ),
+        conditions: Object.entries(monitor.conditions).map(
+          ([conditionName, condition]) => ({
+            name: conditionName,
+            waitingProcessIds: structuredClone(
+              condition.waitingProcessIds,
+            ),
+          }),
+        ),
+      })),
       processes: this.state.program.processes.map(
         (process) => ({
           id: process.id,
@@ -1034,6 +1066,13 @@ export class SimulationEngine {
               ),
             }),
           ),
+          monitorCallStack: (
+            process.monitorCallStack ?? []
+          ).map((frame) => ({
+            monitorName: frame.monitorName,
+            procedureName: frame.procedureName,
+            localMemory: structuredClone(frame.localMemory),
+          })),
           blockingReason: process.blockingReason
             ? structuredClone(process.blockingReason)
             : undefined,
@@ -1233,6 +1272,10 @@ export class SimulationEngine {
 
       case 'FUNCTION_RETURN':
         this.completeFunctionCall(process)
+        return
+
+      case 'MONITOR_RETURN':
+        this.completeMonitorProcedure(process)
         return
 
       case 'EXIT_ATOMIC': {
@@ -1472,7 +1515,10 @@ export class SimulationEngine {
         process.executionStack[index]
           .completionMode
 
-      if (mode === 'FUNCTION_RETURN') {
+      if (
+        mode === 'FUNCTION_RETURN'
+        || mode === 'MONITOR_RETURN'
+      ) {
         return -1
       }
 
@@ -1518,19 +1564,49 @@ export class SimulationEngine {
   private getActiveLocalMemory(
     process: Process,
   ) {
-    const functionFrame =
-      process.callStack[
-        process.callStack.length - 1
-      ]
+    for (
+      let index = process.executionStack.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const mode = process.executionStack[index].completionMode
 
-    return functionFrame?.localMemory
-      ?? process.localMemory
+      if (mode === 'FUNCTION_RETURN') {
+        return process.callStack.at(-1)?.localMemory
+          ?? process.localMemory
+      }
+
+      if (mode === 'MONITOR_RETURN') {
+        return process.monitorCallStack?.at(-1)?.localMemory
+          ?? process.localMemory
+      }
+    }
+
+    return process.localMemory
   }
 
   private executeReturn(
     process: Process,
     expression?: Expression,
   ): void {
+    for (
+      let index = process.executionStack.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const mode = process.executionStack[index].completionMode
+
+      if (mode === 'MONITOR_RETURN') {
+        throw new Error(
+          'RETURN cannot leave a monitor procedure',
+        )
+      }
+
+      if (mode === 'FUNCTION_RETURN') {
+        break
+      }
+    }
+
     const callFrame =
       process.callStack[
         process.callStack.length - 1
@@ -3942,7 +4018,195 @@ export class SimulationEngine {
         return this.getSemaphore(
           reason.semaphoreName,
         ).value > 0
+
+      case 'MONITOR_ENTRY':
+        return this.getMonitorRuntime(
+          reason.monitorName,
+        ).ownerProcessId === undefined
     }
+  }
+
+  private executeMonitorProcedureCall(
+    process: Process,
+    instruction: Extract<
+      Instruction,
+      { type: 'MONITOR_PROCEDURE_CALL' }
+    >,
+  ): { readonly description: string } {
+    if (instruction.arguments.length > 0) {
+      throw new Error(
+        'Monitor procedure arguments are not executable yet',
+      )
+    }
+
+    const definition = this.state.program.monitors?.[
+      instruction.monitorName
+    ]
+    const procedure = definition?.procedures[
+      instruction.procedureName
+    ]
+
+    if (!definition) {
+      throw new Error(
+        `Monitor "${instruction.monitorName}" is not defined`,
+      )
+    }
+
+    if (!procedure) {
+      throw new Error(
+        `Monitor "${instruction.monitorName}" has no procedure "${instruction.procedureName}"`,
+      )
+    }
+
+    const runtime = this.getMonitorRuntime(
+      instruction.monitorName,
+    )
+
+    if (
+      runtime.ownerProcessId
+      && runtime.ownerProcessId !== process.id
+    ) {
+      if (!runtime.entryContenderProcessIds.includes(process.id)) {
+        runtime.entryContenderProcessIds.push(process.id)
+      }
+
+      process.state = 'BLOCKED'
+      process.blockingReason = {
+        type: 'MONITOR_ENTRY',
+        monitorName: instruction.monitorName,
+      }
+
+      return {
+        description: `${instruction.monitorName}.${instruction.procedureName}() blocked: monitor owned by ${runtime.ownerProcessId}`,
+      }
+    }
+
+    if (runtime.ownerProcessId === process.id) {
+      throw new Error(
+        `Monitor "${instruction.monitorName}" does not support reentrant calls`,
+      )
+    }
+
+    runtime.ownerProcessId = process.id
+    runtime.entryContenderProcessIds.splice(
+      runtime.entryContenderProcessIds.indexOf(process.id),
+      runtime.entryContenderProcessIds.includes(process.id) ? 1 : 0,
+    )
+    process.blockingReason = undefined
+    process.monitorCallStack ??= []
+    process.monitorCallStack.push({
+      monitorName: instruction.monitorName,
+      procedureName: instruction.procedureName,
+      localMemory: structuredClone(runtime.memory),
+    })
+
+    if (procedure.body.length === 0) {
+      this.completeMonitorProcedure(process)
+    } else {
+      process.executionStack.push({
+        instructions: procedure.body,
+        programCounter: 0,
+        completionMode: 'MONITOR_RETURN',
+      })
+    }
+
+    return {
+      description: `${instruction.monitorName}.${instruction.procedureName}() acquired monitor`,
+    }
+  }
+
+  private completeMonitorProcedure(
+    process: Process,
+  ): void {
+    const frame = process.monitorCallStack?.pop()
+
+    if (!frame) {
+      throw new Error(
+        'Monitor call stack is empty',
+      )
+    }
+
+    const runtime = this.getMonitorRuntime(frame.monitorName)
+
+    if (runtime.ownerProcessId !== process.id) {
+      throw new Error(
+        `Process "${process.id}" does not own monitor "${frame.monitorName}"`,
+      )
+    }
+
+    this.copyMonitorState(frame.localMemory, runtime)
+    runtime.ownerProcessId = undefined
+    this.advanceProcess(process)
+  }
+
+  private syncActiveMonitorState(
+    process: Process,
+  ): void {
+    for (
+      let index = process.executionStack.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const mode = process.executionStack[index].completionMode
+
+      if (mode === 'FUNCTION_RETURN') {
+        return
+      }
+
+      if (mode === 'MONITOR_RETURN') {
+        const frame = process.monitorCallStack?.at(-1)
+
+        if (frame) {
+          this.copyMonitorState(
+            frame.localMemory,
+            this.getMonitorRuntime(frame.monitorName),
+          )
+        }
+
+        return
+      }
+    }
+  }
+
+  private copyMonitorState(
+    source: Record<string, RuntimeValue>,
+    runtime: MonitorRuntimeState,
+  ): void {
+    const definition = this.state.program.monitors?.[
+      runtime.definitionName
+    ]
+
+    if (!definition) {
+      throw new Error(
+        `Monitor "${runtime.definitionName}" is not defined`,
+      )
+    }
+
+    for (const state of definition.state) {
+      if (!(state.name in source)) {
+        throw new Error(
+          `Monitor state "${state.name}" is missing from the active frame`,
+        )
+      }
+
+      runtime.memory[state.name] = structuredClone(
+        source[state.name],
+      )
+    }
+  }
+
+  private getMonitorRuntime(
+    monitorName: string,
+  ): MonitorRuntimeState {
+    const runtime = this.state.monitorStates?.[monitorName]
+
+    if (!runtime) {
+      throw new Error(
+        `Monitor runtime "${monitorName}" is not initialized`,
+      )
+    }
+
+    return runtime
   }
 
   private executeSimulatedOperation(

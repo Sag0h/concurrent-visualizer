@@ -2364,3 +2364,31 @@ prioridad, LIFO, getters, copia por valor y rechazo de tipos distintos.
 La UI formatea cada registro dentro de la estructura en vez de mostrar
 `[object Object]`. El próximo frente vuelve a ser la primera vertical
 ejecutable de M12 para monitores.
+
+## 2026-09-02 --- M12.2: primera vertical ejecutable de monitores
+
+El tokenizer y parser reconocen `monitor`, estado privado, `procedure` y
+llamadas calificadas sin parámetros como `Counter.increment()`. La
+definición inmutable queda en `Program.monitors`; cada instancia mutable
+se inicializa antes de ejecutar procesos dentro de
+`ExecutionState.monitorStates`.
+
+Una llamada libre registra al proceso como propietario y ejecuta el cuerpo
+mediante un frame `MONITOR_RETURN`. El estado privado se sincroniza durante
+la ejecución y al salir, mientras las declaraciones locales del procedure
+se descartan. Una llamada concurrente a la misma instancia conserva su
+program counter, queda `BLOCKED` con `MONITOR_ENTRY` y aparece entre los
+competidores sin recibir prioridad FIFO. Al liberarse el monitor vuelve a
+competir mediante el scheduler normal.
+
+Snapshots, clonación, reset, Step Back y claves semánticas transportan la
+memoria, propietario y competidores. El análisis de deadlock entiende los
+monitores como recursos con propietario. La UI muestra estado privado,
+propietario, competidores y el stack de procedures de cada proceso.
+
+La prueba Round Robin hace que dos procesos intenten incrementar el mismo
+contador mediante un procedure de varios steps: el segundo se bloquea
+mientras el primero conserva el monitor y el valor final es `2`, sin
+actualización perdida. Esta vertical no presenta como terminados
+`in/out`, condiciones, `wait`, `signal` ni `signal_all`; son los siguientes
+tickets de M12.2.

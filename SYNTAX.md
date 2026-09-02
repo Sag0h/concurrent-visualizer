@@ -1181,6 +1181,48 @@ process P2 {
 
 ------------------------------------------------------------------------
 
+## Monitores: primera vertical ejecutable
+
+Un monitor agrupa estado privado y procedures con exclusión mutua
+implícita. En la primera vertical los procedures no reciben parámetros:
+
+``` text
+monitor Counter {
+    int value = 0;
+
+    procedure increment() {
+        int observed = value;
+        value = observed + 1;
+    }
+}
+
+process P1 {
+    Counter.increment();
+}
+
+process P2 {
+    Counter.increment();
+}
+```
+
+`value` no pertenece a la memoria compartida general ni a la memoria
+local de P1/P2: es estado privado de `Counter`. Cuando un proceso entra a
+`increment()`, conserva la propiedad del monitor durante todas las
+instrucciones del procedure. Otro proceso que intente entrar queda
+`BLOCKED` como competidor y vuelve a competir cuando el monitor se
+libera. La entrada no promete orden FIFO.
+
+La interfaz muestra el propietario, los competidores, el estado privado
+y el procedure activo de cada proceso. Snapshots, forks, exploración,
+`Reset` y `Step Back` conservan esta información.
+
+Limitaciones de esta vertical: todavía no son ejecutables los parámetros
+`in` / `out`, variables condición, `wait`, `signal` ni `signal_all`. Las
+llamadas reentrantes al mismo monitor se rechazan. Estos mecanismos se
+incorporarán sobre el modelo de propiedad ya disponible.
+
+------------------------------------------------------------------------
+
 ## Scheduling
 
 El scheduler no se declara dentro del programa. Se selecciona desde la
@@ -1245,7 +1287,6 @@ yield
 
 arrays de semáforos
 
-monitor
 wait
 signal
 broadcast

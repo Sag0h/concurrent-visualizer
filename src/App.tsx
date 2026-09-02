@@ -1552,6 +1552,16 @@ function App() {
                           </div>
                         )}
 
+                        {process.blockingReason?.type === 'MONITOR_ENTRY' && (
+                          <div className="semaphore-blocking-reason">
+                            <strong>Waiting to enter monitor</strong>
+
+                            <code>
+                              {process.blockingReason.monitorName}
+                            </code>
+                          </div>
+                        )}
+
                         <h4>
                           Local memory
                         </h4>
@@ -1591,6 +1601,39 @@ function App() {
                                   <MemoryTable
                                     memory={frame.localMemory}
                                   />
+                                </div>
+                              ))}
+                          </div>
+                        )}
+
+                        <h4>Monitor Stack</h4>
+
+                        {process.monitorCallStack.length === 0 ? (
+                          <p className="empty">
+                            No active monitor procedures
+                          </p>
+                        ) : (
+                          <div className="call-stack">
+                            {[...process.monitorCallStack]
+                              .reverse()
+                              .map((frame, index) => (
+                                <div
+                                  className="call-frame"
+                                  key={`${frame.monitorName}-${frame.procedureName}-${index}`}
+                                >
+                                  <div className="call-frame-header">
+                                    <strong>
+                                      {frame.monitorName}.{frame.procedureName}()
+                                    </strong>
+
+                                    {index === 0 && (
+                                      <span className="active-frame">
+                                        ACTIVE
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <MemoryTable memory={frame.localMemory} />
                                 </div>
                               ))}
                           </div>
@@ -1665,6 +1708,59 @@ function App() {
                         </article>
                       ),
                     )}
+                  </div>
+                </section>
+              )}
+
+              {snapshot.monitors.length > 0 && (
+                <section className="simulation-mobile-section simulation-state-section">
+                  <h2>Monitors</h2>
+
+                  <div className="semaphore-grid">
+                    {snapshot.monitors.map((monitor) => (
+                      <article
+                        className="semaphore-card"
+                        key={monitor.name}
+                      >
+                        <div className="semaphore-header">
+                          <code>{monitor.name}</code>
+
+                          <strong>
+                            {monitor.ownerProcessId
+                              ? `Owned by ${monitor.ownerProcessId}`
+                              : 'FREE'}
+                          </strong>
+                        </div>
+
+                        <h4>Private state</h4>
+                        <MemoryTable memory={monitor.memory} />
+
+                        <div className="semaphore-waiters">
+                          <span>Entry contenders</span>
+
+                          {monitor.entryContenderProcessIds.length === 0 ? (
+                            <span className="empty">None</span>
+                          ) : (
+                            <div className="semaphore-waiter-list">
+                              {monitor.entryContenderProcessIds.map(
+                                (processId) => (
+                                  <span
+                                    className="semaphore-waiter"
+                                    key={processId}
+                                  >
+                                    {processId}
+                                  </span>
+                                ),
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <small>
+                          Implicit mutual exclusion · entry is not FIFO
+                        </small>
+                      </article>
+                    ))}
                   </div>
                 </section>
               )}

@@ -149,6 +149,14 @@ También pueden almacenarse en `queue<Fallo>`,
 nominal y clonan cada registro al insertarlo y retornarlo, preservando
 FIFO, prioridad estable o LIFO sin aliases accidentales.
 
+M12 ya dispone de su primera vertical ejecutable de monitores: una
+declaración `monitor` puede contener estado privado y procedures sin
+parámetros. Las llamadas `Monitor.procedure()` adquieren exclusión mutua
+implícita; los demás procesos quedan bloqueados como competidores hasta
+que termina el procedure. La UI muestra memoria privada, propietario,
+competidores y frames activos. Los parámetros `in/out` y las variables
+condición continúan como los próximos tickets.
+
 ------------------------------------------------------------------------
 
 ## ¿Qué permite hacer actualmente?
@@ -805,10 +813,10 @@ M10.2 Registros, campos, getters y operaciones simuladas
 M10.3 Arrays, colas y pilas de registros homogéneos
 ```
 
-Próximo:
+En curso:
 
 ``` text
-M11  Visualización avanzada y catálogo educativo
+M12  Monitores: parámetros y variables condición
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
@@ -827,7 +835,7 @@ concurrentes**.
 
 Entre los objetivos futuros se encuentran:
 
--   monitores y variables condición;
+-   completar parámetros y variables condición de monitores;
 -   pasaje de mensajes;
 -   canales síncronos y asíncronos;
 -   análisis más preciso de race conditions;

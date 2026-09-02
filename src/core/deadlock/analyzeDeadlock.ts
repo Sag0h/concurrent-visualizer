@@ -12,6 +12,7 @@ import type {
 } from './DeadlockDiagnostic'
 
 const semaphoreResourcePrefix = 'SEMAPHORE:'
+const monitorResourcePrefix = 'MONITOR:'
 
 export function analyzeDeadlock(
   state: ExecutionState,
@@ -106,6 +107,11 @@ function isBlockedProcessCurrentlyEnabled(
         },
       ) === true
     }
+
+    case 'MONITOR_ENTRY':
+      return state.monitorStates?.[
+        reason.monitorName
+      ]?.ownerProcessId === undefined
   }
 }
 
@@ -122,6 +128,37 @@ function buildDeadlockDiagnostic(
 
   for (const process of blockedProcesses) {
     const reason = process.blockingReason
+
+    if (reason?.type === 'MONITOR_ENTRY') {
+      const resource = monitorResource(reason.monitorName)
+      resources.set(resource.id, resource)
+      resourceDependencies.push({
+        type: 'WAITS_FOR',
+        processId: process.id,
+        resourceId: resource.id,
+      })
+
+      const ownerProcessId = state.monitorStates?.[
+        reason.monitorName
+      ]?.ownerProcessId
+
+      if (!ownerProcessId) {
+        graphIsComplete = false
+        continue
+      }
+
+      resourceDependencies.push({
+        type: 'HOLDS',
+        processId: ownerProcessId,
+        resourceId: resource.id,
+      })
+      waitForEdges.push({
+        waitingProcessId: process.id,
+        holdingProcessId: ownerProcessId,
+        resourceId: resource.id,
+      })
+      continue
+    }
 
     if (reason?.type !== 'SEMAPHORE_P') {
       graphIsComplete = false
@@ -275,6 +312,16 @@ function semaphoreResource(
     id: `${semaphoreResourcePrefix}${semaphoreName}`,
     kind: 'SEMAPHORE',
     name: semaphoreName,
+  }
+}
+
+function monitorResource(
+  monitorName: string,
+): WaitForResource {
+  return {
+    id: `${monitorResourcePrefix}${monitorName}`,
+    kind: 'MONITOR',
+    name: monitorName,
   }
 }
 
