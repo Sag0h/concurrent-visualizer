@@ -795,6 +795,21 @@ las variables declaradas del monitor; variables locales del procedure no
 se vuelven persistentes. Al completar el frame se sincroniza el estado,
 se libera el propietario y se avanza la llamada del proceso.
 
+Los parámetros ejecutables agregan un `MonitorEntryRequest` suspendible.
+Antes de competir por la entrada, el request copia los valores `IN` y
+resuelve los destinos locales `OUT` —incluidos los índices de arrays— contra
+el frame llamador. Si el proceso se bloquea, reutiliza ese mismo request en
+lugar de reevaluar los argumentos. Al adquirir el monitor, el
+`MonitorCallFrame` combina estado privado con parámetros: los `OUT` usan un
+valor centinela que impide leerlos antes de asignarlos.
+
+Al completar un procedure se validan primero todas las salidas y sus tipos.
+Después se sincroniza el estado privado, se escribe cada `OUT` en el frame
+capturado del proceso, función o monitor exterior, y recién entonces se
+libera la instancia. De esta forma una llamada anidada conserva el monitor
+exterior y el write-back no depende de cuál sea la memoria local activa al
+momento de retornar.
+
 Si la instancia está ocupada, el proceso conserva su program counter,
 queda `BLOCKED` con razón `MONITOR_ENTRY` y aparece una sola vez en
 `entryContenderProcessIds`. La reactivación no reserva la entrada: cuando

@@ -12,7 +12,10 @@ import type {
 import type { MicroOperationRuntime } from '../engine/MicroOperationRuntime'
 
 import type { BlockingReason } from './BlockingReason'
-import type { MonitorCallFrame } from '../monitors/MonitorCallFrame'
+import type {
+  MonitorCallFrame,
+  MonitorEntryRequest,
+} from '../monitors/MonitorCallFrame'
 
 export interface Process {
   readonly id: ProcessId
@@ -23,6 +26,7 @@ export interface Process {
   executionStack: ExecutionFrame[]
   callStack: FunctionCallFrame[]
   monitorCallStack?: MonitorCallFrame[]
+  pendingMonitorEntry?: MonitorEntryRequest
   lastReturnValue?: RuntimeValue
   pendingEvaluations: PendingEvaluation[]
   expressionRuntimeStatus: ExpressionRuntimeStatus

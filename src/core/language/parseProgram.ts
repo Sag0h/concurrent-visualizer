@@ -67,7 +67,12 @@ import type {
   MonitorDefinition,
   MonitorProcedureDefinition,
 } from '../monitors/MonitorDefinition'
-import { monitorProcedureCall } from '../monitors/monitorFactories'
+import {
+  monitorInput,
+  monitorOutput,
+  monitorProcedureCall,
+} from '../monitors/monitorFactories'
+import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 
@@ -321,6 +326,19 @@ class Parser {
       'RIGHT_BRACE',
       'Expected "}" after monitor definition',
     )
+
+    for (const procedure of Object.values(definition.procedures)) {
+      for (const parameter of procedure.parameters) {
+        if (definition.state.some(
+          (state) => state.name === parameter.name,
+        )) {
+          throw this.error(
+            name,
+            `Parameter "${parameter.name}" conflicts with private state in monitor "${name.lexeme}"`,
+          )
+        }
+      }
+    }
   }
 
   private parseMonitorProcedureDefinition(): MonitorProcedureDefinition {
@@ -333,11 +351,44 @@ class Parser {
       'Expected "(" after procedure name',
     )
 
+    const parameters: MonitorProcedureDefinition['parameters'] = []
+
     if (!this.check('RIGHT_PAREN')) {
-      throw this.error(
-        this.peek(),
-        'Monitor procedure parameters are not executable yet',
-      )
+      do {
+        let mode: 'IN' | 'OUT'
+
+        if (this.match('IN')) {
+          mode = 'IN'
+        } else if (this.match('OUT')) {
+          mode = 'OUT'
+        } else {
+          throw this.error(
+            this.peek(),
+            'Expected "in" or "out" before monitor parameter type',
+          )
+        }
+
+        const declaredType = this.parseType()
+        const parameterName = this.consume(
+          'IDENTIFIER',
+          'Expected monitor parameter name',
+        )
+
+        if (parameters.some(
+          (parameter) => parameter.name === parameterName.lexeme,
+        )) {
+          throw this.error(
+            parameterName,
+            `Monitor parameter "${parameterName.lexeme}" is already defined`,
+          )
+        }
+
+        parameters.push({
+          name: parameterName.lexeme,
+          mode,
+          declaredType,
+        })
+      } while (this.match('COMMA'))
     }
 
     this.consume(
@@ -347,7 +398,7 @@ class Parser {
 
     return {
       name: name.lexeme,
-      parameters: [],
+      parameters,
       body: this.parseInstructionBlock(),
     }
   }
@@ -1243,10 +1294,32 @@ class Parser {
       'Expected "(" after monitor procedure name',
     )
 
+    const args = procedureDefinition.parameters.map(
+      (parameter, index) => {
+        if (index > 0) {
+          this.consume(
+            'COMMA',
+            'Expected "," between monitor procedure arguments',
+          )
+        }
+
+        if (this.check('RIGHT_PAREN')) {
+          throw this.error(
+            this.peek(),
+            `Missing argument for ${parameter.mode.toLowerCase()} parameter "${parameter.name}"`,
+          )
+        }
+
+        return parameter.mode === 'IN'
+          ? monitorInput(this.parseExpression())
+          : monitorOutput(this.parseMonitorOutputTarget())
+      },
+    )
+
     if (!this.check('RIGHT_PAREN')) {
       throw this.error(
         this.peek(),
-        'Monitor procedure arguments are not executable yet',
+        `Too many arguments for monitor procedure "${procedure.lexeme}"`,
       )
     }
 
@@ -1262,8 +1335,53 @@ class Parser {
     return monitorProcedureCall(
       monitor.lexeme,
       procedure.lexeme,
-      [],
+      args,
     )
+  }
+
+  private parseMonitorOutputTarget(): AssignmentTarget {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected assignable local target for out argument',
+    )
+
+    if (this.match('LEFT_BRACKET')) {
+      const index = this.parseExpression()
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after out array index',
+      )
+
+      if (this.match('DOT')) {
+        const field = this.consume(
+          'IDENTIFIER',
+          'Expected record field name after "."',
+        )
+
+        return arrayRecordFieldTarget(
+          name.lexeme,
+          index,
+          field.lexeme,
+        )
+      }
+
+      return arrayTarget(name.lexeme, index)
+    }
+
+    if (this.match('DOT')) {
+      const field = this.consume(
+        'IDENTIFIER',
+        'Expected record field name after "."',
+      )
+
+      return recordFieldTarget(
+        name.lexeme,
+        field.lexeme,
+      )
+    }
+
+    return variableTarget(name.lexeme)
   }
 
   private parsePrintInstruction(): Instruction {

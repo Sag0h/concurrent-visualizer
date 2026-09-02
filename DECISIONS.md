@@ -1369,13 +1369,13 @@ condiciones, procedures y un cuerpo opcional de inicialización. El modelo
 de tipos declarado se extrajo del parser para compartir tipos escalares,
 arrays, colas, pilas y registros sin copiar la gramática.
 
-El futuro `ExecutionState` almacenará una instancia mutable por monitor
+`ExecutionState` almacena una instancia mutable por monitor
 mediante `MonitorRuntimeState`: memoria, indicador de inicialización,
 propietario, conjunto de competidores de entrada y una cola FIFO por
 condición. El orden del conjunto de competidores no otorgará prioridad de
 admisión.
 
-La sintaxis inicial requerirá modos explícitos:
+La sintaxis requiere modos explícitos:
 
 ``` text
 procedure take(in int requestedId, out int result) {
@@ -1384,27 +1384,27 @@ procedure take(in int requestedId, out int result) {
 ```
 
 En una llamada `Buffer.take(id, result)`, el parámetro formal determina el
-modo del argumento real. Los `IN` se evaluarán de izquierda a derecha y
-quedarán capturados antes de competir por el monitor. Un `OUT` deberá ser
+modo del argumento real. Los `IN` se evalúan de izquierda a derecha y
+quedan capturados antes de competir por el monitor. Un `OUT` debe ser
 un target asignable del llamador —variable, posición de array o campo de
-registro—; su ubicación concreta también se capturará al iniciar la
-llamada. La primera vertical limitará `OUT` a memoria local del llamador.
+registro—; su ubicación concreta también se captura al iniciar la
+llamada. La primera vertical limita `OUT` a memoria local del llamador.
 
-Los valores de salida vivirán en el frame suspendible del procedure y se
-escribirán en sus destinos al terminar correctamente, antes de liberar el
+Los valores de salida viven en el frame suspendible del procedure y se
+escriben en sus destinos al terminar correctamente, antes de liberar el
 monitor. Si el procedure ejecuta `wait`, tanto los valores capturados como
 los `OUT` pendientes sobreviven al bloqueo. La inicialización de todas las
 instancias terminará antes de que cualquier proceso quede `READY`.
 
-`MonitorProcedureCall` queda modelado pero no forma parte todavía de la
-unión ejecutable `Instruction`; se incorporará junto con parser y runtime
-para no crear instrucciones que el engine aún no pueda ejecutar.
+`MonitorProcedureCall` forma parte de la unión ejecutable `Instruction`.
+`MonitorEntryRequest` conserva la captura si la entrada queda bloqueada y
+`MonitorCallFrame` mantiene los bindings necesarios para el write-back.
 
 **Consecuencia:** definición y estado pueden clonarse y visualizarse por
 separado. `out` no admite literales ni cuentas como destino, y no expone
 resultados parciales mientras el llamador permanece bloqueado. El parser
-podrá validar aridad, modo y asignabilidad antes de crear la instrucción
-ejecutable.
+valida aridad, modo y asignabilidad antes de crear la instrucción
+ejecutable; el runtime completa las validaciones dependientes de memoria.
 
 **Motivo:** preparar un AST fiel a la cátedra sin contaminar funciones
 por valor ni introducir ramas incompletas en `SimulationEngine`.

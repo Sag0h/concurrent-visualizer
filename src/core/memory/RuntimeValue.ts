@@ -54,9 +54,36 @@ export interface RecordValue {
   readonly fields: Record<string, PrimitiveValue>
 }
 
+export interface UninitializedOutValue {
+  readonly kind: 'UNINITIALIZED_OUT'
+  readonly parameterName: string
+}
+
 export type CollectionElementValue =
   | PrimitiveValue
   | RecordValue
+
+export function createUninitializedOutValue(
+  parameterName: string,
+): UninitializedOutValue {
+  return {
+    kind: 'UNINITIALIZED_OUT',
+    parameterName,
+  }
+}
+
+export function isUninitializedOutValue(
+  value: unknown,
+): value is UninitializedOutValue {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'kind' in value
+    && value.kind === 'UNINITIALIZED_OUT'
+    && 'parameterName' in value
+    && typeof value.parameterName === 'string'
+  )
+}
 
 export type ArrayElementValue =
   | PrimitiveValue
@@ -71,6 +98,7 @@ export type RuntimeValue =
   | PriorityQueueValue
   | StackValue
   | RecordValue
+  | UninitializedOutValue
 
 export function createRecordValue(
   recordType: string,
@@ -362,6 +390,10 @@ export function describeRuntimeType(
 
   if (isRecordValue(value)) {
     return value.recordType
+  }
+
+  if (isUninitializedOutValue(value)) {
+    return `unassigned out parameter "${value.parameterName}"`
   }
 
   if (typeof value === 'number') {

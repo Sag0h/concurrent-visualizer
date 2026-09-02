@@ -2392,3 +2392,24 @@ mientras el primero conserva el monitor y el valor final es `2`, sin
 actualización perdida. Esta vertical no presenta como terminados
 `in/out`, condiciones, `wait`, `signal` ni `signal_all`; son los siguientes
 tickets de M12.2.
+
+## 2026-09-02 --- M12.2: parámetros `in/out` ejecutables
+
+Los procedures de monitor ya declaran parámetros con `in tipo nombre` y
+`out tipo nombre`. La firma guía el parser de cada llamada: una entrada es
+una expresión y una salida es un destino asignable local, incluyendo
+variables, posiciones de array, campos de registro y campos de registros en
+arrays.
+
+El runtime captura por valor todos los `in` y resuelve los destinos `out`
+antes de competir por el monitor. Una llamada bloqueada conserva ese pedido
+y no reevalúa expresiones ni índices al reactivarse. Dentro del procedure
+los `out` comienzan sin valor, no pueden leerse antes de asignarse y deben
+estar todos definidos al finalizar. Sus tipos se validan y el write-back se
+completa antes de liberar la exclusión mutua.
+
+Los destinos se asocian al frame llamador concreto, por lo que funcionan
+desde procesos, funciones y monitores anidados. Las pruebas cubren además
+tipos incorrectos, salidas omitidas, rechazo de destinos compartidos,
+captura durante bloqueo y las cuatro formas de destino local. El siguiente
+ticket de M12.2 son variables condición.

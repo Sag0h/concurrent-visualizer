@@ -1,5 +1,6 @@
 import {
   isRecordValue,
+  isUninitializedOutValue,
   resolveRecordGetterFieldName,
   type RuntimeValue,
 } from '../memory/RuntimeValue'
@@ -76,7 +77,15 @@ function readVariable(
   context: ExpressionContext,
 ): RuntimeValue {
   if (name in context.localMemory) {
-    return context.localMemory[name]
+    const value = context.localMemory[name]
+
+    if (isUninitializedOutValue(value)) {
+      throw new Error(
+        `OUT parameter "${value.parameterName}" cannot be read before assignment`,
+      )
+    }
+
+    return value
   }
 
   if (name in context.sharedMemory) {

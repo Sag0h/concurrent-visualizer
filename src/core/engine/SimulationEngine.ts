@@ -17,6 +17,9 @@ import {
   isPriorityQueueValue,
   isPrimitiveValue,
   isStackValue,
+  createUninitializedOutValue,
+  isUninitializedOutValue,
+  describeRuntimeType,
   type PriorityQueueValue,
   type CollectionElementValue,
   type QueueValue,
@@ -33,6 +36,16 @@ import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { FunctionDefinition } from '../language/FunctionDefinition'
 import type { DeclaredValueType } from '../language/DeclaredType'
 import type { MonitorRuntimeState } from '../monitors/MonitorRuntimeState'
+import type {
+  MonitorCallerMemory,
+  MonitorEntryRequest,
+  MonitorOutputBinding,
+  ResolvedMonitorOutputTarget,
+} from '../monitors/MonitorCallFrame'
+import {
+  formatDeclaredType,
+  valueMatchesDeclaredType,
+} from '../language/DeclaredTypeUtils'
 import type { PendingEvaluation } from '../process/PendingEvaluation'
 import type { SharedMemoryRead } from '../expressions/SharedMemoryExpression'
 import type { MemoryLocation } from '../memory/MemoryLocation'
@@ -4033,12 +4046,6 @@ export class SimulationEngine {
       { type: 'MONITOR_PROCEDURE_CALL' }
     >,
   ): { readonly description: string } {
-    if (instruction.arguments.length > 0) {
-      throw new Error(
-        'Monitor procedure arguments are not executable yet',
-      )
-    }
-
     const definition = this.state.program.monitors?.[
       instruction.monitorName
     ]
@@ -4055,6 +4062,31 @@ export class SimulationEngine {
     if (!procedure) {
       throw new Error(
         `Monitor "${instruction.monitorName}" has no procedure "${instruction.procedureName}"`,
+      )
+    }
+
+    if (
+      instruction.arguments.length
+      !== procedure.parameters.length
+    ) {
+      throw new Error(
+        `Monitor procedure "${instruction.monitorName}.${instruction.procedureName}" expects ${procedure.parameters.length} arguments but received ${instruction.arguments.length}`,
+      )
+    }
+
+    const request = process.pendingMonitorEntry
+      ?? this.prepareMonitorEntryRequest(
+        process,
+        instruction,
+        procedure.parameters,
+      )
+
+    if (
+      request.monitorName !== instruction.monitorName
+      || request.procedureName !== instruction.procedureName
+    ) {
+      throw new Error(
+        'Pending monitor entry does not match the active instruction',
       )
     }
 
@@ -4075,6 +4107,7 @@ export class SimulationEngine {
         type: 'MONITOR_ENTRY',
         monitorName: instruction.monitorName,
       }
+      process.pendingMonitorEntry = request
 
       return {
         description: `${instruction.monitorName}.${instruction.procedureName}() blocked: monitor owned by ${runtime.ownerProcessId}`,
@@ -4093,11 +4126,16 @@ export class SimulationEngine {
       runtime.entryContenderProcessIds.includes(process.id) ? 1 : 0,
     )
     process.blockingReason = undefined
+    process.pendingMonitorEntry = undefined
     process.monitorCallStack ??= []
     process.monitorCallStack.push({
       monitorName: instruction.monitorName,
       procedureName: instruction.procedureName,
-      localMemory: structuredClone(runtime.memory),
+      localMemory: {
+        ...structuredClone(runtime.memory),
+        ...structuredClone(request.parameterMemory),
+      },
+      outputBindings: structuredClone(request.outputBindings),
     })
 
     if (procedure.body.length === 0) {
@@ -4118,7 +4156,7 @@ export class SimulationEngine {
   private completeMonitorProcedure(
     process: Process,
   ): void {
-    const frame = process.monitorCallStack?.pop()
+    const frame = process.monitorCallStack?.at(-1)
 
     if (!frame) {
       throw new Error(
@@ -4134,9 +4172,416 @@ export class SimulationEngine {
       )
     }
 
+
+    const outputValues = frame.outputBindings.map(
+      (binding) => {
+        const value = frame.localMemory[binding.parameterName]
+
+        if (value === undefined) {
+          throw new Error(
+            `OUT parameter "${binding.parameterName}" is missing from the monitor frame`,
+          )
+        }
+
+        if (isUninitializedOutValue(value)) {
+          throw new Error(
+            `OUT parameter "${binding.parameterName}" must be assigned before procedure returns`,
+          )
+        }
+
+        if (!valueMatchesDeclaredType(value, binding.declaredType)) {
+          throw new Error(
+            `OUT parameter "${binding.parameterName}" requires ${formatDeclaredType(binding.declaredType)} but received ${describeRuntimeType(value)}`,
+          )
+        }
+
+        const callerMemory = this.getCapturedMonitorCallerMemory(
+          process,
+          binding.callerMemory,
+        )
+
+        this.assertMonitorOutputTargetCompatible(
+          callerMemory,
+          binding,
+          value,
+        )
+
+        return {
+          binding,
+          callerMemory,
+          value: structuredClone(value),
+        }
+      },
+    )
+
     this.copyMonitorState(frame.localMemory, runtime)
+
+    for (const output of outputValues) {
+      this.writeResolvedMonitorOutput(
+        output.callerMemory,
+        output.binding.target,
+        output.value,
+      )
+    }
+
+    process.monitorCallStack?.pop()
     runtime.ownerProcessId = undefined
     this.advanceProcess(process)
+  }
+
+  private prepareMonitorEntryRequest(
+    process: Process,
+    instruction: Extract<
+      Instruction,
+      { type: 'MONITOR_PROCEDURE_CALL' }
+    >,
+    parameters: NonNullable<
+      ExecutionState['program']['monitors']
+    >[string]['procedures'][string]['parameters'],
+  ): MonitorEntryRequest {
+    const parameterMemory: Record<string, RuntimeValue> = {}
+    const outputBindings: MonitorOutputBinding[] = []
+    const callerMemory = this.captureMonitorCallerMemory(process)
+    const activeMemory = this.getCapturedMonitorCallerMemory(
+      process,
+      callerMemory,
+    )
+
+    parameters.forEach((parameter, index) => {
+      const argument = instruction.arguments[index]
+
+      if (!argument || argument.mode !== parameter.mode) {
+        throw new Error(
+          `Argument ${index + 1} of "${instruction.monitorName}.${instruction.procedureName}" must be ${parameter.mode.toLowerCase()}`,
+        )
+      }
+
+      if (argument.mode === 'IN') {
+        if (this.containsFunctionCall(argument.expression)) {
+          throw new Error(
+            `Function calls inside monitor in parameter "${parameter.name}" are not supported yet; store the result in local memory first`,
+          )
+        }
+
+        if (this.findNextSharedMemoryRead(process, argument.expression)) {
+          throw new Error(
+            `Shared-memory reads inside monitor in parameter "${parameter.name}" are not supported yet; copy the value to local memory first`,
+          )
+        }
+
+        const value = evaluateExpression(argument.expression, {
+          localMemory: activeMemory,
+          sharedMemory: this.state.program.sharedMemory,
+        })
+
+        if (!valueMatchesDeclaredType(value, parameter.declaredType)) {
+          throw new Error(
+            `IN parameter "${parameter.name}" requires ${formatDeclaredType(parameter.declaredType)} but received ${describeRuntimeType(value)}`,
+          )
+        }
+
+        parameterMemory[parameter.name] = structuredClone(value)
+        return
+      }
+
+      const target = this.resolveMonitorOutputTarget(
+        process,
+        activeMemory,
+        argument.target,
+        parameter.name,
+      )
+      const currentValue = this.readResolvedMonitorOutput(
+        activeMemory,
+        target,
+      )
+
+      if (!valueMatchesDeclaredType(currentValue, parameter.declaredType)) {
+        throw new Error(
+          `OUT parameter "${parameter.name}" requires a ${formatDeclaredType(parameter.declaredType)} target but received ${describeRuntimeType(currentValue)}`,
+        )
+      }
+
+      parameterMemory[parameter.name] =
+        createUninitializedOutValue(parameter.name)
+      outputBindings.push({
+        parameterName: parameter.name,
+        declaredType: parameter.declaredType,
+        callerMemory,
+        target,
+      })
+    })
+
+    return {
+      monitorName: instruction.monitorName,
+      procedureName: instruction.procedureName,
+      parameterMemory,
+      outputBindings,
+    }
+  }
+
+  private captureMonitorCallerMemory(
+    process: Process,
+  ): MonitorCallerMemory {
+    for (
+      let index = process.executionStack.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const mode = process.executionStack[index].completionMode
+
+      if (mode === 'FUNCTION_RETURN') {
+        return {
+          kind: 'FUNCTION',
+          frameIndex: process.callStack.length - 1,
+        }
+      }
+
+      if (mode === 'MONITOR_RETURN') {
+        return {
+          kind: 'MONITOR',
+          frameIndex: (process.monitorCallStack?.length ?? 0) - 1,
+        }
+      }
+    }
+
+    return { kind: 'PROCESS' }
+  }
+
+  private getCapturedMonitorCallerMemory(
+    process: Process,
+    caller: MonitorCallerMemory,
+  ): Record<string, RuntimeValue> {
+    if (caller.kind === 'PROCESS') {
+      return process.localMemory
+    }
+
+    const memory = caller.kind === 'FUNCTION'
+      ? process.callStack[caller.frameIndex]?.localMemory
+      : process.monitorCallStack?.[caller.frameIndex]?.localMemory
+
+    if (!memory) {
+      throw new Error(
+        'Monitor OUT destination frame is no longer available',
+      )
+    }
+
+    return memory
+  }
+
+  private resolveMonitorOutputTarget(
+    process: Process,
+    localMemory: Record<string, RuntimeValue>,
+    target: AssignmentTarget,
+    parameterName: string,
+  ): ResolvedMonitorOutputTarget {
+    const rootName = target.type === 'VARIABLE'
+      ? target.name
+      : target.type === 'RECORD_FIELD'
+        ? target.recordName
+        : target.arrayName
+
+    if (!(rootName in localMemory)) {
+      if (rootName in this.state.program.sharedMemory) {
+        throw new Error(
+          `OUT parameter "${parameterName}" must target local memory; "${rootName}" is shared`,
+        )
+      }
+
+      throw new Error(
+        `OUT target "${rootName}" is not defined in local memory`,
+      )
+    }
+
+    if (
+      target.type === 'VARIABLE'
+      || target.type === 'RECORD_FIELD'
+    ) {
+      return target
+    }
+
+    if (this.containsFunctionCall(target.index)) {
+      throw new Error(
+        `Function calls inside OUT target for "${parameterName}" are not supported yet`,
+      )
+    }
+
+    if (this.findNextSharedMemoryRead(process, target.index)) {
+      throw new Error(
+        `Shared-memory reads inside OUT target for "${parameterName}" are not supported yet`,
+      )
+    }
+
+    const index = evaluateExpression(target.index, {
+      localMemory,
+      sharedMemory: this.state.program.sharedMemory,
+    })
+
+    if (typeof index !== 'number' || !Number.isInteger(index)) {
+      throw new Error('Array index must be an integer')
+    }
+
+    return {
+      ...target,
+      index,
+    }
+  }
+
+  private readResolvedMonitorOutput(
+    memory: Record<string, RuntimeValue>,
+    target: ResolvedMonitorOutputTarget,
+  ): RuntimeValue {
+    if (target.type === 'VARIABLE') {
+      return memory[target.name]
+    }
+
+    if (target.type === 'RECORD_FIELD') {
+      const record = memory[target.recordName]
+
+      if (!isRecordValue(record)) {
+        throw new Error(
+          `Variable "${target.recordName}" is not a record`,
+        )
+      }
+
+      if (!(target.fieldName in record.fields)) {
+        throw new Error(
+          `Record "${record.recordType}" has no field "${target.fieldName}"`,
+        )
+      }
+
+      return record.fields[target.fieldName]
+    }
+
+    const array = memory[target.arrayName]
+
+    if (!Array.isArray(array)) {
+      throw new Error(
+        `Variable "${target.arrayName}" is not an array`,
+      )
+    }
+
+    if (target.index < 0 || target.index >= array.length) {
+      throw new Error(
+        `Array index ${target.index} is out of bounds`,
+      )
+    }
+
+    const value = array[target.index]
+
+    if (target.type === 'ARRAY_ACCESS') {
+      return value
+    }
+
+    if (!isRecordValue(value)) {
+      throw new Error(
+        `Array element "${target.arrayName}[${target.index}]" is not a record`,
+      )
+    }
+
+    if (!(target.fieldName in value.fields)) {
+      throw new Error(
+        `Record "${value.recordType}" has no field "${target.fieldName}"`,
+      )
+    }
+
+    return value.fields[target.fieldName]
+  }
+
+  private assertMonitorOutputTargetCompatible(
+    memory: Record<string, RuntimeValue>,
+    binding: MonitorOutputBinding,
+    value: RuntimeValue,
+  ): void {
+    const currentValue = this.readResolvedMonitorOutput(
+      memory,
+      binding.target,
+    )
+
+    if (!valueMatchesDeclaredType(currentValue, binding.declaredType)) {
+      throw new Error(
+        `OUT target for "${binding.parameterName}" changed to incompatible type ${describeRuntimeType(currentValue)}`,
+      )
+    }
+
+    if (
+      binding.target.type === 'ARRAY_ACCESS'
+    ) {
+      if (
+        !isPrimitiveValue(currentValue)
+        && !isRecordValue(currentValue)
+      ) {
+        throw new Error(
+          `OUT target for "${binding.parameterName}" is not an array element value`,
+        )
+      }
+
+      assertArrayElementCompatible(
+        currentValue,
+        value,
+        `${binding.target.arrayName}[${binding.target.index}]`,
+      )
+      return
+    }
+
+    if (
+      binding.target.type === 'RECORD_FIELD'
+      || binding.target.type === 'ARRAY_RECORD_FIELD'
+    ) {
+      if (
+        !isPrimitiveValue(value)
+        || !isPrimitiveValue(currentValue)
+        || typeof value !== typeof currentValue
+      ) {
+        throw new Error(
+          `OUT field target for "${binding.parameterName}" has an incompatible type`,
+        )
+      }
+    }
+  }
+
+  private writeResolvedMonitorOutput(
+    memory: Record<string, RuntimeValue>,
+    target: ResolvedMonitorOutputTarget,
+    value: RuntimeValue,
+  ): void {
+    if (target.type === 'VARIABLE') {
+      memory[target.name] = structuredClone(value)
+      return
+    }
+
+    if (target.type === 'RECORD_FIELD') {
+      const record = memory[target.recordName]
+
+      if (!isRecordValue(record) || !isPrimitiveValue(value)) {
+        throw new Error('Invalid record OUT write-back')
+      }
+
+      record.fields[target.fieldName] = structuredClone(value)
+      return
+    }
+
+    const array = memory[target.arrayName]
+
+    if (!Array.isArray(array)) {
+      throw new Error('Invalid array OUT write-back')
+    }
+
+    if (target.type === 'ARRAY_ACCESS') {
+      if (!isPrimitiveValue(value) && !isRecordValue(value)) {
+        throw new Error('Invalid array element OUT write-back')
+      }
+
+      array[target.index] = structuredClone(value)
+      return
+    }
+
+    const record = array[target.index]
+
+    if (!isRecordValue(record) || !isPrimitiveValue(value)) {
+      throw new Error('Invalid record field OUT write-back')
+    }
+
+    record.fields[target.fieldName] = structuredClone(value)
   }
 
   private syncActiveMonitorState(

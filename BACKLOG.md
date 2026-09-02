@@ -1060,7 +1060,7 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [ ] Colas asociadas.
 -   [x] Visualización base de estado privado, propietario, competidores
     y stack de procedures activos.
--   [ ] Parámetros `in` / `out` ejecutables y write-back de salidas.
+-   [x] Parámetros `in` / `out` ejecutables y write-back de salidas.
 -   [ ] Buffer limitado con monitor.
 
 ------------------------------------------------------------------------

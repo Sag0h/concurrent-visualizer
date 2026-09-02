@@ -1181,45 +1181,84 @@ process P2 {
 
 ------------------------------------------------------------------------
 
-## Monitores: primera vertical ejecutable
+## Monitores y parámetros `in` / `out`
 
 Un monitor agrupa estado privado y procedures con exclusión mutua
-implícita. En la primera vertical los procedures no reciben parámetros:
+implícita. Un procedure puede declarar entradas por valor y salidas:
 
 ``` text
 monitor Counter {
     int value = 0;
 
-    procedure increment() {
-        int observed = value;
-        value = observed + 1;
+    procedure add(in int amount, out int newValue) {
+        value = value + amount;
+        newValue = value;
     }
 }
 
 process P1 {
-    Counter.increment();
+    int result = 0;
+    Counter.add(2, result);
+    print(result); // 2
 }
 
 process P2 {
-    Counter.increment();
+    int result = 0;
+    Counter.add(5, result);
 }
 ```
 
 `value` no pertenece a la memoria compartida general ni a la memoria
 local de P1/P2: es estado privado de `Counter`. Cuando un proceso entra a
-`increment()`, conserva la propiedad del monitor durante todas las
+`add()`, conserva la propiedad del monitor durante todas las
 instrucciones del procedure. Otro proceso que intente entrar queda
 `BLOCKED` como competidor y vuelve a competir cuando el monitor se
 libera. La entrada no promete orden FIFO.
+
+La firma determina el significado de cada argumento; la llamada no
+repite las palabras `in` y `out`:
+
+-   un `in` acepta una expresión, se evalúa una sola vez antes de competir
+    por el monitor y se copia al frame del procedure;
+-   un `out` acepta una variable local, una posición de array, un campo de
+    registro o un campo de un registro dentro de un array;
+-   el destino concreto de un `out`, incluido su índice, también queda
+    capturado antes de una posible espera;
+-   un `out` comienza sin valor: leerlo antes de asignarlo produce un
+    error y todos los `out` deben haberse asignado al terminar;
+-   el write-back de todas las salidas ocurre antes de liberar el monitor.
+
+Los parámetros conservan el tipo declarado. Admiten primitivos, registros,
+arrays, colas FIFO, colas de prioridad y pilas. Los valores compuestos se
+copian, por lo que no crean aliases accidentales.
+
+Por ahora el destino `out` debe pertenecer a memoria local. Para publicar
+el resultado en memoria compartida se usa una variable local y luego una
+asignación explícita, que seguirá mostrando sus microoperaciones:
+
+``` text
+shared int published = 0;
+
+process P1 {
+    int localResult = 0;
+    Counter.add(3, localResult);
+    published = localResult;
+}
+```
+
+Las llamadas a funciones y las lecturas compartidas dentro de un argumento
+`in` o del índice de un `out` todavía deben calcularse previamente en una
+variable local. Un procedure no devuelve con `return`: comunica resultados
+mediante sus parámetros `out`.
 
 La interfaz muestra el propietario, los competidores, el estado privado
 y el procedure activo de cada proceso. Snapshots, forks, exploración,
 `Reset` y `Step Back` conservan esta información.
 
-Limitaciones de esta vertical: todavía no son ejecutables los parámetros
-`in` / `out`, variables condición, `wait`, `signal` ni `signal_all`. Las
-llamadas reentrantes al mismo monitor se rechazan. Estos mecanismos se
-incorporarán sobre el modelo de propiedad ya disponible.
+Limitaciones actuales: todavía no son ejecutables las variables condición,
+`wait`, `signal` ni `signal_all`. Las llamadas reentrantes al mismo monitor
+se rechazan. Estos mecanismos se incorporarán sobre el modelo de propiedad
+ya disponible.
 
 ------------------------------------------------------------------------
 

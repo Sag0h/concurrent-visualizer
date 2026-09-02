@@ -15,6 +15,7 @@ import {
   isQueueValue,
   isStackValue,
   isRecordValue,
+  isUninitializedOutValue,
   type RuntimeValue,
 } from './core/memory/RuntimeValue'
 import { createScheduler } from './core/scheduler/createScheduler'
@@ -2684,6 +2685,10 @@ function formatValue(
     return `${value.recordType} { ${Object.entries(value.fields)
       .map(([name, fieldValue]) => `${name}: ${String(fieldValue)}`)
       .join(', ')} }`
+  }
+
+  if (isUninitializedOutValue(value)) {
+    return `<unassigned out ${value.parameterName}>`
   }
 
   if (Array.isArray(value)) {
