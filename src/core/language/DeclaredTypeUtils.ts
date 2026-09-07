@@ -69,6 +69,31 @@ export function formatDeclaredType(
   }
 }
 
+export function declaredTypesEqual(
+  left: DeclaredType,
+  right: DeclaredType,
+): boolean {
+  if (left.container !== right.container) {
+    return false
+  }
+
+  if (left.container === 'SCALAR' && right.container === 'SCALAR') {
+    return declaredValueTypesEqual(
+      left.valueType,
+      right.valueType,
+    )
+  }
+
+  if (left.container === 'SCALAR' || right.container === 'SCALAR') {
+    return false
+  }
+
+  return declaredValueTypesEqual(
+    left.elementType,
+    right.elementType,
+  )
+}
+
 function valueMatchesDeclaredValueType(
   value: RuntimeValue,
   declaredType: DeclaredValueType,
@@ -104,4 +129,18 @@ function formatDeclaredValueType(
   return declaredType.kind === 'PRIMITIVE'
     ? declaredType.primitiveType
     : formatCollectionElementType(declaredType)
+}
+
+function declaredValueTypesEqual(
+  left: DeclaredValueType,
+  right: DeclaredValueType,
+): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+
+  return left.kind === 'PRIMITIVE' && right.kind === 'PRIMITIVE'
+    ? left.primitiveType === right.primitiveType
+    : left.kind === 'RECORD' && right.kind === 'RECORD'
+      && left.recordType === right.recordType
 }

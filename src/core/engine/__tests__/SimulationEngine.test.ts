@@ -13,6 +13,15 @@ import {
 
 import { parseProgram } from '../../language/parseProgram'
 import { RoundRobinScheduler } from '../../scheduler/RoundRobinScheduler'
+import type { DeclaredType } from '../../language/DeclaredType'
+
+const INT_TYPE = {
+  container: 'SCALAR',
+  valueType: {
+    kind: 'PRIMITIVE',
+    primitiveType: 'int',
+  },
+} satisfies DeclaredType
 
 function createProcess(
   id: string,
@@ -371,7 +380,7 @@ describe('SimulationEngine', () => {
 
   it('declares a local variable', () => {
     const process = createProcess('P1', [
-      declare('LOCAL', 'x', literal(10)),
+      declare('LOCAL', 'x', INT_TYPE, literal(10)),
     ])
 
     const program: Program = {
@@ -391,7 +400,7 @@ describe('SimulationEngine', () => {
 
   it('declares a shared variable', () => {
     const process = createProcess('P1', [
-      declare('SHARED', 'counter', literal(0)),
+      declare('SHARED', 'counter', INT_TYPE, literal(0)),
     ])
 
     const program: Program = {
@@ -411,7 +420,7 @@ describe('SimulationEngine', () => {
 
   it('executes declarations and assignments sequentially', () => {
     const process = createProcess('P1', [
-      declare('LOCAL', 'x', literal(5)),
+      declare('LOCAL', 'x', INT_TYPE, literal(5)),
       assign(
         variableTarget('x'),
         binary(
@@ -510,7 +519,7 @@ describe('SimulationEngine', () => {
 
   it('exposes a simulation snapshot for visualization', () => {
     const process = createProcess('P1', [
-      declare('LOCAL', 'x', literal(5)),
+      declare('LOCAL', 'x', INT_TYPE, literal(5)),
     ])
 
     const program: Program = {
@@ -599,6 +608,7 @@ describe('SimulationEngine', () => {
       declare(
         'LOCAL',
         'x',
+        INT_TYPE,
         literal(10),
       ),
       ifInstruction(
@@ -649,6 +659,7 @@ describe('SimulationEngine', () => {
       declare(
         'LOCAL',
         'x',
+        INT_TYPE,
         literal(0),
       ),
       whileInstruction(

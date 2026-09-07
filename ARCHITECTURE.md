@@ -172,6 +172,19 @@ parseo son procesos ordinarios. Por eso schedulers, snapshots, forks,
 claves canónicas y exploración los tratan automáticamente como unidades
 independientes.
 
+Una declaración local puede omitir el inicializador. `DeclareInstruction`
+conserva siempre su `DeclaredType`; al ejecutarse sin expresión deposita un
+`UninitializedVariableValue` tipado en la memoria del frame activo. El
+marcador participa normalmente en snapshots, forks, Reset, Step Back y
+claves semánticas, pero `evaluateExpression` impide observarlo como un valor
+del programa.
+
+La primera asignación valida su `RuntimeValue` contra el tipo almacenado y
+reemplaza el marcador. Este modelo evita inventar ceros o registros vacíos y
+permite usar una variable todavía no inicializada como destino `out`. La
+memoria compartida y el estado privado de monitores siguen totalmente
+inicializados antes de habilitar procesos.
+
 ### BlockingReason
 
 El proceso conserva por qué está bloqueado. Actualmente existen al menos

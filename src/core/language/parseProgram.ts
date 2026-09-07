@@ -765,6 +765,14 @@ class Parser {
       'Expected variable name',
     )
 
+    if (this.match('SEMICOLON')) {
+      return declare(
+        'LOCAL',
+        name.lexeme,
+        declaredType,
+      )
+    }
+
     this.consume(
       'ASSIGN',
       'Expected "=" after variable name',
@@ -855,6 +863,7 @@ class Parser {
     return declare(
       'LOCAL',
       name.lexeme,
+      declaredType,
       initialValue,
     )
   }
@@ -2109,7 +2118,7 @@ class Parser {
     )
 
     const initializerStart = this.peek()
-    this.parseType()
+    const declaredType = this.parseType()
 
     const variableName = this.consume(
       'IDENTIFIER',
@@ -2133,6 +2142,7 @@ class Parser {
       declare(
         'LOCAL',
         variableName.lexeme,
+        declaredType,
         initialValue,
       ),
       initializerStart,

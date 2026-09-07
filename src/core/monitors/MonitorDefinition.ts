@@ -50,8 +50,7 @@ export type MonitorProcedureArgument =
   | MonitorOutputArgument
 
 /**
- * Parsed representation of `monitor.procedure(...)`.
- * It becomes an executable Instruction only when M12 adds runtime support.
+ * Executable parsed representation of `monitor.procedure(...)`.
  */
 export interface MonitorProcedureCall {
   readonly type: 'MONITOR_PROCEDURE_CALL'

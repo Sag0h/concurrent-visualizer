@@ -1,3 +1,5 @@
+import type { DeclaredType } from '../language/DeclaredType'
+
 export type PrimitiveValue =
   | number
   | boolean
@@ -59,6 +61,12 @@ export interface UninitializedOutValue {
   readonly parameterName: string
 }
 
+export interface UninitializedVariableValue {
+  readonly kind: 'UNINITIALIZED_VARIABLE'
+  readonly variableName: string
+  readonly declaredType: DeclaredType
+}
+
 export type CollectionElementValue =
   | PrimitiveValue
   | RecordValue
@@ -85,6 +93,33 @@ export function isUninitializedOutValue(
   )
 }
 
+export function createUninitializedVariableValue(
+  variableName: string,
+  declaredType: DeclaredType,
+): UninitializedVariableValue {
+  return {
+    kind: 'UNINITIALIZED_VARIABLE',
+    variableName,
+    declaredType: structuredClone(declaredType),
+  }
+}
+
+export function isUninitializedVariableValue(
+  value: unknown,
+): value is UninitializedVariableValue {
+  return (
+    typeof value === 'object'
+    && value !== null
+    && 'kind' in value
+    && value.kind === 'UNINITIALIZED_VARIABLE'
+    && 'variableName' in value
+    && typeof value.variableName === 'string'
+    && 'declaredType' in value
+    && typeof value.declaredType === 'object'
+    && value.declaredType !== null
+  )
+}
+
 export type ArrayElementValue =
   | PrimitiveValue
   | RecordValue
@@ -99,6 +134,7 @@ export type RuntimeValue =
   | StackValue
   | RecordValue
   | UninitializedOutValue
+  | UninitializedVariableValue
 
 export function createRecordValue(
   recordType: string,
@@ -394,6 +430,10 @@ export function describeRuntimeType(
 
   if (isUninitializedOutValue(value)) {
     return `unassigned out parameter "${value.parameterName}"`
+  }
+
+  if (isUninitializedVariableValue(value)) {
+    return `uninitialized variable "${value.variableName}"`
   }
 
   if (typeof value === 'number') {

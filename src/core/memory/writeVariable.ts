@@ -1,5 +1,13 @@
 import type { Memory } from './Memory'
-import type { RuntimeValue } from './RuntimeValue'
+import {
+  describeRuntimeType,
+  isUninitializedVariableValue,
+  type RuntimeValue,
+} from './RuntimeValue'
+import {
+  formatDeclaredType,
+  valueMatchesDeclaredType,
+} from '../language/DeclaredTypeUtils'
 
 export function writeVariable(
   name: string,
@@ -8,6 +16,20 @@ export function writeVariable(
   sharedMemory: Memory,
 ): void {
   if (name in localMemory) {
+    const previousValue = localMemory[name]
+
+    if (
+      isUninitializedVariableValue(previousValue)
+      && !valueMatchesDeclaredType(
+        value,
+        previousValue.declaredType,
+      )
+    ) {
+      throw new Error(
+        `Variable "${name}" requires ${formatDeclaredType(previousValue.declaredType)} but received ${describeRuntimeType(value)}`,
+      )
+    }
+
     localMemory[name] = structuredClone(value)
     return
   }

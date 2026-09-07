@@ -5,7 +5,7 @@
 
 ## Estado actual
 
-**Fase:** transición de M11 a M12.1 --- Semántica de monitores.
+**Fase:** M12.2 --- Variables condición de monitores.
 
 **Último milestone completado:** M10.3 --- Colecciones de registros.
 
@@ -26,11 +26,11 @@ waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
 **Próximo objetivo:** la vertical principal de M11 está cerrada y sus
-mejoras restantes son opcionales. M12.1 comenzó con la semántica de
-monitores alineada con la cátedra y ya dispone del AST base y del contrato
-de parámetros `in`/`out`. El siguiente ticket es una primera vertical
-ejecutable de tokenizer, parser y runtime para monitores. Las assertions
-explícitas quedaron como extensión futura del lenguaje.
+mejoras restantes son opcionales. M12.1 está completado y M12.2 ya dispone
+de tokenizer/parser, runtime de monitores, exclusión mutua y parámetros
+`in`/`out` ejecutables. El siguiente ticket formal son las variables
+condición con `wait`, `signal` y `signal_all`. Las assertions explícitas
+quedaron como extensión futura del lenguaje.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -46,7 +46,8 @@ Procesos e Historial en lugar de comprimir las columnas de escritorio.
 Los paneles ocultos conservarán su estado y los separadores
 redimensionables se evaluarán sólo después de validar el layout base.
 
-También queda registrado un borrador local persistente para el editor:
+También queda registrado como requerimiento futuro un borrador local
+persistente para el editor:
 guardado con debounce en `localStorage`, esquema versionado, restauración
 al abrir, confirmación antes de cargar ejemplos y acción para limpiar el
 borrador. Será local al navegador y dispositivo, sin sincronización en la
@@ -2413,3 +2414,22 @@ desde procesos, funciones y monitores anidados. Las pruebas cubren además
 tipos incorrectos, salidas omitidas, rechazo de destinos compartidos,
 captura durante bloqueo y las cuatro formas de destino local. El siguiente
 ticket de M12.2 son variables condición.
+
+## 2026-09-02 --- Declaraciones locales sin inicializador
+
+El lenguaje acepta declaraciones locales como `int nivel;` y
+`Fallo fallo;` dentro de procesos, funciones y procedures. El AST conserva
+el `DeclaredType` aunque no exista expresión inicial y el runtime representa
+temporalmente la variable con un marcador tipado visible como
+`<uninitialized tipo>`.
+
+Leer ese marcador produce un error explícito; la primera asignación valida
+el tipo y lo reemplaza. Una variable no inicializada también puede actuar
+como destino `out`, lo que elimina registros ficticios en los ejercicios
+con monitores y colas. No se agregó `new`: los registros mantienen su
+semántica de valores copiados, sin heap, referencias ni constructores.
+
+Memoria compartida, semáforos y estado privado de monitores conservan la
+inicialización obligatoria. Las pruebas cubren parser, registros extraídos
+de colas, lectura prematura, tipo incorrecto, write-back de `out`, Step Back
+y Reset.

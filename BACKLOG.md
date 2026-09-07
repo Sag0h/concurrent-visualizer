@@ -793,6 +793,8 @@ mejoras transversales y extensiones futuras.
 
 -   [x] Sintaxis inicial, tokenizer, parser descendente recursivo y AST.
 -   [x] Variables, declaraciones, expresiones y estructuras de control.
+-   [x] Permitir declaraciones locales tipadas sin inicializador y
+    detectar lecturas antes de la primera asignación.
 -   [x] Funciones y llamadas como expresiones.
 -   [x] Procesos y errores con línea/columna.
 -   [x] Transformar código fuente en representación ejecutable.
@@ -810,7 +812,8 @@ mejoras transversales y extensiones futuras.
     cuando se justifique.
 -   [ ] Parsear arrays de semáforos cuando se incorporen.
 -   [ ] Parsear primitivas temporales.
--   [ ] Parsear monitores.
+-   [x] Parsear monitores, procedures, parámetros `in`/`out` y llamadas
+    calificadas.
 -   [ ] Parsear primitivas de pasaje de mensajes.
 
 ### M10.1 --- Estructuras de datos académicas

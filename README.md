@@ -16,11 +16,16 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M11 --- **Visualización avanzada y catálogo educativo**.
+**Milestone actual:** M12 --- **Monitores**.
 
 **Último milestone completado:** M10.3 --- **Colecciones de registros**.
 
-M11 comenzó con un catálogo cargable de los nueve temas académicos de
+La vertical principal de M11 está cerrada. M12 ya dispone de monitores
+ejecutables con estado privado, exclusión mutua implícita, procedures y
+parámetros `in`/`out`; el próximo frente son las variables condición,
+`wait`, `signal` y `signal_all`.
+
+El catálogo incluye los nueve temas académicos de
 semáforos. Cada tema ofrece el código con un problema reproducible y su
 solución correcta. Los 18 programas comparten su pseudocódigo con las
 pruebas, seleccionan un scheduler recomendado y nunca se construyen o
@@ -316,7 +321,8 @@ La lógica del simulador vive en el motor y es independiente de React.
 
 ### Lenguaje
 
--   Variables locales y compartidas.
+-   Variables locales —con inicialización opcional y lectura segura— y
+    variables compartidas inicializadas explícitamente.
 -   `int`, `bool` y `string`.
 -   Arrays.
 -   Expresiones aritméticas, booleanas y comparaciones.
@@ -787,14 +793,14 @@ Exploración acotada
         ↓
 Estructuras de datos académicas
         ↓
-Monitores
+Monitores  ← actual
         ↓
 Pasaje de mensajes
         ↓
-Visualización y análisis avanzado  ← actual
+Visualización y análisis avanzado
 ```
 
-### Último milestone completado --- M10.2: Registros y operaciones simuladas
+### Último milestone completado --- M10.3: Colecciones de registros
 
 Completado:
 

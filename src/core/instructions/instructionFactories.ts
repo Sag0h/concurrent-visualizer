@@ -25,6 +25,7 @@ import type {
 import type { Instruction } from './Instruction'
 import type { AssignmentTarget } from './AssignmentTarget'
 import type { Expression } from '../expressions/Expression'
+import type { DeclaredType } from '../language/DeclaredType'
 
 export function noOp(): NoOpInstruction {
   return {
@@ -41,12 +42,14 @@ export function finish(): FinishInstruction {
 export function declare(
   scope: DeclareInstruction['scope'],
   name: string,
-  initialValue: Expression,
+  declaredType: DeclaredType,
+  initialValue?: Expression,
 ): DeclareInstruction {
   return {
     type: 'DECLARE',
     scope,
     name,
+    declaredType,
     initialValue,
   }
 }

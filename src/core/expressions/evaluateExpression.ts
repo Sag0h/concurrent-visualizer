@@ -1,6 +1,7 @@
 import {
   isRecordValue,
   isUninitializedOutValue,
+  isUninitializedVariableValue,
   resolveRecordGetterFieldName,
   type RuntimeValue,
 } from '../memory/RuntimeValue'
@@ -82,6 +83,12 @@ function readVariable(
     if (isUninitializedOutValue(value)) {
       throw new Error(
         `OUT parameter "${value.parameterName}" cannot be read before assignment`,
+      )
+    }
+
+    if (isUninitializedVariableValue(value)) {
+      throw new Error(
+        `Variable "${value.variableName}" cannot be read before initialization`,
       )
     }
 

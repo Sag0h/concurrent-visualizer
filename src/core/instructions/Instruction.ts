@@ -1,6 +1,9 @@
 import type { Expression } from '../expressions/Expression'
 import type { SourceRange } from '../language/SourceRange'
-import type { DeclaredValueType } from '../language/DeclaredType'
+import type {
+  DeclaredType,
+  DeclaredValueType,
+} from '../language/DeclaredType'
 import type { AssignmentTarget } from './AssignmentTarget'
 import type { MonitorProcedureCall } from '../monitors/MonitorDefinition'
 export interface NoOpInstruction {
@@ -22,7 +25,8 @@ export interface DeclareInstruction {
   readonly type: 'DECLARE'
   readonly scope: 'LOCAL' | 'SHARED'
   readonly name: string
-  readonly initialValue: Expression
+  readonly declaredType: DeclaredType
+  readonly initialValue?: Expression
 }
 
 export interface IfInstruction {

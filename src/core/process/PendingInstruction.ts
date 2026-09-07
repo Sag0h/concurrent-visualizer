@@ -11,12 +11,14 @@ import type {
 import type { ExecutionFrame } from './ExecutionFrame'
 
 import type { RuntimeValue } from '../memory/RuntimeValue'
+import type { DeclaredType } from '../language/DeclaredType'
 
 export type PendingInstruction =
   | {
       readonly type: 'DECLARE'
       readonly name: string
       readonly scope: 'LOCAL' | 'SHARED'
+      readonly declaredType: DeclaredType
     }
   | {
       readonly type: 'ASSIGN'

@@ -1497,3 +1497,33 @@ aceptarlos sin semántica.
 
 **Motivo:** validar primero el ciclo completo adquirir–ejecutar–liberar y
 dar a las variables condición una base clonable, explorable y visible.
+
+------------------------------------------------------------------------
+
+## ADR-041 --- Variables locales tipadas sin valor predeterminado
+
+**Estado:** Aceptada
+
+**Contexto:** exigir inicializadores ficticios como `int nivel = 0` o un
+registro con campos inventados deforma ejercicios donde el valor llegará
+inmediatamente desde una cola o un parámetro `out`. Introducir `new`
+implicaría constructores, referencias, heap y eventualmente `null`, aunque
+los registros actuales tienen semántica por valor.
+
+**Decisión:** una declaración local puede omitir `= expresión`.
+`DeclareInstruction` conserva el tipo y el runtime crea un marcador
+`UNINITIALIZED_VARIABLE`. El marcador no puede leerse, la primera asignación
+se valida contra el tipo declarado y los destinos `out` compatibles pueden
+reemplazarlo. No se asignan valores predeterminados implícitos.
+
+La posibilidad se limita a memoria local de procesos, funciones y
+procedures. Memoria compartida y estado permanente de monitores continúan
+requiriendo valores iniciales deterministas.
+
+**Consecuencia:** `Fallo fallo; fallo = fallos.dequeue();` expresa el
+algoritmo directamente y los errores de uso antes de inicializar son
+observables. Los registros siguen siendo valores copiados y no adquieren
+identidad de objeto.
+
+**Motivo:** mejorar la fidelidad del pseudocódigo académico sin incorporar
+un modelo de objetos que el simulador no necesita.

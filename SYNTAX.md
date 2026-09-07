@@ -197,6 +197,36 @@ process P1 {
 }
 ```
 
+La inicialización es opcional para variables locales:
+
+``` text
+process P1 {
+    int nivel;
+    bool procesado;
+    Fallo fallo;
+
+    fallo = fallos.dequeue();
+    nivel = fallo.getNivel();
+    procesado = true;
+}
+```
+
+Una declaración sin `=` crea la variable con su tipo, pero sin inventar un
+valor predeterminado. La interfaz la muestra, por ejemplo, como
+`<uninitialized Fallo>`. Su primera asignación debe respetar el tipo
+declarado. Intentar leerla antes produce un error:
+
+``` text
+int nivel;
+print(nivel); // error: lectura antes de inicializar
+```
+
+Los registros son valores y no requieren `new`. `Fallo fallo;` reserva una
+variable tipada; el registro comienza a existir cuando se le asigna un
+literal, el resultado de una cola, un parámetro `out` u otro valor `Fallo`.
+Las variables compartidas, los semáforos y el estado privado de monitores
+continúan requiriendo inicialización explícita antes de ejecutar procesos.
+
 Dos procesos pueden declarar una variable con el mismo nombre sin
 compartirla.
 
@@ -329,14 +359,47 @@ process Worker {
 }
 ```
 
-Tipos de elemento disponibles:
+Para valores primitivos, los tipos de elemento disponibles son:
 
 ``` text
 queue<int>
 queue<bool>
 queue<string>
-queue<Fallo>
 ```
+
+Para almacenar registros primero se declara el tipo con `record` y luego
+se utiliza **el nombre de ese tipo** entre `<` y `>`. Por ejemplo:
+
+``` text
+record Fallo {
+    int id;
+    int nivel;
+    string mensaje;
+}
+
+shared queue<Fallo> fallos = queue[
+    Fallo { id: 1, nivel: 3, mensaje: "temperatura" },
+    Fallo { id: 2, nivel: 1, mensaje: "red" }
+];
+
+process Controlador {
+    fallos.enqueue(
+        Fallo { id: 3, nivel: 2, mensaje: "disco" }
+    );
+
+    Fallo siguiente = fallos.dequeue();
+    print(
+        siguiente.getID(),
+        siguiente.getNivel(),
+        siguiente.getMensaje()
+    );
+}
+```
+
+`Fallo` no es una palabra reservada: es el nombre del registro declarado
+en la primera línea. Por eso la forma correcta es `queue<Fallo>`, no
+`queue<record>`. La misma regla sirve para cualquier otro registro, por
+ejemplo `queue<Persona>` después de declarar `record Persona { ... }`.
 
 La notación `queue[...]` enumera los elementos desde el frente hacia el
 fondo. Una cola vacía se declara con `queue[]`.

@@ -9,6 +9,7 @@ import { createExecutionState } from './core/engine/createExecutionState'
 import { SimulationEngine } from './core/engine/SimulationEngine'
 import type { SimulationSnapshot } from './core/engine/SimulationSnapshot'
 import { parseProgram } from './core/language/parseProgram'
+import { formatDeclaredType } from './core/language/DeclaredTypeUtils'
 import {
   formatCollectionElementType,
   isPriorityQueueValue,
@@ -16,6 +17,7 @@ import {
   isStackValue,
   isRecordValue,
   isUninitializedOutValue,
+  isUninitializedVariableValue,
   type RuntimeValue,
 } from './core/memory/RuntimeValue'
 import { createScheduler } from './core/scheduler/createScheduler'
@@ -2689,6 +2691,10 @@ function formatValue(
 
   if (isUninitializedOutValue(value)) {
     return `<unassigned out ${value.parameterName}>`
+  }
+
+  if (isUninitializedVariableValue(value)) {
+    return `<uninitialized ${formatDeclaredType(value.declaredType)}>`
   }
 
   if (Array.isArray(value)) {

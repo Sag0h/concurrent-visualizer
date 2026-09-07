@@ -18,7 +18,9 @@ import {
   isPrimitiveValue,
   isStackValue,
   createUninitializedOutValue,
+  createUninitializedVariableValue,
   isUninitializedOutValue,
+  isUninitializedVariableValue,
   describeRuntimeType,
   type PriorityQueueValue,
   type CollectionElementValue,
@@ -34,7 +36,10 @@ import type {
 } from '../expressions/Expression'
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { FunctionDefinition } from '../language/FunctionDefinition'
-import type { DeclaredValueType } from '../language/DeclaredType'
+import type {
+  DeclaredType,
+  DeclaredValueType,
+} from '../language/DeclaredType'
 import type { MonitorRuntimeState } from '../monitors/MonitorRuntimeState'
 import type {
   MonitorCallerMemory,
@@ -43,6 +48,7 @@ import type {
   ResolvedMonitorOutputTarget,
 } from '../monitors/MonitorCallFrame'
 import {
+  declaredTypesEqual,
   formatDeclaredType,
   valueMatchesDeclaredType,
 } from '../language/DeclaredTypeUtils'
@@ -411,6 +417,22 @@ export class SimulationEngine {
       }
 
       case 'DECLARE': {
+        if (!instruction.initialValue) {
+          if (instruction.scope !== 'LOCAL') {
+            throw new Error(
+              'Shared variables require an initial value',
+            )
+          }
+
+          this.getActiveLocalMemory(process)[instruction.name] =
+            createUninitializedVariableValue(
+              instruction.name,
+              instruction.declaredType,
+            )
+          this.advanceProcess(process)
+          break
+        }
+
         if (
           this.containsFunctionCall(
             instruction.initialValue,
@@ -423,6 +445,7 @@ export class SimulationEngine {
               type: 'DECLARE',
               name: instruction.name,
               scope: instruction.scope,
+              declaredType: instruction.declaredType,
             },
           )
 
@@ -437,6 +460,12 @@ export class SimulationEngine {
             sharedMemory:
               this.state.program.sharedMemory,
           },
+        )
+
+        this.assertDeclarationValue(
+          instruction.name,
+          instruction.declaredType,
+          value,
         )
 
         if (instruction.scope === 'LOCAL') {
@@ -1948,6 +1977,12 @@ export class SimulationEngine {
 
     switch (pending.type) {
       case 'DECLARE':
+        this.assertDeclarationValue(
+          pending.name,
+          pending.declaredType,
+          value,
+        )
+
         if (pending.scope === 'LOCAL') {
           this.getActiveLocalMemory(process)[
             pending.name
@@ -4295,7 +4330,10 @@ export class SimulationEngine {
         target,
       )
 
-      if (!valueMatchesDeclaredType(currentValue, parameter.declaredType)) {
+      if (!this.valueOrUninitializedVariableMatchesType(
+        currentValue,
+        parameter.declaredType,
+      )) {
         throw new Error(
           `OUT parameter "${parameter.name}" requires a ${formatDeclaredType(parameter.declaredType)} target but received ${describeRuntimeType(currentValue)}`,
         )
@@ -4497,7 +4535,10 @@ export class SimulationEngine {
       binding.target,
     )
 
-    if (!valueMatchesDeclaredType(currentValue, binding.declaredType)) {
+    if (!this.valueOrUninitializedVariableMatchesType(
+      currentValue,
+      binding.declaredType,
+    )) {
       throw new Error(
         `OUT target for "${binding.parameterName}" changed to incompatible type ${describeRuntimeType(currentValue)}`,
       )
@@ -4582,6 +4623,27 @@ export class SimulationEngine {
     }
 
     record.fields[target.fieldName] = structuredClone(value)
+  }
+
+  private valueOrUninitializedVariableMatchesType(
+    value: RuntimeValue,
+    declaredType: DeclaredType,
+  ): boolean {
+    return isUninitializedVariableValue(value)
+      ? declaredTypesEqual(value.declaredType, declaredType)
+      : valueMatchesDeclaredType(value, declaredType)
+  }
+
+  private assertDeclarationValue(
+    variableName: string,
+    declaredType: DeclaredType,
+    value: RuntimeValue,
+  ): void {
+    if (!valueMatchesDeclaredType(value, declaredType)) {
+      throw new Error(
+        `Variable "${variableName}" requires ${formatDeclaredType(declaredType)} but received ${describeRuntimeType(value)}`,
+      )
+    }
   }
 
   private syncActiveMonitorState(
