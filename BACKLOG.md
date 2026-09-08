@@ -1050,6 +1050,11 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [x] Reorganizar escritorio como un workspace que aproveche la altura
     disponible: controles visibles, paneles con scroll independiente y
     código, estado e historial observables sin recorrer toda la página.
+-   [ ] Permitir colapsar el panel de código y volver a mostrarlo mediante
+    un control siempre accesible, aprovechando el espacio liberado para la
+    simulación. Ocultarlo no debe borrar el source, invalidar el Build,
+    reiniciar el engine ni perder la línea resaltada o la posición de scroll;
+    la preferencia debe integrarse con Settings y funcionar también en mobile.
 -   [ ] Evaluar paneles redimensionables después de validar el nuevo
     layout; no incorporarlos como requisito de la primera versión.
 -   [x] Mejorar la experiencia mobile mediante pestañas para Código,
