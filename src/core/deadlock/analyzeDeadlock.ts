@@ -13,6 +13,7 @@ import type {
 
 const semaphoreResourcePrefix = 'SEMAPHORE:'
 const monitorResourcePrefix = 'MONITOR:'
+const conditionResourcePrefix = 'CONDITION:'
 
 export function analyzeDeadlock(
   state: ExecutionState,
@@ -112,6 +113,12 @@ function isBlockedProcessCurrentlyEnabled(
       return state.monitorStates?.[
         reason.monitorName
       ]?.ownerProcessId === undefined
+
+    case 'MONITOR_CONDITION':
+      return reason.phase === 'REACQUIRE'
+        && state.monitorStates?.[
+          reason.monitorName
+        ]?.ownerProcessId === undefined
   }
 }
 
@@ -129,7 +136,13 @@ function buildDeadlockDiagnostic(
   for (const process of blockedProcesses) {
     const reason = process.blockingReason
 
-    if (reason?.type === 'MONITOR_ENTRY') {
+    if (
+      reason?.type === 'MONITOR_ENTRY'
+      || (
+        reason?.type === 'MONITOR_CONDITION'
+        && reason.phase === 'REACQUIRE'
+      )
+    ) {
       const resource = monitorResource(reason.monitorName)
       resources.set(resource.id, resource)
       resourceDependencies.push({
@@ -157,6 +170,24 @@ function buildDeadlockDiagnostic(
         holdingProcessId: ownerProcessId,
         resourceId: resource.id,
       })
+      continue
+    }
+
+    if (
+      reason?.type === 'MONITOR_CONDITION'
+      && reason.phase === 'WAITING'
+    ) {
+      const resource = conditionResource(
+        reason.monitorName,
+        reason.conditionName,
+      )
+      resources.set(resource.id, resource)
+      resourceDependencies.push({
+        type: 'WAITS_FOR',
+        processId: process.id,
+        resourceId: resource.id,
+      })
+      graphIsComplete = false
       continue
     }
 
@@ -322,6 +353,19 @@ function monitorResource(
     id: `${monitorResourcePrefix}${monitorName}`,
     kind: 'MONITOR',
     name: monitorName,
+  }
+}
+
+function conditionResource(
+  monitorName: string,
+  conditionName: string,
+): WaitForResource {
+  const name = `${monitorName}.${conditionName}`
+
+  return {
+    id: `${conditionResourcePrefix}${name}`,
+    kind: 'CONDITION',
+    name,
   }
 }
 

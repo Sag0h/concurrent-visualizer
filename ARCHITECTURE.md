@@ -95,15 +95,16 @@ Actualmente contiene:
 -   procesos;
 -   memoria compartida;
 -   definiciones de funciones;
--   semáforos.
+-   semáforos;
+-   definiciones de monitores.
 
 Los semáforos forman parte del programa, pero permanecen separados de la
 memoria compartida ordinaria. Esta separación es semántica: un semáforo
 es un recurso de sincronización y no una variable `int` común accesible
 mediante asignaciones del lenguaje.
 
-A futuro `Program` podrá incorporar monitores, canales y configuración
-adicional del modelo de ejecución.
+A futuro `Program` podrá incorporar canales y configuración adicional del
+modelo de ejecución.
 
 ### Semaphore
 
@@ -158,8 +159,9 @@ BLOCKED
 FINISHED
 ```
 
-`BLOCKED` se utiliza actualmente tanto para `await` como para una
-operación `P(s)` que no puede completarse.
+`BLOCKED` se utiliza para `await`, una operación `P(s)` que no puede
+completarse, la entrada a un monitor ocupado y la espera o reentrada de una
+variable condición.
 
 Las declaraciones parametrizadas `process Name[i:start..end]` se
 expanden en el parser. Los extremos son inclusivos y pueden formar rangos
@@ -187,17 +189,22 @@ inicializados antes de habilitar procesos.
 
 ### BlockingReason
 
-El proceso conserva por qué está bloqueado. Actualmente existen al menos
-dos motivos conceptuales:
+El proceso conserva por qué está bloqueado. Actualmente existen estos
+motivos conceptuales:
 
 ``` text
 AWAIT(condition)
 SEMAPHORE_P(semaphoreName)
+MONITOR_ENTRY(monitorName)
+MONITOR_CONDITION(monitorName, conditionName, WAITING | REACQUIRE)
 ```
 
 Para `await` se conserva la condición necesaria para reevaluarla.
 
-Para `P` se conserva el nombre del semáforo esperado.
+Para `P` se conserva el nombre concreto del semáforo esperado. Para un
+monitor se distingue competir por una entrada normal, esperar dentro de la
+cola FIFO de una condición y haber sido señalado pero necesitar readquirir
+la instancia.
 
 Esta información pertenece al proceso y no implica una cola FIFO dentro
 del recurso.
@@ -276,6 +283,21 @@ El mecanismo se utiliza en declaraciones, asignaciones, estructuras de
 control, `return`, argumentos de funciones, `foreach` e índices/targets
 de arrays.
 
+Antes de iniciar una función usada dentro de una expresión,
+`PendingFunctionArguments` conserva sus argumentos todavía no resueltos,
+el índice actual y los valores ya capturados. Cada lectura de memoria
+compartida de esos argumentos consume una microoperación `SHARED_READ`
+independiente. Sólo después se crea el `FunctionCallFrame`, usando copias
+de los valores observados. Este estado intermedio pertenece al proceso y
+se incluye en clones y claves semánticas.
+
+Cuando la última llamada de un `ASSIGN` retorna, una asignación que lee o
+escribe memoria compartida no se completa directamente. La expresión con
+los retornos reemplazados por literales se entrega a
+`SharedAssignmentRuntime`, que conserva las fases `READ`, `COMPUTE`,
+`TARGET_READ` y `WRITE`. Así una llamada suspendible no oculta el store
+final ni lo elimina del análisis de conflictos.
+
 Regla arquitectónica:
 
 > Una expresión que pueda contener una llamada a función no debe
@@ -319,6 +341,11 @@ utiliza el valor y la ubicación ya resueltos.
 
 Esto permite representar lost updates e interferencias reales sin
 introducir comportamientos especiales para ejemplos concretos.
+
+La descomposición de argumentos compartidos se aplica actualmente a
+funciones usadas dentro de expresiones suspendibles. Generalizar la misma
+traza fina a los argumentos compartidos de una llamada usada como
+instrucción independiente queda como mejora transversal.
 
 ## 8. Captura de valores observados
 
@@ -592,15 +619,18 @@ Por ahora:
 
 ## 15. Semáforos
 
-La sintaxis escalar actual es:
+La sintaxis admite semáforos escalares y arrays:
 
 ``` text
 sem mutex = 1;
 sem available = 3;
+sem[] forks = [1, 1, 1, 1, 1];
 
 process P1 {
     P(mutex);
     V(mutex);
+    P(forks[0]);
+    V(forks[0]);
 }
 ```
 
@@ -638,6 +668,23 @@ V(s): < s = s + 1; >
 Los semáforos generales no modelan ownership. Por ello el engine no
 exige que el proceso que ejecuta `V` sea el mismo que previamente
 ejecutó `P`.
+
+### Arrays de semáforos
+
+El parser expande `sem[] s = [v0, v1, ...]` en semáforos concretos con
+nombres canónicos `s[0]`, `s[1]`, etc. Esta representación permite que
+runtime, snapshots, historial, Step Back, exploración, análisis de mutex y
+deadlock reutilicen exactamente el modelo escalar.
+
+El AST de `P` y `V` conserva el nombre base y una expresión opcional para
+el índice. El runtime evalúa esa expresión contra la memoria local activa y
+la memoria compartida, exige un entero dentro de rango y resuelve el nombre
+canónico antes de operar.
+
+Un `P` bloqueado captura el elemento resuelto en `BlockingReason`. Esto
+evita que un cambio posterior en una variable usada como índice traslade
+silenciosamente la espera a otro recurso. `V` resuelve su índice en el
+momento de ejecutarse.
 
 ### Reactivación sin reserva
 
@@ -791,7 +838,8 @@ Memoria compartida soporta actualmente:
 -   `await`;
 -   semáforos escalares `P` / `V`.
 
-Quedan previstos monitores y variables condición.
+También están implementados monitores con estado privado, procedures,
+parámetros `in/out` y variables condición escalares.
 
 M12 separa dos niveles. `MonitorDefinition` describe estado privado,
 variables condición, procedures, parámetros y cuerpo de inicialización.
@@ -843,6 +891,22 @@ referencia controlada a una variable, posición de array o campo del
 llamador; no es una expresión arbitraria. Esta separación evita reutilizar
 incorrectamente el paso por valor de las funciones existentes.
 
+Cada entrada de `MonitorRuntimeState.conditions` conserva una cola FIFO de
+ids. `wait` agrega al propietario al final, sincroniza el estado privado,
+libera la instancia y suspende el frame en la misma instrucción. `signal`
+extrae como máximo el primero y `signal_all` vacía la cola; ambos trasladan
+los despertados al conjunto de competidores de entrada sin transferirles la
+propiedad. Si no hay esperadores, la señal no deja estado persistente.
+
+La semántica es signal-and-continue: el señalador continúa dentro del
+monitor. El despertado reanuda después de `wait` únicamente al readquirir la
+instancia. En esa reentrada se refrescan en el frame suspendido sólo los
+nombres del estado permanente; variables locales, parámetros y destinos
+`out` se preservan. Las colas y fases forman parte de snapshots, forks,
+Step Back y claves semánticas. `ExecutionEvent.monitorConditionEvent`
+permite que la UI muestre espera, señal, broadcast, reentrada y señal sin
+esperadores sin analizar descripciones textuales.
+
 Pasaje de mensajes permanece futuro: canales, `send`, `receive`,
 comunicación asincrónica/sincrónica, RPC y Rendezvous.
 
@@ -878,8 +942,11 @@ La capa concurrente soporta actualmente:
 -   `atomic`;
 -   `await`;
 -   declaraciones escalares `sem`;
+-   arrays `sem[]` y referencias indexadas;
 -   `P`;
--   `V`.
+-   `V`;
+-   monitores, procedures y parámetros `in/out`;
+-   condiciones `cond`, `wait`, `signal` y `signal_all`.
 
 Pipeline vigente:
 
@@ -903,8 +970,8 @@ la resolución de una referencia utilizada por `P` / `V` ocurre
 actualmente en runtime. Un nombre inexistente produce un error de
 ejecución.
 
-Próximas extensiones relevantes incluyen arrays de semáforos cuando sean
-necesarios, monitores, pasaje de mensajes y tiempo simulado.
+Próximas extensiones relevantes incluyen el buffer limitado con monitor,
+pasaje de mensajes y tiempo simulado.
 
 ## 20. Análisis de errores
 
@@ -924,9 +991,9 @@ STEP_LIMIT_REACHED
 
 Existe deadlock cuando quedan procesos sin finalizar, no existe ningún
 proceso `READY`/`RUNNING` y ninguna espera bloqueada está actualmente
-habilitada. La reevaluación incluye condiciones de `await` y permisos de
-semáforos, por lo que un bloqueo visible pero habilitable sigue siendo
-temporal.
+habilitada. La reevaluación incluye condiciones de `await`, permisos de
+semáforos y procesos señalados que pueden readquirir un monitor, por lo que
+un bloqueo visible pero habilitable sigue siendo temporal.
 
 `src/core/deadlock/` permanece separado del runtime. Consume procesos,
 razones de bloqueo, recursos e historial, pero no modifica scheduling ni
@@ -946,12 +1013,15 @@ afirmar una espera circular.
 Los recursos usan una clase extensible:
 
 ``` text
-SEMAPHORE | MONITOR | CHANNEL
+SEMAPHORE | MONITOR | CONDITION | CHANNEL
 ```
 
-Semáforos están integrados. Monitores y canales incorporarán sus propias
-dependencias al introducirse esas primitivas, reutilizando el mismo
-algoritmo de ciclos y la misma representación visual.
+Semáforos, monitores y condiciones están integrados. Una espera
+`MONITOR_ENTRY` o `REACQUIRE` depende del propietario de la instancia. Una
+espera `WAITING` depende de un recurso `CONDITION:Monitor.cond`; si no queda
+ningún proceso capaz de señalizarlo, se informa bloqueo terminal con grafo
+parcial. Los canales incorporarán sus dependencias reutilizando el mismo
+algoritmo y representación visual.
 
 El objetivo posterior incluye:
 
@@ -1393,9 +1463,9 @@ sincronización. Cuando exista tiempo simulado, deberán expresarse con
 `sleep(ticks)`, `yield` o una operación de trabajo explícita, reutilizando
 el motor ordinario y sin temporizadores reales dentro del pseudocódigo.
 
-Los casos que necesiten características todavía ausentes ---por ejemplo
-arrays de semáforos--- deben esperar a que el lenguaje pueda
-representarlos fielmente en lugar de introducir excepciones específicas.
+Los casos que necesiten características todavía ausentes deben esperar a
+que el lenguaje pueda representarlos fielmente en lugar de introducir
+excepciones específicas.
 
 ## 23. Fuente académica
 

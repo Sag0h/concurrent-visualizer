@@ -376,4 +376,69 @@ describe('tokenize', () => {
       'EOF',
     ])
   })
+
+  it('tokenizes monitor conditions and their operations', () => {
+    const tokens = tokenize(`
+      cond ready;
+      wait(ready);
+      signal(ready);
+      signal_all(ready);
+    `)
+
+    expect(
+      tokens.map((token) => token.type),
+    ).toEqual([
+      'COND',
+      'IDENTIFIER',
+      'SEMICOLON',
+      'WAIT',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'SIGNAL',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'SIGNAL_ALL',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
+
+  it('tokenizes semaphore arrays and indexed operations', () => {
+    const tokens = tokenize(`
+      sem[] gates = [1, 0];
+      P(gates[index]);
+    `)
+
+    expect(
+      tokens.map((token) => token.type),
+    ).toEqual([
+      'SEM',
+      'LEFT_BRACKET',
+      'RIGHT_BRACKET',
+      'IDENTIFIER',
+      'ASSIGN',
+      'LEFT_BRACKET',
+      'NUMBER',
+      'COMMA',
+      'NUMBER',
+      'RIGHT_BRACKET',
+      'SEMICOLON',
+      'SEMAPHORE_P',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'LEFT_BRACKET',
+      'IDENTIFIER',
+      'RIGHT_BRACKET',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
 })

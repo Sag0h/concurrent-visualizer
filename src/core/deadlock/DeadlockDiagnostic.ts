@@ -14,6 +14,7 @@ export type DeadlockKind =
 export type SynchronizationResourceKind =
   | 'SEMAPHORE'
   | 'MONITOR'
+  | 'CONDITION'
   | 'CHANNEL'
 
 export interface WaitForResource {

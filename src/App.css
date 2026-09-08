@@ -1523,6 +1523,66 @@ h2 {
   color: #777;
 }
 
+.monitor-condition-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.monitor-condition-list h4 {
+  margin: 0;
+}
+
+.monitor-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.monitor-condition-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monitor-condition-status {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.monitor-condition-status-waiting,
+.monitor-condition-status-reentry-blocked {
+  color: #842029;
+  background: #f8d7da;
+}
+
+.monitor-condition-status-reacquired,
+.monitor-condition-status-signaled {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.monitor-condition-status-no-waiter {
+  color: var(--text-muted);
+  background: var(--surface-subtle);
+}
+
+.monitor-condition-history-detail {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .semaphore-status {
   display: inline-block;
   padding: 3px 6px;
@@ -2220,6 +2280,8 @@ html[data-theme='dark'] .history-current-indicator {
 html[data-theme='dark'] .micro-operation-shared_write,
 html[data-theme='dark'] .semaphore-status-succeeded,
 html[data-theme='dark'] .await-status-enabled,
+html[data-theme='dark'] .monitor-condition-status-reacquired,
+html[data-theme='dark'] .monitor-condition-status-signaled,
 html[data-theme='dark'] .playback-state-playing,
 html[data-theme='dark'] .playback-state-finished {
   color: #b9e7c8;
@@ -2235,6 +2297,8 @@ html[data-theme='dark'] .playback-state {
 html[data-theme='dark'] .semaphore-waiter,
 html[data-theme='dark'] .semaphore-status-blocked,
 html[data-theme='dark'] .await-status-blocked,
+html[data-theme='dark'] .monitor-condition-status-waiting,
+html[data-theme='dark'] .monitor-condition-status-reentry-blocked,
 html[data-theme='dark'] .playback-state-deadlock,
 html[data-theme='dark'] .counterexample-kind {
   color: #f1b7b1;

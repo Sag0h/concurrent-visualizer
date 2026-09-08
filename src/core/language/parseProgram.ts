@@ -29,6 +29,9 @@ import {
   awaitInstruction,
   semaphoreVInstruction,
   semaphorePInstruction,
+  monitorWaitInstruction,
+  monitorSignalInstruction,
+  monitorSignalAllInstruction,
   dataStructureOperationInstruction,
   recordFieldTarget,
   simulatedOperationInstruction,
@@ -95,6 +98,9 @@ class Parser {
     string,
     MonitorDefinition
   > = {}
+  private readonly semaphoreDeclarationNames =
+    new Set<string>()
+  private monitorProcedureDepth = 0
 
   constructor(tokens: Token[]) {
     this.tokens = tokens
@@ -268,6 +274,13 @@ class Parser {
     )
 
     while (!this.check('RIGHT_BRACE') && !this.isAtEnd()) {
+      if (this.match('COND')) {
+        this.parseMonitorConditionDeclaration(
+          definition,
+        )
+        continue
+      }
+
       if (this.match('PROCEDURE')) {
         const procedure = this.parseMonitorProcedureDefinition()
 
@@ -304,6 +317,15 @@ class Parser {
         )
       }
 
+      if (definition.conditions.some(
+        (condition) => condition.name === stateName.lexeme,
+      )) {
+        throw this.error(
+          stateName,
+          `Monitor state "${stateName.lexeme}" conflicts with condition in monitor "${name.lexeme}"`,
+        )
+      }
+
       this.consume(
         'ASSIGN',
         'Expected "=" after monitor state variable name',
@@ -337,8 +359,55 @@ class Parser {
             `Parameter "${parameter.name}" conflicts with private state in monitor "${name.lexeme}"`,
           )
         }
+
+        if (definition.conditions.some(
+          (condition) => condition.name === parameter.name,
+        )) {
+          throw this.error(
+            name,
+            `Parameter "${parameter.name}" conflicts with condition in monitor "${name.lexeme}"`,
+          )
+        }
       }
     }
+  }
+
+  private parseMonitorConditionDeclaration(
+    definition: MonitorDefinition,
+  ): void {
+    do {
+      const condition = this.consume(
+        'IDENTIFIER',
+        'Expected condition name',
+      )
+
+      if (definition.conditions.some(
+        (existing) => existing.name === condition.lexeme,
+      )) {
+        throw this.error(
+          condition,
+          `Condition "${condition.lexeme}" is already defined in monitor "${definition.name}"`,
+        )
+      }
+
+      if (definition.state.some(
+        (state) => state.name === condition.lexeme,
+      )) {
+        throw this.error(
+          condition,
+          `Condition "${condition.lexeme}" conflicts with private state in monitor "${definition.name}"`,
+        )
+      }
+
+      definition.conditions.push({
+        name: condition.lexeme,
+      })
+    } while (this.match('COMMA'))
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after condition declaration',
+    )
   }
 
   private parseMonitorProcedureDefinition(): MonitorProcedureDefinition {
@@ -396,10 +465,16 @@ class Parser {
       'Expected ")" after procedure parameters',
     )
 
-    return {
-      name: name.lexeme,
-      parameters,
-      body: this.parseInstructionBlock(),
+    this.monitorProcedureDepth += 1
+
+    try {
+      return {
+        name: name.lexeme,
+        parameters,
+        body: this.parseInstructionBlock(),
+      }
+    } finally {
+      this.monitorProcedureDepth -= 1
     }
   }
 
@@ -491,39 +566,96 @@ class Parser {
     sharedMemory[name.lexeme] = value
   }
 
-    private parseSemaphoreDeclaration(
+  private parseSemaphoreDeclaration(
     semaphores: NonNullable<Program['semaphores']>,
   ): void {
-    const name = this.consume(
-      'IDENTIFIER',
-      'Expected semaphore name',
-    )
+    const isArray = this.match('LEFT_BRACKET')
 
-    this.consume(
-      'ASSIGN',
-      'Expected "=" after semaphore name',
-    )
+    if (isArray) {
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after "sem["',
+      )
+    }
 
-    const value = this.consume(
-      'NUMBER',
-      'Expected non-negative integer semaphore value',
-    )
+    const name = this.consumeSemaphoreName()
 
-    this.consume(
-      'SEMICOLON',
-      'Expected ";" after semaphore declaration',
-    )
-
-    if (semaphores[name.lexeme]) {
+    if (this.semaphoreDeclarationNames.has(name.lexeme)) {
       throw this.error(
         name,
         `Semaphore "${name.lexeme}" is already defined`,
       )
     }
 
-    semaphores[name.lexeme] = {
-      name: name.lexeme,
-      value: Number(value.lexeme),
+    this.consume(
+      'ASSIGN',
+      'Expected "=" after semaphore name',
+    )
+
+    if (isArray) {
+      this.parseSemaphoreArrayValues(
+        semaphores,
+        name,
+      )
+    } else {
+      const value = this.consume(
+        'NUMBER',
+        'Expected non-negative integer semaphore value',
+      )
+
+      semaphores[name.lexeme] = {
+        name: name.lexeme,
+        value: Number(value.lexeme),
+      }
+    }
+
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after semaphore declaration',
+    )
+
+    this.semaphoreDeclarationNames.add(name.lexeme)
+  }
+
+  private parseSemaphoreArrayValues(
+    semaphores: NonNullable<Program['semaphores']>,
+    name: Token,
+  ): void {
+    this.consume(
+      'LEFT_BRACKET',
+      'Expected "[" before semaphore array values',
+    )
+
+    if (this.check('RIGHT_BRACKET')) {
+      throw this.error(
+        this.peek(),
+        'Semaphore array must contain at least one value',
+      )
+    }
+
+    const values: number[] = []
+
+    do {
+      const value = this.consume(
+        'NUMBER',
+        'Expected non-negative integer semaphore value',
+      )
+
+      values.push(Number(value.lexeme))
+    } while (this.match('COMMA'))
+
+    this.consume(
+      'RIGHT_BRACKET',
+      'Expected "]" after semaphore array values',
+    )
+
+    for (const [index, value] of values.entries()) {
+      const elementName = `${name.lexeme}[${index}]`
+
+      semaphores[elementName] = {
+        name: elementName,
+        value,
+      }
     }
   }
 
@@ -704,6 +836,18 @@ class Parser {
 
     if (this.match('SEMAPHORE_V')) {
       return this.parseSemaphoreOperation('V')
+    }
+
+    if (this.match('WAIT')) {
+      return this.parseMonitorConditionOperation('WAIT')
+    }
+
+    if (this.match('SIGNAL')) {
+      return this.parseMonitorConditionOperation('SIGNAL')
+    }
+
+    if (this.match('SIGNAL_ALL')) {
+      return this.parseMonitorConditionOperation('SIGNAL_ALL')
     }
 
     if (this.match('PRINT')) {
@@ -2600,14 +2744,22 @@ class Parser {
       `Expected "(" after "${operation}"`,
     )
 
-    const semaphore = this.consume(
-      'IDENTIFIER',
-      'Expected semaphore name',
-    )
+    const semaphore = this.consumeSemaphoreName()
+
+    let semaphoreIndex: Expression | undefined
+
+    if (this.match('LEFT_BRACKET')) {
+      semaphoreIndex = this.parseExpression()
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after semaphore index',
+      )
+    }
 
     this.consume(
       'RIGHT_PAREN',
-      `Expected ")" after semaphore name`,
+      `Expected ")" after semaphore reference`,
     )
 
     this.consume(
@@ -2616,8 +2768,68 @@ class Parser {
     )
 
     return operation === 'P'
-      ? semaphorePInstruction(semaphore.lexeme)
-      : semaphoreVInstruction(semaphore.lexeme)
+      ? semaphorePInstruction(
+          semaphore.lexeme,
+          semaphoreIndex,
+        )
+      : semaphoreVInstruction(
+          semaphore.lexeme,
+          semaphoreIndex,
+        )
+  }
+
+  private parseMonitorConditionOperation(
+    operation: 'WAIT' | 'SIGNAL' | 'SIGNAL_ALL',
+  ): Instruction {
+    if (this.monitorProcedureDepth === 0) {
+      throw this.error(
+        this.previous(),
+        `"${monitorConditionKeyword(operation)}" can only be used inside a monitor procedure`,
+      )
+    }
+
+    this.consume(
+      'LEFT_PAREN',
+      `Expected "(" after "${monitorConditionKeyword(operation)}"`,
+    )
+    const condition = this.consume(
+      'IDENTIFIER',
+      'Expected condition name',
+    )
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after condition name',
+    )
+    this.consume(
+      'SEMICOLON',
+      `Expected ";" after ${monitorConditionKeyword(operation)} operation`,
+    )
+
+    switch (operation) {
+      case 'WAIT':
+        return monitorWaitInstruction(condition.lexeme)
+      case 'SIGNAL':
+        return monitorSignalInstruction(condition.lexeme)
+      case 'SIGNAL_ALL':
+        return monitorSignalAllInstruction(condition.lexeme)
+    }
+  }
+
+  private consumeSemaphoreName(): Token {
+    if (
+      this.check('IDENTIFIER')
+      || this.check('COND')
+      || this.check('WAIT')
+      || this.check('SIGNAL')
+      || this.check('SIGNAL_ALL')
+    ) {
+      return this.advance()
+    }
+
+    throw this.error(
+      this.peek(),
+      'Expected semaphore name',
+    )
   }
 
   private checkAt(
@@ -2637,6 +2849,12 @@ function matchesPrimitiveType(
     || (type === 'bool' && typeof value === 'boolean')
     || (type === 'string' && typeof value === 'string')
   )
+}
+
+function monitorConditionKeyword(
+  operation: 'WAIT' | 'SIGNAL' | 'SIGNAL_ALL',
+): string {
+  return operation.toLocaleLowerCase()
 }
 
 function toCollectionElementType(

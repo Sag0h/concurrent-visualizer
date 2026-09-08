@@ -94,6 +94,7 @@ Sintaxis soportada:
 sem mutex = 1;
 sem available = 3;
 sem event = 0;
+sem[] forks = [1, 1, 1, 1, 1];
 ```
 
 La inicialización es obligatoria.
@@ -114,10 +115,32 @@ Ejemplos no válidos:
 sem missing;
 sem negative = -1;
 sem computed = 1 + 1;
+sem[] empty = [];
+sem[] invalid = [1, -1];
 ```
 
-Actualmente los semáforos son escalares. No se soportan todavía arrays
-de semáforos.
+También se soportan arrays homogéneos de semáforos generales. Cada valor
+del literal inicializa un semáforo independiente y el array debe contener
+al menos un elemento:
+
+``` text
+sem[] mutexes = [1, 1, 1, 1];
+sem[] ready = [0, 0, 0];
+```
+
+Los elementos sólo se acceden desde `P` y `V`. El índice puede ser una
+expresión entera y se valida al ejecutar:
+
+``` text
+P(mutexes[i]);
+V(mutexes[(i + 1) % 4]);
+```
+
+En la interfaz y el historial, cada elemento aparece con su nombre
+resuelto, por ejemplo `mutexes[2]`. Si un `P(mutexes[i])` se bloquea, se
+conserva el elemento elegido en ese intento hasta que la operación pueda
+completarse; cambios posteriores en las variables usadas por el índice no
+redirigen una espera ya iniciada.
 
 Los semáforos no son variables compartidas ordinarias. No se leen ni
 modifican mediante asignaciones como:
@@ -967,6 +990,31 @@ una única operación atómica. El motor puede suspender la evaluación,
 ejecutar la función durante múltiples steps y reanudar posteriormente la
 expresión original.
 
+Si sus argumentos leen memoria compartida, cada lectura se observa en un
+step diferente y el valor queda capturado para esa posición. Por ejemplo:
+
+``` text
+shared int x = 1;
+
+function add(int left, int right) {
+    return left + right;
+}
+
+process P1 {
+    x = add(x, x);
+}
+```
+
+Las dos apariciones de `x` pueden observar valores distintos si otro
+proceso escribe entre ambas lecturas. Al retornar la función, la
+asignación compartida continúa con sus fases `COMPUTE` y `SHARED_WRITE`;
+el retorno no convierte el store final en una operación invisible.
+
+Esta granularidad detallada corresponde actualmente a funciones usadas
+dentro de expresiones suspendibles. Una llamada usada como instrucción
+independiente todavía evalúa directamente los argumentos que no contienen
+otra llamada; su generalización queda como mejora futura.
+
 ------------------------------------------------------------------------
 
 ## `return`
@@ -1318,10 +1366,76 @@ La interfaz muestra el propietario, los competidores, el estado privado
 y el procedure activo de cada proceso. Snapshots, forks, exploración,
 `Reset` y `Step Back` conservan esta información.
 
-Limitaciones actuales: todavía no son ejecutables las variables condición,
-`wait`, `signal` ni `signal_all`. Las llamadas reentrantes al mismo monitor
-se rechazan. Estos mecanismos se incorporarán sobre el modelo de propiedad
-ya disponible.
+### Variables condición
+
+Una condición se declara dentro del monitor. Se pueden declarar varias en
+la misma línea:
+
+``` text
+monitor Buffer {
+    int data = 0;
+    bool hasData = false;
+    cond canProduce, canConsume;
+
+    procedure send(in int value) {
+        while (hasData) {
+            wait(canProduce);
+        }
+
+        data = value;
+        hasData = true;
+        signal(canConsume);
+    }
+
+    procedure receive(out int value) {
+        while (!hasData) {
+            wait(canConsume);
+        }
+
+        value = data;
+        hasData = false;
+        signal(canProduce);
+    }
+}
+
+process Consumer {
+    int result;
+    Buffer.receive(result);
+    print(result);
+}
+
+process Producer {
+    Buffer.send(42);
+}
+```
+
+Las tres operaciones sólo son válidas dentro de un procedure del monitor:
+
+-   `wait(condition)`: siempre bloquea al proceso, lo agrega al final de
+    la cola FIFO y libera el monitor;
+-   `signal(condition)`: despierta como máximo al primer proceso de la
+    cola;
+-   `signal_all(condition)`: despierta a todos los procesos de la cola.
+
+Se usa semántica **signal-and-continue**: quien ejecuta `signal` conserva el
+monitor. El proceso despertado debe competir nuevamente por la entrada y
+continúa justo después de su `wait` cuando logra readquirirlo. Al readquirir,
+observa el estado privado actualizado sin perder sus parámetros ni variables
+locales.
+
+Una señal emitida cuando la cola está vacía se pierde; no queda guardada como
+un permiso. Por esta razón una variable condición no equivale a un semáforo.
+Como el estado puede volver a cambiar antes de la reentrada, normalmente la
+condición se comprueba con `while` y no con `if`.
+
+La interfaz muestra la cola de cada condición, la transición del proceso a
+espera o reentrada y los eventos `wait`, `signal` y `signal_all` en el
+historial. Las condiciones participan en Reset, Step Back, forks, exploración
+BFS y diagnóstico de deadlock.
+
+Limitaciones actuales: las condiciones son escalares; todavía no existen
+arrays de condiciones ni consultas como `empty(condition)`. Las llamadas
+reentrantes al mismo monitor se rechazan.
 
 ------------------------------------------------------------------------
 
@@ -1386,8 +1500,6 @@ están disponibles:
 ``` text
 sleep
 yield
-
-arrays de semáforos
 
 wait
 signal

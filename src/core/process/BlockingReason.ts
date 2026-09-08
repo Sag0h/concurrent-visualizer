@@ -13,3 +13,9 @@ export type BlockingReason =
       readonly type: 'MONITOR_ENTRY'
       readonly monitorName: string
     }
+  | {
+      readonly type: 'MONITOR_CONDITION'
+      readonly monitorName: string
+      readonly conditionName: string
+      readonly phase: 'WAITING' | 'REACQUIRE'
+    }

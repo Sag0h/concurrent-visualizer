@@ -62,6 +62,7 @@ import type {
   LoopConditionExecutionEvent,
   DataStructureExecutionEvent,
   SemaphoreExecutionEvent,
+  MonitorConditionExecutionEvent,
   SimulatedOperationExecutionEvent,
 } from './ExecutionEvent'
 import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
@@ -327,6 +328,9 @@ export class SimulationEngine {
     let semaphoreEvent:
       SemaphoreExecutionEvent | undefined
 
+    let monitorConditionEvent:
+      MonitorConditionExecutionEvent | undefined
+
     let loopConditionEvent:
       LoopConditionExecutionEvent | undefined
 
@@ -336,7 +340,11 @@ export class SimulationEngine {
     let simulatedOperationEvent:
       SimulatedOperationExecutionEvent | undefined
 
-    switch (instruction.type) {
+    if (this.hasPendingFunctionArgumentEvaluation(process)) {
+      this.continuePendingFunctionArguments(process)
+      executionDescription =
+        'Evaluated a pending function argument'
+    } else switch (instruction.type) {
       case 'NO_OP':
         this.advanceProcess(process)
         break
@@ -357,18 +365,22 @@ export class SimulationEngine {
 
       case 'ASSIGN': {
         if (
-          !this.containsFunctionCall(
-            instruction.expression,
-          )
-          && (
-            process.microOperationRuntime
-            || this.isSharedAssignmentTarget(
-              process,
-              instruction.target,
-            )
-            || this.findNextSharedMemoryRead(
-              process,
+          process.microOperationRuntime?.type
+            === 'SHARED_ASSIGNMENT'
+          || (
+            !this.containsFunctionCall(
               instruction.expression,
+            )
+            && (
+              process.microOperationRuntime
+              || this.isSharedAssignmentTarget(
+                process,
+                instruction.target,
+              )
+              || this.findNextSharedMemoryRead(
+                process,
+                instruction.expression,
+              )
             )
           )
         ) {
@@ -824,9 +836,16 @@ export class SimulationEngine {
       }
 
       case 'SEMAPHORE_P': {
+        const semaphoreName =
+          process.blockingReason?.type === 'SEMAPHORE_P'
+            ? process.blockingReason.semaphoreName
+            : this.resolveSemaphoreName(
+                process,
+                instruction,
+              )
         const semaphore =
           this.getSemaphore(
-            instruction.semaphoreName,
+            semaphoreName,
           )
 
         if (semaphore.value === 0) {
@@ -834,17 +853,15 @@ export class SimulationEngine {
 
           process.blockingReason = {
             type: 'SEMAPHORE_P',
-            semaphoreName:
-              instruction.semaphoreName,
+            semaphoreName,
           }
 
           executionDescription =
-            `P(${instruction.semaphoreName}) blocked: semaphore value is 0`
+            `P(${semaphoreName}) blocked: semaphore value is 0`
 
           semaphoreEvent = {
             operation: 'P',
-            semaphoreName:
-              instruction.semaphoreName,
+            semaphoreName,
             status: 'BLOCKED',
             valueBefore: semaphore.value,
             valueAfter: semaphore.value,
@@ -860,12 +877,11 @@ export class SimulationEngine {
         process.blockingReason = undefined
 
         executionDescription =
-          `P(${instruction.semaphoreName}): ${previousValue} -> ${semaphore.value}`
+          `P(${semaphoreName}): ${previousValue} -> ${semaphore.value}`
 
         semaphoreEvent = {
           operation: 'P',
-          semaphoreName:
-            instruction.semaphoreName,
+          semaphoreName,
           status: 'SUCCEEDED',
           valueBefore: previousValue,
           valueAfter: semaphore.value,
@@ -877,9 +893,14 @@ export class SimulationEngine {
       }
 
       case 'SEMAPHORE_V': {
+        const semaphoreName =
+          this.resolveSemaphoreName(
+            process,
+            instruction,
+          )
         const semaphore =
           this.getSemaphore(
-            instruction.semaphoreName,
+            semaphoreName,
           )
 
         const previousValue = semaphore.value
@@ -887,12 +908,11 @@ export class SimulationEngine {
         semaphore.value += 1
 
         executionDescription =
-          `V(${instruction.semaphoreName}): ${previousValue} -> ${semaphore.value}`
+          `V(${semaphoreName}): ${previousValue} -> ${semaphore.value}`
 
         semaphoreEvent = {
           operation: 'V',
-          semaphoreName:
-            instruction.semaphoreName,
+          semaphoreName,
           status: 'SUCCEEDED',
           valueBefore: previousValue,
           valueAfter: semaphore.value,
@@ -900,6 +920,30 @@ export class SimulationEngine {
 
         this.advanceProcess(process)
 
+        break
+      }
+
+      case 'MONITOR_WAIT': {
+        const result = this.executeMonitorWait(
+          process,
+          instruction.conditionName,
+        )
+
+        monitorConditionEvent = result.event
+        executionDescription = result.description
+        break
+      }
+
+      case 'MONITOR_SIGNAL':
+      case 'MONITOR_SIGNAL_ALL': {
+        const result = this.executeMonitorSignal(
+          process,
+          instruction.conditionName,
+          instruction.type === 'MONITOR_SIGNAL_ALL',
+        )
+
+        monitorConditionEvent = result.event
+        executionDescription = result.description
         break
       }
 
@@ -957,6 +1001,7 @@ export class SimulationEngine {
         : {}),
       awaitStatus,
       semaphoreEvent,
+      monitorConditionEvent,
       loopConditionEvent,
       dataStructureEvent,
       simulatedOperationEvent,
@@ -1785,6 +1830,103 @@ export class SimulationEngine {
       )
     }
 
+    this.getFunctionDefinitionForCall(functionCall)
+
+    evaluation.pendingExpression = {
+      expression: pending.expression,
+      activeCall: functionCall,
+      functionArguments: {
+        pendingArguments: structuredClone(
+          functionCall.arguments,
+        ),
+        argumentIndex: 0,
+        argumentValues: [],
+      },
+    }
+
+    this.continuePendingFunctionArguments(process)
+  }
+
+  private hasPendingFunctionArgumentEvaluation(
+    process: Process,
+  ): boolean {
+    return this.getCurrentPendingEvaluation(process)
+      ?.pendingExpression.functionArguments !== undefined
+  }
+
+  private continuePendingFunctionArguments(
+    process: Process,
+  ): void {
+    const evaluation =
+      this.getCurrentPendingEvaluation(process)
+    const pending = evaluation?.pendingExpression
+    const functionCall = pending?.activeCall
+    const argumentRuntime = pending?.functionArguments
+
+    if (
+      !evaluation
+      || !pending
+      || !functionCall
+      || !argumentRuntime
+    ) {
+      throw new Error(
+        'Missing pending function argument evaluation',
+      )
+    }
+
+    while (
+      argumentRuntime.argumentIndex
+      < argumentRuntime.pendingArguments.length
+    ) {
+      const argumentIndex =
+        argumentRuntime.argumentIndex
+      const argument =
+        argumentRuntime.pendingArguments[argumentIndex]
+      const read = this.findNextSharedMemoryRead(
+        process,
+        argument,
+      )
+
+      if (read) {
+        const value = this.readSharedMemoryLocation(
+          read.location,
+        )
+        const locationDescription =
+          this.formatMemoryLocation(read.location)
+
+        this.recordMicroOperation(
+          process,
+          'SHARED_READ',
+          `${locationDescription} = ${JSON.stringify(value)}`,
+          read.location,
+        )
+
+        argumentRuntime.pendingArguments[argumentIndex] =
+          this.replaceExpressionWithValue(
+            argument,
+            read.expression,
+            value,
+          )
+
+        return
+      }
+
+      const value = evaluateExpression(
+        argument,
+        {
+          localMemory:
+            this.getActiveLocalMemory(process),
+          sharedMemory:
+            this.state.program.sharedMemory,
+        },
+      )
+
+      argumentRuntime.argumentValues.push(
+        structuredClone(value),
+      )
+      argumentRuntime.argumentIndex++
+    }
+
     evaluation.pendingExpression = {
       expression: pending.expression,
       activeCall: functionCall,
@@ -1793,50 +1935,17 @@ export class SimulationEngine {
     this.startFunctionCallExpression(
       process,
       functionCall,
+      argumentRuntime.argumentValues,
     )
   }
 
   private startFunctionCallExpression(
     process: Process,
     expression: FunctionCallExpression,
+    argumentValues: RuntimeValue[],
   ): void {
     const functionDefinition =
-      this.state.program.functions?.[
-        expression.functionName
-      ]
-
-    if (!functionDefinition) {
-      throw new Error(
-        `Function "${expression.functionName}" is not defined`,
-      )
-    }
-
-    if (
-      expression.arguments.length
-      !== functionDefinition.parameters.length
-    ) {
-      throw new Error(
-        `Function "${expression.functionName}" expected `
-        + `${functionDefinition.parameters.length} arguments `
-        + `but received ${expression.arguments.length}`,
-      )
-    }
-
-    const localMemory =
-      this.getActiveLocalMemory(process)
-
-    const argumentValues =
-      expression.arguments.map(
-        (argument) =>
-          evaluateExpression(
-            argument,
-            {
-              localMemory,
-              sharedMemory:
-                this.state.program.sharedMemory,
-            },
-          ),
-      )
+      this.getFunctionDefinitionForCall(expression)
 
     const functionMemory: Record<
       string,
@@ -1874,6 +1983,34 @@ export class SimulationEngine {
       completionMode:
         'FUNCTION_RETURN',
     })
+  }
+
+  private getFunctionDefinitionForCall(
+    expression: FunctionCallExpression,
+  ): FunctionDefinition {
+    const functionDefinition =
+      this.state.program.functions?.[
+        expression.functionName
+      ]
+
+    if (!functionDefinition) {
+      throw new Error(
+        `Function "${expression.functionName}" is not defined`,
+      )
+    }
+
+    if (
+      expression.arguments.length
+      !== functionDefinition.parameters.length
+    ) {
+      throw new Error(
+        `Function "${expression.functionName}" expected `
+        + `${functionDefinition.parameters.length} arguments `
+        + `but received ${expression.arguments.length}`,
+      )
+    }
+
+    return functionDefinition
   }
 
   private completePendingExpression(
@@ -1936,6 +2073,15 @@ export class SimulationEngine {
       return
     }
 
+    if (
+      this.startResolvedAssignmentMicroOperations(
+        process,
+        newExpression,
+      )
+    ) {
+      return
+    }
+
     const finalValue =
       evaluateExpression(
         newExpression,
@@ -1958,22 +2104,8 @@ export class SimulationEngine {
     process: Process,
     value: RuntimeValue,
   ): void {
-    const evaluation =
-      process.pendingEvaluations.pop()
-
-    if (!evaluation) {
-      throw new Error(
-        'Missing pending evaluation',
-      )
-    }
-
     const pending =
-      evaluation.pendingInstruction
-
-    process.expressionRuntimeStatus =
-      process.pendingEvaluations.length > 0
-        ? 'WAITING_FOR_FUNCTION'
-        : 'IDLE'
+      this.takePendingInstruction(process)
 
     switch (pending.type) {
       case 'DECLARE':
@@ -2087,6 +2219,81 @@ export class SimulationEngine {
         this.advanceProcess(process)
         return
     }
+  }
+
+  private takePendingInstruction(
+    process: Process,
+  ): PendingInstruction {
+    const evaluation =
+      process.pendingEvaluations.pop()
+
+    if (!evaluation) {
+      throw new Error(
+        'Missing pending evaluation',
+      )
+    }
+
+    process.expressionRuntimeStatus =
+      process.pendingEvaluations.length > 0
+        ? 'WAITING_FOR_FUNCTION'
+        : 'IDLE'
+
+    return evaluation.pendingInstruction
+  }
+
+  private startResolvedAssignmentMicroOperations(
+    process: Process,
+    expression: Expression,
+  ): boolean {
+    const evaluation =
+      this.getCurrentPendingEvaluation(process)
+    const pending = evaluation?.pendingInstruction
+
+    if (!pending || pending.type !== 'ASSIGN') {
+      return false
+    }
+
+    const targetIndexContainsFunction =
+      (pending.target.type === 'ARRAY_ACCESS'
+      || pending.target.type === 'ARRAY_RECORD_FIELD')
+      && this.containsFunctionCall(pending.target.index)
+
+    if (targetIndexContainsFunction) {
+      return false
+    }
+
+    if (
+      !this.isSharedAssignmentTarget(
+        process,
+        pending.target,
+      )
+      && !this.findNextSharedMemoryRead(
+        process,
+        expression,
+      )
+    ) {
+      return false
+    }
+
+    this.takePendingInstruction(process)
+
+    process.microOperationRuntime = {
+      type: 'SHARED_ASSIGNMENT',
+      instruction: {
+        type: 'ASSIGN',
+        target: structuredClone(pending.target),
+        expression: structuredClone(expression),
+      },
+      phase: 'READ',
+      pendingExpression: structuredClone(expression),
+      pendingTargetIndex:
+        pending.target.type === 'ARRAY_ACCESS'
+        || pending.target.type === 'ARRAY_RECORD_FIELD'
+          ? structuredClone(pending.target.index)
+          : undefined,
+    }
+
+    return true
   }
 
   private findNextFunctionCall(
@@ -4020,7 +4227,14 @@ export class SimulationEngine {
 
       if (this.isBlockingReasonEnabled(process)) {
         process.state = 'READY'
-        process.blockingReason = undefined
+
+        if (
+          process.blockingReason.type !== 'SEMAPHORE_P'
+          && process.blockingReason.type
+            !== 'MONITOR_CONDITION'
+        ) {
+          process.blockingReason = undefined
+        }
       }
     }
   }
@@ -4071,6 +4285,12 @@ export class SimulationEngine {
         return this.getMonitorRuntime(
           reason.monitorName,
         ).ownerProcessId === undefined
+
+      case 'MONITOR_CONDITION':
+        return reason.phase === 'REACQUIRE'
+          && this.getMonitorRuntime(
+            reason.monitorName,
+          ).ownerProcessId === undefined
     }
   }
 
@@ -4185,6 +4405,279 @@ export class SimulationEngine {
 
     return {
       description: `${instruction.monitorName}.${instruction.procedureName}() acquired monitor`,
+    }
+  }
+
+  private executeMonitorWait(
+    process: Process,
+    conditionName: string,
+  ): {
+    readonly description: string
+    readonly event: MonitorConditionExecutionEvent
+  } {
+    const { frame, runtime, condition } =
+      this.getActiveMonitorConditionContext(
+        process,
+        conditionName,
+      )
+    const waitingProcessIdsBefore = structuredClone(
+      condition.waitingProcessIds,
+    )
+    const blockingReason = process.blockingReason
+
+    if (blockingReason?.type === 'MONITOR_CONDITION') {
+      if (
+        blockingReason.monitorName !== frame.monitorName
+        || blockingReason.conditionName !== conditionName
+        || blockingReason.phase !== 'REACQUIRE'
+      ) {
+        throw new Error(
+          'Pending monitor condition wait does not match the active instruction',
+        )
+      }
+
+      if (
+        runtime.ownerProcessId
+        && runtime.ownerProcessId !== process.id
+      ) {
+        this.addMonitorEntryContender(
+          runtime,
+          process.id,
+        )
+        process.state = 'BLOCKED'
+
+        return {
+          description:
+            `${process.id} was signaled on ${frame.monitorName}.${conditionName} but the monitor is owned by ${runtime.ownerProcessId}`,
+          event: {
+            operation: 'WAIT',
+            monitorName: frame.monitorName,
+            conditionName,
+            status: 'REENTRY_BLOCKED',
+            awakenedProcessIds: [],
+            waitingProcessIdsBefore,
+            waitingProcessIdsAfter: structuredClone(
+              condition.waitingProcessIds,
+            ),
+          },
+        }
+      }
+
+      runtime.ownerProcessId = process.id
+      this.removeMonitorEntryContender(
+        runtime,
+        process.id,
+      )
+      this.refreshMonitorFrameState(frame, runtime)
+      process.blockingReason = undefined
+      this.advanceProcess(process)
+
+      return {
+        description:
+          `${process.id} reacquired ${frame.monitorName} after wait(${conditionName})`,
+        event: {
+          operation: 'WAIT',
+          monitorName: frame.monitorName,
+          conditionName,
+          status: 'REACQUIRED',
+          awakenedProcessIds: [],
+          waitingProcessIdsBefore,
+          waitingProcessIdsAfter: structuredClone(
+            condition.waitingProcessIds,
+          ),
+        },
+      }
+    }
+
+    if (runtime.ownerProcessId !== process.id) {
+      throw new Error(
+        `Process "${process.id}" does not own monitor "${frame.monitorName}"`,
+      )
+    }
+
+    if (condition.waitingProcessIds.includes(process.id)) {
+      throw new Error(
+        `Process "${process.id}" is already waiting on condition "${conditionName}"`,
+      )
+    }
+
+    this.copyMonitorState(frame.localMemory, runtime)
+    condition.waitingProcessIds.push(process.id)
+    runtime.ownerProcessId = undefined
+    process.state = 'BLOCKED'
+    process.blockingReason = {
+      type: 'MONITOR_CONDITION',
+      monitorName: frame.monitorName,
+      conditionName,
+      phase: 'WAITING',
+    }
+
+    return {
+      description:
+        `${process.id} waits on ${frame.monitorName}.${conditionName} and releases the monitor`,
+      event: {
+        operation: 'WAIT',
+        monitorName: frame.monitorName,
+        conditionName,
+        status: 'WAITING',
+        awakenedProcessIds: [],
+        waitingProcessIdsBefore,
+        waitingProcessIdsAfter: structuredClone(
+          condition.waitingProcessIds,
+        ),
+      },
+    }
+  }
+
+  private executeMonitorSignal(
+    process: Process,
+    conditionName: string,
+    broadcast: boolean,
+  ): {
+    readonly description: string
+    readonly event: MonitorConditionExecutionEvent
+  } {
+    const { frame, runtime, condition } =
+      this.getActiveMonitorConditionContext(
+        process,
+        conditionName,
+      )
+
+    if (runtime.ownerProcessId !== process.id) {
+      throw new Error(
+        `Process "${process.id}" does not own monitor "${frame.monitorName}"`,
+      )
+    }
+
+    const waitingProcessIdsBefore = structuredClone(
+      condition.waitingProcessIds,
+    )
+    const awakenedProcessIds = broadcast
+      ? condition.waitingProcessIds.splice(0)
+      : condition.waitingProcessIds.splice(0, 1)
+
+    for (const processId of awakenedProcessIds) {
+      this.prepareConditionWaiterForReentry(
+        frame.monitorName,
+        conditionName,
+        processId,
+        runtime,
+      )
+    }
+
+    this.advanceProcess(process)
+
+    const operation = broadcast
+      ? 'SIGNAL_ALL' as const
+      : 'SIGNAL' as const
+    const status = awakenedProcessIds.length > 0
+      ? 'SIGNALED' as const
+      : 'NO_WAITER' as const
+    const awakenedDescription = awakenedProcessIds.length > 0
+      ? `woke ${awakenedProcessIds.join(', ')}`
+      : 'had no waiting process'
+
+    return {
+      description:
+        `${monitorConditionOperationName(operation)}(${conditionName}) ${awakenedDescription}; signaler continues in ${frame.monitorName}`,
+      event: {
+        operation,
+        monitorName: frame.monitorName,
+        conditionName,
+        status,
+        awakenedProcessIds: structuredClone(
+          awakenedProcessIds,
+        ),
+        waitingProcessIdsBefore,
+        waitingProcessIdsAfter: structuredClone(
+          condition.waitingProcessIds,
+        ),
+      },
+    }
+  }
+
+  private getActiveMonitorConditionContext(
+    process: Process,
+    conditionName: string,
+  ) {
+    const frame = process.monitorCallStack?.at(-1)
+
+    if (!frame) {
+      throw new Error(
+        'Monitor condition operations require an active monitor procedure',
+      )
+    }
+
+    const runtime = this.getMonitorRuntime(
+      frame.monitorName,
+    )
+    const condition = runtime.conditions[conditionName]
+
+    if (!condition) {
+      throw new Error(
+        `Condition "${conditionName}" is not defined in monitor "${frame.monitorName}"`,
+      )
+    }
+
+    return {
+      frame,
+      runtime,
+      condition,
+    }
+  }
+
+  private prepareConditionWaiterForReentry(
+    monitorName: string,
+    conditionName: string,
+    processId: string,
+    runtime: MonitorRuntimeState,
+  ): void {
+    const waiter = this.state.program.processes.find(
+      (process) => process.id === processId,
+    )
+
+    if (
+      !waiter
+      || waiter.state !== 'BLOCKED'
+      || waiter.blockingReason?.type
+        !== 'MONITOR_CONDITION'
+      || waiter.blockingReason.monitorName !== monitorName
+      || waiter.blockingReason.conditionName !== conditionName
+      || waiter.blockingReason.phase !== 'WAITING'
+    ) {
+      throw new Error(
+        `Condition "${monitorName}.${conditionName}" contains invalid waiter "${processId}"`,
+      )
+    }
+
+    waiter.blockingReason = {
+      type: 'MONITOR_CONDITION',
+      monitorName,
+      conditionName,
+      phase: 'REACQUIRE',
+    }
+    this.addMonitorEntryContender(runtime, processId)
+  }
+
+  private addMonitorEntryContender(
+    runtime: MonitorRuntimeState,
+    processId: string,
+  ): void {
+    if (!runtime.entryContenderProcessIds.includes(processId)) {
+      runtime.entryContenderProcessIds.push(processId)
+    }
+  }
+
+  private removeMonitorEntryContender(
+    runtime: MonitorRuntimeState,
+    processId: string,
+  ): void {
+    const index = runtime.entryContenderProcessIds.indexOf(
+      processId,
+    )
+
+    if (index >= 0) {
+      runtime.entryContenderProcessIds.splice(index, 1)
     }
   }
 
@@ -4698,6 +5191,33 @@ export class SimulationEngine {
 
       runtime.memory[state.name] = structuredClone(
         source[state.name],
+      )
+    }
+  }
+
+  private refreshMonitorFrameState(
+    frame: NonNullable<Process['monitorCallStack']>[number],
+    runtime: MonitorRuntimeState,
+  ): void {
+    const definition = this.state.program.monitors?.[
+      runtime.definitionName
+    ]
+
+    if (!definition) {
+      throw new Error(
+        `Monitor "${runtime.definitionName}" is not defined`,
+      )
+    }
+
+    for (const state of definition.state) {
+      if (!(state.name in runtime.memory)) {
+        throw new Error(
+          `Monitor state "${state.name}" is missing from runtime`,
+        )
+      }
+
+      frame.localMemory[state.name] = structuredClone(
+        runtime.memory[state.name],
       )
     }
   }
@@ -5299,12 +5819,89 @@ export class SimulationEngine {
       ]
 
     if (!semaphore) {
+      const isArray = Object.keys(
+        this.state.program.semaphores ?? {},
+      ).some((name) =>
+        name.startsWith(`${semaphoreName}[`),
+      )
+
+      if (isArray) {
+        throw new Error(
+          `Semaphore array "${semaphoreName}" requires an index`,
+        )
+      }
+
       throw new Error(
         `Semaphore "${semaphoreName}" is not defined`,
       )
     }
 
     return semaphore
+  }
+
+  private resolveSemaphoreName(
+    process: Process,
+    instruction: {
+      readonly semaphoreName: string
+      readonly semaphoreIndex?: Expression
+    },
+  ): string {
+    if (!instruction.semaphoreIndex) {
+      return instruction.semaphoreName
+    }
+
+    const index = evaluateExpression(
+      instruction.semaphoreIndex,
+      {
+        localMemory:
+          this.getActiveLocalMemory(process),
+        sharedMemory:
+          this.state.program.sharedMemory,
+      },
+    )
+
+    if (
+      typeof index !== 'number'
+      || !Number.isInteger(index)
+    ) {
+      throw new Error(
+        'Semaphore index must evaluate to an integer',
+      )
+    }
+
+    const resolvedName =
+      `${instruction.semaphoreName}[${index}]`
+    const semaphores =
+      this.state.program.semaphores ?? {}
+    const hasArrayElements = Object.keys(semaphores)
+      .some((name) =>
+        name.startsWith(
+          `${instruction.semaphoreName}[`,
+        ),
+      )
+
+    if (!hasArrayElements) {
+      if (semaphores[instruction.semaphoreName]) {
+        throw new Error(
+          `Semaphore "${instruction.semaphoreName}" is not an array`,
+        )
+      }
+
+      throw new Error(
+        `Semaphore array "${instruction.semaphoreName}" is not defined`,
+      )
+    }
+
+    if (
+      index < 0
+      || !semaphores[resolvedName]
+    ) {
+      throw new Error(
+        `Semaphore index ${index} is out of bounds for "${instruction.semaphoreName}"`,
+      )
+    }
+
+    return resolvedName
   }
 }
 
@@ -5361,4 +5958,10 @@ function dataStructureMethodName(
     case 'SIZE':
       return 'size'
   }
+}
+
+function monitorConditionOperationName(
+  operation: 'SIGNAL' | 'SIGNAL_ALL',
+): string {
+  return operation.toLocaleLowerCase()
 }

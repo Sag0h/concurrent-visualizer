@@ -16,6 +16,9 @@ import type {
   AtomicInstruction,
   SemaphoreVInstruction,
   SemaphorePInstruction,
+  MonitorWaitInstruction,
+  MonitorSignalInstruction,
+  MonitorSignalAllInstruction,
   DataStructureOperationInstruction,
   DataStructureOperation,
   DataStructureResultTarget,
@@ -202,19 +205,50 @@ export function awaitInstruction(
 
 export function semaphorePInstruction(
   semaphoreName: string,
+  semaphoreIndex?: Expression,
 ): SemaphorePInstruction {
   return {
     type: 'SEMAPHORE_P',
     semaphoreName,
+    semaphoreIndex,
   }
 }
 
 export function semaphoreVInstruction(
   semaphoreName: string,
+  semaphoreIndex?: Expression,
 ): SemaphoreVInstruction {
   return {
     type: 'SEMAPHORE_V',
     semaphoreName,
+    semaphoreIndex,
+  }
+}
+
+export function monitorWaitInstruction(
+  conditionName: string,
+): MonitorWaitInstruction {
+  return {
+    type: 'MONITOR_WAIT',
+    conditionName,
+  }
+}
+
+export function monitorSignalInstruction(
+  conditionName: string,
+): MonitorSignalInstruction {
+  return {
+    type: 'MONITOR_SIGNAL',
+    conditionName,
+  }
+}
+
+export function monitorSignalAllInstruction(
+  conditionName: string,
+): MonitorSignalAllInstruction {
+  return {
+    type: 'MONITOR_SIGNAL_ALL',
+    conditionName,
   }
 }
 

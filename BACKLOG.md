@@ -278,6 +278,14 @@ proceso.
     `MemoryLocation`.
 -   [x] Soportar accesos a elementos de arrays compartidos a nivel de
     microoperación.
+-   [x] Evaluar por separado las lecturas compartidas de argumentos de
+    funciones usadas dentro de expresiones suspendibles.
+-   [x] Reanudar una asignación compartida mediante `COMPUTE` y
+    `SHARED_WRITE` después de resolver sus llamadas a funciones.
+-   [x] Verificar resultados alcanzables, clonación intermedia y llamadas
+    anidadas con tests de granularidad académica.
+-   [ ] Generalizar la misma granularidad a argumentos compartidos de una
+    llamada a función usada como instrucción independiente.
 
 ### Interferencia e interleavings
 
@@ -632,7 +640,8 @@ comportamiento debe emerger del motor general.
 -   No asumir fairness débil/fuerte ni imponer FIFO.
 -   No reservar permisos al reactivar procesos.
 -   No modelar ownership del semáforo.
--   No implementar todavía arrays de semáforos.
+-   Los arrays de semáforos, diferidos originalmente, se incorporaron en
+    M10.4 sin crear un subtipo binario.
 -   No mezclar semáforos con memoria compartida ordinaria.
 -   No reutilizar `atomicDepth` para representar secciones críticas
     protegidas con `P` / `V`.
@@ -810,7 +819,7 @@ mejoras transversales y extensiones futuras.
 -   [ ] Agregar tests de tokenizer/parser por cada extensión.
 -   [ ] Evaluar una fase explícita de validación semántica/símbolos
     cuando se justifique.
--   [ ] Parsear arrays de semáforos cuando se incorporen.
+-   [x] Parsear arrays de semáforos y referencias indexadas en `P` / `V`.
 -   [ ] Parsear primitivas temporales.
 -   [x] Parsear monitores, procedures, parámetros `in`/`out` y llamadas
     calificadas.
@@ -909,6 +918,29 @@ colecciones de datos compuestos.
     valor y tipos incompatibles.
 
 **Estado:** M10.3 COMPLETADO.
+
+### M10.4 --- Arrays de semáforos
+
+Extensión necesaria para expresar familias de recursos como tenedores,
+mutexes por posición y sincronización por proceso sin declarar manualmente
+un nombre escalar por elemento.
+
+-   [x] Aceptar declaraciones `sem[] nombre = [v0, v1, ...];`.
+-   [x] Exigir al menos un valor y literales enteros no negativos.
+-   [x] Aceptar expresiones enteras en `P(nombre[indice])` y
+    `V(nombre[indice])`.
+-   [x] Validar tipo, existencia y rango del índice durante la ejecución.
+-   [x] Resolver cada elemento con un nombre canónico como `nombre[2]`.
+-   [x] Conservar el elemento concreto cuando un `P` queda bloqueado.
+-   [x] Integrar elementos indexados con snapshots, historial, waiters,
+    Step Back, fork y claves semánticas.
+-   [x] Integrar arrays con detección y exploración BFS de deadlock.
+-   [x] Reutilizar el análisis existente de protocolos mutex y
+    señalización sobre cada elemento concreto.
+-   [x] Agregar pruebas de tokenizer, parser, runtime, errores, clonación,
+    rewind y deadlock.
+
+**Estado:** M10.4 COMPLETADO.
 
 Flujo vigente:
 
@@ -1056,15 +1088,23 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
     `monitor.procedure()`.
 -   [x] Exclusión mutua implícita con propietario y competidores de
     entrada sin prioridad FIFO.
--   [ ] Variables condición.
--   [ ] `wait`.
--   [ ] `signal`.
--   [ ] `signal_all` (broadcast académico).
--   [ ] Colas asociadas.
+-   [x] Variables condición escalares.
+-   [x] `wait`: encola FIFO, libera el monitor y reanuda después de
+    readquirirlo.
+-   [x] `signal`: despierta al primer esperador sin ceder el monitor ni
+    acumular señales.
+-   [x] `signal_all` (broadcast académico).
+-   [x] Colas FIFO asociadas, visibles y clonables.
 -   [x] Visualización base de estado privado, propietario, competidores
     y stack de procedures activos.
+-   [x] Visualización e historial de esperas, señales, broadcast y
+    competencia de reentrada.
 -   [x] Parámetros `in` / `out` ejecutables y write-back de salidas.
+-   [x] Integrar condiciones con snapshots, forks, Reset, Step Back,
+    claves semánticas, BFS y diagnóstico de bloqueo terminal.
 -   [ ] Buffer limitado con monitor.
+-   [ ] Evaluar arrays de variables condición cuando un ejercicio real
+    los requiera.
 
 ------------------------------------------------------------------------
 

@@ -18,6 +18,21 @@ export interface SemaphoreExecutionEvent {
   readonly valueAfter: number
 }
 
+export interface MonitorConditionExecutionEvent {
+  readonly operation: 'WAIT' | 'SIGNAL' | 'SIGNAL_ALL'
+  readonly monitorName: string
+  readonly conditionName: string
+  readonly status:
+    | 'WAITING'
+    | 'REACQUIRED'
+    | 'REENTRY_BLOCKED'
+    | 'SIGNALED'
+    | 'NO_WAITER'
+  readonly awakenedProcessIds: ProcessId[]
+  readonly waitingProcessIdsBefore: ProcessId[]
+  readonly waitingProcessIdsAfter: ProcessId[]
+}
+
 export interface LoopConditionExecutionEvent {
   readonly loopType: 'WHILE' | 'REPEAT_UNTIL'
   readonly conditionResult: boolean
@@ -65,6 +80,7 @@ export interface ExecutionEvent {
   readonly description?: string
   readonly awaitStatus?: AwaitEventStatus
   readonly semaphoreEvent?: SemaphoreExecutionEvent
+  readonly monitorConditionEvent?: MonitorConditionExecutionEvent
   readonly loopConditionEvent?: LoopConditionExecutionEvent
   readonly dataStructureEvent?: DataStructureExecutionEvent
   readonly simulatedOperationEvent?: SimulatedOperationExecutionEvent

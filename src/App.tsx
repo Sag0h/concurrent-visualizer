@@ -1565,6 +1565,20 @@ function App() {
                           </div>
                         )}
 
+                        {process.blockingReason?.type === 'MONITOR_CONDITION' && (
+                          <div className="semaphore-blocking-reason">
+                            <strong>
+                              {process.blockingReason.phase === 'WAITING'
+                                ? 'Waiting on condition'
+                                : 'Signaled · waiting to reenter'}
+                            </strong>
+
+                            <code>
+                              {`${process.blockingReason.monitorName}.${process.blockingReason.conditionName}`}
+                            </code>
+                          </div>
+                        )}
+
                         <h4>
                           Local memory
                         </h4>
@@ -1758,6 +1772,41 @@ function App() {
                             </div>
                           )}
                         </div>
+
+                        {monitor.conditions.length > 0 && (
+                          <div className="monitor-condition-list">
+                            <h4>Condition queues</h4>
+
+                            {monitor.conditions.map((condition) => (
+                              <div
+                                className="monitor-condition"
+                                key={condition.name}
+                              >
+                                <div className="monitor-condition-heading">
+                                  <code>{condition.name}</code>
+                                  <small>FIFO</small>
+                                </div>
+
+                                {condition.waitingProcessIds.length === 0 ? (
+                                  <span className="empty">No waiters</span>
+                                ) : (
+                                  <div className="semaphore-waiter-list">
+                                    {condition.waitingProcessIds.map(
+                                      (processId) => (
+                                        <span
+                                          className="semaphore-waiter"
+                                          key={processId}
+                                        >
+                                          {processId}
+                                        </span>
+                                      ),
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         <small>
                           Implicit mutual exclusion · entry is not FIFO
@@ -2125,6 +2174,14 @@ function App() {
                                     >
                                       {entry.semaphoreEvent.status}
                                     </span>
+                                  ) : entry.monitorConditionEvent ? (
+                                    <span
+                                      className={
+                                        `monitor-condition-status monitor-condition-status-${entry.monitorConditionEvent.status.toLowerCase().replaceAll('_', '-')}`
+                                      }
+                                    >
+                                      {entry.monitorConditionEvent.status}
+                                    </span>
                                   ) : entry.awaitStatus ? (
                                     <span
                                       className={
@@ -2158,6 +2215,18 @@ function App() {
                                         {entry.semaphoreEvent.valueBefore}
                                         {' → '}
                                         {entry.semaphoreEvent.valueAfter}
+                                      </span>
+                                    </span>
+                                  ) : entry.monitorConditionEvent ? (
+                                    <span className="monitor-condition-history-detail">
+                                      <code>
+                                        {`${entry.monitorConditionEvent.operation.toLowerCase()}(${entry.monitorConditionEvent.conditionName})`}
+                                      </code>
+
+                                      <span>
+                                        {entry.monitorConditionEvent.awakenedProcessIds.length > 0
+                                          ? `Woke ${entry.monitorConditionEvent.awakenedProcessIds.join(', ')}`
+                                          : entry.description}
                                       </span>
                                     </span>
                                   ) : (

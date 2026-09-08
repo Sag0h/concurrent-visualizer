@@ -1527,3 +1527,108 @@ identidad de objeto.
 
 **Motivo:** mejorar la fidelidad del pseudocódigo académico sin incorporar
 un modelo de objetos que el simulador no necesita.
+
+------------------------------------------------------------------------
+
+## ADR-042 --- Argumentos compartidos de funciones conservan grano fino
+
+**Estado:** Aceptada
+
+**Contexto:** la cátedra define una ejecución de grano fino como un
+interleaving de lecturas y escrituras atómicas de memoria. Sin embargo, el
+runtime suspendible evaluaba todos los argumentos de una función dentro de
+un único step y, al retornar desde una asignación, escribía el resultado sin
+pasar nuevamente por `SharedAssignmentRuntime`. Esto preservaba algunos
+resultados alcanzables, pero ocultaba accesos y no permitía que dos
+argumentos como `add(x, x)` observaran escrituras intermedias.
+
+**Decisión:** una función usada dentro de una expresión captura sus
+argumentos de izquierda a derecha mediante `PendingFunctionArguments`.
+Cada lectura compartida produce su propio `SHARED_READ` y puede
+intercalarse. Las llamadas anidadas continúan resolviéndose desde la más
+interna y sus valores se copian al frame de la función.
+
+Cuando la última llamada retorna dentro de un `ASSIGN` que lee o escribe
+memoria compartida, la expresión resuelta inicia un
+`SharedAssignmentRuntime`; `COMPUTE` y `SHARED_WRITE` permanecen como
+acciones separadas. El estado parcial se clona y forma parte de la clave
+semántica sin introducir resultados especiales para ningún ejercicio.
+
+**Consecuencia:** `x = add(x, x)` puede observar un valor diferente en
+cada argumento, y el historial/análisis registra el store final. El caso
+académico con `mult(x, 3) + mult(x, 2) + 1` conserva los resultados que
+surgen de este modelo: `0`, `1`, `10`, `30`, `31`, `51`, `91`, `151` y
+`153`. Los valores `22`, `23` y `56` no se derivan del código disponible y
+requieren recuperar la consigna o resolución donde fueron mencionados.
+
+Las llamadas usadas como instrucciones independientes conservan por ahora
+la evaluación directa de los argumentos que no contienen otras llamadas;
+uniformar también ese camino queda registrado como mejora.
+
+**Motivo:** hacer coincidir la unidad mínima visible del simulador con el
+modelo académico de load/store, manteniendo la reproducibilidad de BFS y
+la separación entre ejecución y análisis.
+
+------------------------------------------------------------------------
+
+## ADR-043 --- Los arrays de semáforos se expanden en recursos concretos
+
+**Estado:** Aceptada
+
+**Contexto:** los ejercicios académicos usan familias de semáforos
+seleccionadas por el índice de un proceso. Crear un runtime paralelo para
+arrays duplicaría la semántica ya validada de bloqueo, historial,
+exploración y deadlock.
+
+**Decisión:** `sem[] s = [v0, v1, ...]` se expande al parsear en recursos
+con nombres canónicos `s[0]`, `s[1]`, etc. Las instrucciones conservan el
+nombre base y la expresión de índice; el engine exige que produzca un
+entero dentro de rango y opera sobre el recurso resuelto.
+
+Un `P` que no puede avanzar captura ese nombre canónico en
+`BlockingReason`. La espera no cambia de recurso aunque posteriormente se
+modifique una variable compartida usada para calcular el índice. Cada `V`
+resuelve su referencia al ejecutarse.
+
+**Consecuencia:** la UI, Step Back, forks, claves semánticas, historial,
+análisis mutex y deadlock ven semáforos escalares concretos y no necesitan
+ramas especiales. El programador sigue siendo responsable de utilizar el
+mismo índice lógico entre su `P` y su `V`; no se introduce ownership ni un
+tipo de semáforo binario.
+
+**Motivo:** extender la expresividad del lenguaje preservando una única
+semántica observable para todos los semáforos.
+
+------------------------------------------------------------------------
+
+## ADR-044 --- Reentrada de condiciones preserva el frame y refresca estado
+
+**Estado:** Aceptada
+
+**Contexto:** con signal-and-continue, un proceso señalado no ejecuta
+inmediatamente. Conserva parámetros, locales y salidas pendientes mientras el
+señalador puede modificar el estado privado antes de liberar el monitor. Usar
+sin cambios la copia privada tomada antes de `wait` haría que el despertado
+observara datos obsoletos; recrear todo el frame perdería su contexto local.
+
+**Decisión:** `wait` deja el program counter en la propia instrucción y bloquea
+con fase `WAITING`. `signal` o `signal_all` quitan ids de la cola FIFO y cambian
+su fase a `REACQUIRE`, agregándolos a los competidores de entrada. El señalador
+mantiene la propiedad. Cuando un despertado obtiene la instancia, el runtime
+reemplaza únicamente los campos que pertenecen al estado permanente del monitor
+y conserva el resto de `MonitorCallFrame`; recién entonces avanza después de
+`wait`.
+
+Una señal sobre una cola vacía produce un evento `NO_WAITER` y ningún estado
+acumulable. Las razones `MONITOR_CONDITION` se conservan al pasar temporalmente
+a `READY`, igual que el recurso concreto capturado por un `P` indexado, porque
+esa metadata determina cómo debe reintentarse la instrucción.
+
+**Consecuencia:** el proceso despertado observa los cambios del señalador,
+mantiene locales, parámetros y bindings `out`, y puede volver a comprobar la
+guarda dentro de un `while`. Colas y fases son clonables, reversibles y parte de
+la identidad semántica; el diagnóstico puede representar una condición nunca
+señalada como bloqueo terminal.
+
+**Motivo:** ejecutar fielmente la semántica académica de monitores sin perder el
+estado suspendido ni confundir una señal con un permiso de semáforo.

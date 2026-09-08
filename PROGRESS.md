@@ -2433,3 +2433,71 @@ Memoria compartida, semáforos y estado privado de monitores conservan la
 inicialización obligatoria. Las pruebas cubren parser, registros extraídos
 de colas, lectura prematura, tipo incorrecto, write-back de `out`, Step Back
 y Reset.
+
+## 2026-09-07 --- Granularidad de expresiones con funciones
+
+Se contrastó el runtime con la teoría de acciones atómicas de grano fino:
+una asignación se descompone en lecturas y store, y dos referencias a la
+misma variable pueden observar estados diferentes. El engine evaluaba en
+un único step todos los argumentos de una función suspendible y completaba
+directamente el assignment al retornar, por lo que esos accesos no quedaban
+representados de manera uniforme en las microoperaciones.
+
+`PendingExpression` incorpora ahora `PendingFunctionArguments`. Los
+argumentos se capturan de izquierda a derecha, una lectura compartida por
+step, antes de crear el frame. Al terminar la última función de una
+asignación compartida, la expresión resuelta vuelve a
+`SharedAssignmentRuntime` para ejecutar `COMPUTE` y `SHARED_WRITE` por
+separado.
+
+Las pruebas verifican que `add(x, x)` puede observar una escritura entre
+sus argumentos, que las cuatro fases quedan en el historial, que el estado
+intermedio se clona sin aliases y que las llamadas anidadas mantienen el
+orden. La exploración exhaustiva del ejercicio reportado conserva como
+resultados finales `0`, `1`, `10`, `30`, `31`, `51`, `91`, `151` y `153`.
+Con el material disponible, `22`, `23` y `56` no corresponden a este
+programa bajo el modelo load/store y no se los codificó artificialmente.
+
+Queda como mejora aplicar la misma granularidad a una llamada de función
+usada como instrucción independiente. La siguiente sección registra la
+incorporación posterior de arrays de semáforos.
+
+## 2026-09-07 --- Arrays de semáforos
+
+El lenguaje acepta `sem[] nombre = [v0, v1, ...];` y referencias
+indexadas como `P(nombre[i]);` y `V(nombre[(i + 1) % N]);`. Los valores
+iniciales deben ser literales enteros no negativos y el array no puede ser
+vacío.
+
+El parser materializa cada posición como un semáforo independiente con un
+nombre canónico (`nombre[0]`, `nombre[1]`, etc.). De esa forma los valores,
+waiters y transiciones aparecen automáticamente en la interfaz y el
+historial, mientras Step Back, forks, exploración y análisis de deadlock
+reutilizan la infraestructura escalar existente.
+
+Los índices se evalúan al ejecutar y deben ser enteros dentro de rango. Si
+un `P` se bloquea, guarda el elemento concreto elegido para que una
+modificación posterior de la expresión de índice no cambie el recurso que
+está esperando. Las pruebas cubren expresiones de índice, errores precisos,
+historial, snapshots, clonación, rewind, deadlock circular y búsqueda BFS.
+
+## 2026-09-08 --- M12.2: variables condición ejecutables
+
+Los monitores aceptan condiciones escalares mediante `cond` y las operaciones
+académicas `wait`, `signal` y `signal_all`. Cada condición mantiene su propia
+cola FIFO. `wait` siempre encola al propietario, sincroniza el estado privado,
+libera el monitor y suspende su frame; no realiza busy waiting.
+
+La ejecución adopta signal-and-continue. `signal` despierta al proceso más
+antiguo y `signal_all` despierta a todos, pero el señalador conserva el monitor.
+Los despertados pasan a competir por la entrada y continúan después de `wait`
+al readquirirla. En ese punto reciben el estado privado actualizado sin perder
+parámetros, variables locales ni bindings `out`. Una señal sobre una cola vacía
+no se acumula.
+
+Snapshots, forks, Reset, Step Back y claves semánticas conservan colas y fases
+de reentrada. BFS puede encontrar una señal perdida seguida por espera terminal;
+el diagnóstico representa la condición como recurso propio. La interfaz muestra
+las colas por monitor, la fase de bloqueo y eventos estructurados de espera,
+señal, broadcast y reentrada. El próximo ticket de M12.2 es el ejemplo completo
+de buffer limitado; arrays de condiciones permanecen como extensión posterior.

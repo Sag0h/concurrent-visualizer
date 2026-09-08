@@ -21,9 +21,9 @@ scheduler y de los interleavings producidos por el motor.
 **Último milestone completado:** M10.3 --- **Colecciones de registros**.
 
 La vertical principal de M11 está cerrada. M12 ya dispone de monitores
-ejecutables con estado privado, exclusión mutua implícita, procedures y
-parámetros `in`/`out`; el próximo frente son las variables condición,
-`wait`, `signal` y `signal_all`.
+ejecutables con estado privado, exclusión mutua implícita, procedures,
+parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
+`signal_all`. El próximo frente es el caso completo de buffer limitado.
 
 El catálogo incluye los nueve temas académicos de
 semáforos. Cada tema ofrece el código con un problema reproducible y su
@@ -155,12 +155,13 @@ nominal y clonan cada registro al insertarlo y retornarlo, preservando
 FIFO, prioridad estable o LIFO sin aliases accidentales.
 
 M12 ya dispone de monitores ejecutables con estado privado, exclusión mutua
-implícita y parámetros `in/out`. Los `in` se capturan por valor antes de
-competir por la entrada; los `out` apuntan a destinos locales controlados y
-se escriben antes de liberar el monitor. Los demás procesos quedan
-bloqueados como competidores hasta que termina el procedure. La UI muestra
-memoria privada, propietario, competidores y frames activos. Las variables
-condición continúan como el próximo ticket.
+implícita, parámetros `in/out` y variables condición escalares. Los `in` se
+capturan por valor antes de competir por la entrada; los `out` apuntan a
+destinos locales controlados y se escriben antes de liberar el monitor.
+`wait` libera la instancia y encola FIFO; `signal` y `signal_all` despiertan
+sin transferir inmediatamente la propiedad ni acumular permisos. La UI muestra
+memoria privada, propietario, competidores, colas de condición, frames activos
+y eventos de cada operación.
 
 ------------------------------------------------------------------------
 
@@ -465,6 +466,23 @@ V(s): < s = s + 1; >
 
 `P` y `V` son operaciones atómicas individuales, pero no utilizan
 `atomicDepth`.
+
+Además de declaraciones escalares, se pueden agrupar recursos y
+seleccionarlos con una expresión entera:
+
+``` text
+sem[] forks = [1, 1, 1, 1, 1];
+
+process Philosopher[id:0..4] {
+    P(forks[id]);
+    P(forks[(id + 1) % 5]);
+    V(forks[(id + 1) % 5]);
+    V(forks[id]);
+}
+```
+
+Cada elemento se visualiza y analiza como un semáforo independiente, con
+nombres como `forks[0]` y `forks[1]`.
 
 Por lo tanto:
 
@@ -822,7 +840,7 @@ M10.3 Arrays, colas y pilas de registros homogéneos
 En curso:
 
 ``` text
-M12  Monitores: variables condición
+M12  Monitores: buffer limitado y ejemplos educativos
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
@@ -841,7 +859,7 @@ concurrentes**.
 
 Entre los objetivos futuros se encuentran:
 
--   completar variables condición de monitores;
+-   completar el buffer limitado y ejemplos educativos con monitores;
 -   pasaje de mensajes;
 -   canales síncronos y asíncronos;
 -   análisis más preciso de race conditions;

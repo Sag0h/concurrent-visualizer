@@ -95,11 +95,28 @@ export interface AwaitInstruction {
 export interface SemaphorePInstruction {
   readonly type: 'SEMAPHORE_P'
   readonly semaphoreName: string
+  readonly semaphoreIndex?: Expression
 }
 
 export interface SemaphoreVInstruction {
   readonly type: 'SEMAPHORE_V'
   readonly semaphoreName: string
+  readonly semaphoreIndex?: Expression
+}
+
+export interface MonitorWaitInstruction {
+  readonly type: 'MONITOR_WAIT'
+  readonly conditionName: string
+}
+
+export interface MonitorSignalInstruction {
+  readonly type: 'MONITOR_SIGNAL'
+  readonly conditionName: string
+}
+
+export interface MonitorSignalAllInstruction {
+  readonly type: 'MONITOR_SIGNAL_ALL'
+  readonly conditionName: string
 }
 
 export type DataStructureOperation =
@@ -158,6 +175,9 @@ type InstructionWithoutSourceRange =
   | AwaitInstruction
   | SemaphorePInstruction
   | SemaphoreVInstruction
+  | MonitorWaitInstruction
+  | MonitorSignalInstruction
+  | MonitorSignalAllInstruction
   | DataStructureOperationInstruction
   | SimulatedOperationInstruction
   | MonitorProcedureCall
