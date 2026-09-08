@@ -104,6 +104,20 @@ export interface SemaphoreVInstruction {
   readonly semaphoreIndex?: Expression
 }
 
+export interface SendInstruction {
+  readonly type: 'SEND'
+  readonly channelName: string
+  readonly channelIndex?: Expression
+  readonly arguments: Expression[]
+}
+
+export interface ReceiveInstruction {
+  readonly type: 'RECEIVE'
+  readonly channelName: string
+  readonly channelIndex?: Expression
+  readonly targets: AssignmentTarget[]
+}
+
 export interface MonitorWaitInstruction {
   readonly type: 'MONITOR_WAIT'
   readonly conditionName: string
@@ -175,6 +189,8 @@ type InstructionWithoutSourceRange =
   | AwaitInstruction
   | SemaphorePInstruction
   | SemaphoreVInstruction
+  | SendInstruction
+  | ReceiveInstruction
   | MonitorWaitInstruction
   | MonitorSignalInstruction
   | MonitorSignalAllInstruction

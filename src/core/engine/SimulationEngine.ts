@@ -923,6 +923,12 @@ export class SimulationEngine {
         break
       }
 
+      case 'SEND':
+      case 'RECEIVE':
+        throw new Error(
+          'Message passing syntax is available, but its runtime will be implemented in M13.3',
+        )
+
       case 'MONITOR_WAIT': {
         const result = this.executeMonitorWait(
           process,

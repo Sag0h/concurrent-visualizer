@@ -993,7 +993,7 @@ programático de estados.
 La capa secuencial soporta variables, arrays, asignaciones, expresiones,
 funciones, llamadas suspendibles, estructuras de control y `return`.
 
-La capa concurrente soporta actualmente:
+La capa concurrente ejecutable soporta actualmente:
 
 -   `process`;
 -   memoria compartida;
@@ -1006,6 +1006,14 @@ La capa concurrente soporta actualmente:
 -   `V`;
 -   monitores, procedures y parámetros `in/out`;
 -   condiciones `cond`, `wait`, `signal` y `signal_all`.
+
+M13.2 agrega al modelo `ChannelDefinition` y reconoce en tokenizer/parser
+canales escalares tipados, `send` con expresiones y `receive` con destinos de
+asignación. Los tipos de payload pueden ser primitivos o registros declarados
+previamente, y la aridad se comprueba durante el parsing. Esta sintaxis todavía
+no es ejecutable: el engine produce un error explícito hasta que M13.3 agregue
+el estado y las transiciones PMA. Arrays de canales y `empty(canal)` siguen
+pendientes dentro de M13.2.
 
 Pipeline vigente:
 

@@ -23,6 +23,8 @@ import type {
   DataStructureOperation,
   DataStructureResultTarget,
   SimulatedOperationInstruction,
+  SendInstruction,
+  ReceiveInstruction,
 } from './Instruction'
 
 import type { Instruction } from './Instruction'
@@ -222,6 +224,32 @@ export function semaphoreVInstruction(
     type: 'SEMAPHORE_V',
     semaphoreName,
     semaphoreIndex,
+  }
+}
+
+export function sendInstruction(
+  channelName: string,
+  args: Expression[],
+  channelIndex?: Expression,
+): SendInstruction {
+  return {
+    type: 'SEND',
+    channelName,
+    channelIndex,
+    arguments: args,
+  }
+}
+
+export function receiveInstruction(
+  channelName: string,
+  targets: AssignmentTarget[],
+  channelIndex?: Expression,
+): ReceiveInstruction {
+  return {
+    type: 'RECEIVE',
+    channelName,
+    channelIndex,
+    targets,
   }
 }
 

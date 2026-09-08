@@ -29,6 +29,8 @@ import {
   awaitInstruction,
   semaphoreVInstruction,
   semaphorePInstruction,
+  sendInstruction,
+  receiveInstruction,
   monitorWaitInstruction,
   monitorSignalInstruction,
   monitorSignalAllInstruction,
@@ -76,6 +78,7 @@ import {
   monitorProcedureCall,
 } from '../monitors/monitorFactories'
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
+import type { ChannelDefinition } from '../channels/ChannelDefinition'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 
@@ -100,6 +103,10 @@ class Parser {
   > = {}
   private readonly semaphoreDeclarationNames =
     new Set<string>()
+  private readonly channelDefinitions: Record<
+    string,
+    ChannelDefinition
+  > = {}
   private monitorProcedureDepth = 0
 
   constructor(tokens: Token[]) {
@@ -127,6 +134,11 @@ class Parser {
 
       if (this.match('MONITOR')) {
         this.parseMonitorDefinition()
+        continue
+      }
+
+      if (this.match('CHAN')) {
+        this.parseChannelDefinition()
         continue
       }
 
@@ -177,7 +189,7 @@ class Parser {
 
       throw this.error(
         this.peek(),
-        'Expected "record", "monitor", "shared", "sem", "function" or "process"'
+        'Expected "record", "monitor", "chan", "shared", "sem", "function" or "process"'
       )
     }
 
@@ -188,6 +200,53 @@ class Parser {
       semaphores,
       recordDefinitions: this.recordDefinitions,
       monitors: this.monitorDefinitions,
+      channels: this.channelDefinitions,
+    }
+  }
+
+  private parseChannelDefinition(): void {
+    const name = this.consume(
+      'IDENTIFIER',
+      'Expected channel name',
+    )
+
+    if (this.channelDefinitions[name.lexeme]) {
+      throw this.error(
+        name,
+        `Channel "${name.lexeme}" is already defined`,
+      )
+    }
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after channel name',
+    )
+
+    if (this.check('RIGHT_PAREN')) {
+      throw this.error(
+        this.peek(),
+        `Channel "${name.lexeme}" must declare at least one payload type`,
+      )
+    }
+
+    const payloadTypes: DeclaredValueType[] = []
+
+    do {
+      payloadTypes.push(this.parseDeclaredValueType())
+    } while (this.match('COMMA'))
+
+    this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after channel payload types',
+    )
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after channel declaration',
+    )
+
+    this.channelDefinitions[name.lexeme] = {
+      name: name.lexeme,
+      payloadTypes,
     }
   }
 
@@ -411,8 +470,7 @@ class Parser {
   }
 
   private parseMonitorProcedureDefinition(): MonitorProcedureDefinition {
-    const name = this.consume(
-      'IDENTIFIER',
+    const name = this.consumeCallableName(
       'Expected procedure name',
     )
     this.consume(
@@ -836,6 +894,14 @@ class Parser {
 
     if (this.match('SEMAPHORE_V')) {
       return this.parseSemaphoreOperation('V')
+    }
+
+    if (this.match('SEND')) {
+      return this.parseSendInstruction()
+    }
+
+    if (this.match('RECEIVE')) {
+      return this.parseReceiveInstruction()
     }
 
     if (this.match('WAIT')) {
@@ -1314,8 +1380,7 @@ class Parser {
       }
 
       if (this.match('DOT')) {
-        const field = this.consume(
-          'IDENTIFIER',
+        const field = this.consumeCallableName(
           'Expected field name after "."',
         )
 
@@ -1427,8 +1492,7 @@ class Parser {
       'DOT',
       'Expected "." after monitor name',
     )
-    const procedure = this.consume(
-      'IDENTIFIER',
+    const procedure = this.consumeCallableName(
       'Expected monitor procedure name',
     )
     const definition = this.monitorDefinitions[monitor.lexeme]
@@ -1493,9 +1557,17 @@ class Parser {
   }
 
   private parseMonitorOutputTarget(): AssignmentTarget {
+    return this.parseAssignmentTarget(
+      'Expected assignable local target for out argument',
+    )
+  }
+
+  private parseAssignmentTarget(
+    message: string,
+  ): AssignmentTarget {
     const name = this.consume(
       'IDENTIFIER',
-      'Expected assignable local target for out argument',
+      message,
     )
 
     if (this.match('LEFT_BRACKET')) {
@@ -1503,12 +1575,11 @@ class Parser {
 
       this.consume(
         'RIGHT_BRACKET',
-        'Expected "]" after out array index',
+        'Expected "]" after assignment target index',
       )
 
       if (this.match('DOT')) {
-        const field = this.consume(
-          'IDENTIFIER',
+        const field = this.consumeCallableName(
           'Expected record field name after "."',
         )
 
@@ -1523,8 +1594,7 @@ class Parser {
     }
 
     if (this.match('DOT')) {
-      const field = this.consume(
-        'IDENTIFIER',
+      const field = this.consumeCallableName(
         'Expected record field name after "."',
       )
 
@@ -1535,6 +1605,120 @@ class Parser {
     }
 
     return variableTarget(name.lexeme)
+  }
+
+  private parseSendInstruction(): Instruction {
+    const channel = this.consumeChannelName('send')
+    const definition = this.channelDefinitions[channel.lexeme]
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after channel name in send',
+    )
+
+    const args: Expression[] = []
+
+    if (!this.check('RIGHT_PAREN')) {
+      do {
+        args.push(this.parseExpression())
+      } while (this.match('COMMA'))
+    }
+
+    const closingParenthesis = this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after send arguments',
+    )
+    this.assertChannelArity(
+      definition,
+      args.length,
+      'send',
+      closingParenthesis,
+    )
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after send',
+    )
+
+    return sendInstruction(
+      channel.lexeme,
+      args,
+    )
+  }
+
+  private parseReceiveInstruction(): Instruction {
+    const channel = this.consumeChannelName('receive')
+    const definition = this.channelDefinitions[channel.lexeme]
+
+    this.consume(
+      'LEFT_PAREN',
+      'Expected "(" after channel name in receive',
+    )
+
+    const targets: AssignmentTarget[] = []
+
+    if (!this.check('RIGHT_PAREN')) {
+      do {
+        targets.push(this.parseAssignmentTarget(
+          'Expected assignable target in receive',
+        ))
+      } while (this.match('COMMA'))
+    }
+
+    const closingParenthesis = this.consume(
+      'RIGHT_PAREN',
+      'Expected ")" after receive targets',
+    )
+    this.assertChannelArity(
+      definition,
+      targets.length,
+      'receive',
+      closingParenthesis,
+    )
+    this.consume(
+      'SEMICOLON',
+      'Expected ";" after receive',
+    )
+
+    return receiveInstruction(
+      channel.lexeme,
+      targets,
+    )
+  }
+
+  private consumeChannelName(
+    operation: 'send' | 'receive',
+  ): Token {
+    const channel = this.consume(
+      'IDENTIFIER',
+      `Expected channel name after "${operation}"`,
+    )
+
+    if (!this.channelDefinitions[channel.lexeme]) {
+      throw this.error(
+        channel,
+        `Channel "${channel.lexeme}" is not defined; declare it before processes`,
+      )
+    }
+
+    return channel
+  }
+
+  private assertChannelArity(
+    definition: ChannelDefinition,
+    actual: number,
+    operation: 'send' | 'receive',
+    token: Token,
+  ): void {
+    const expected = definition.payloadTypes.length
+
+    if (actual === expected) {
+      return
+    }
+
+    throw this.error(
+      token,
+      `Channel "${definition.name}" expects ${expected} value(s), but ${operation} provides ${actual}`,
+    )
   }
 
   private parsePrintInstruction(): Instruction {
@@ -1575,8 +1759,7 @@ class Parser {
       'DOT',
       'Expected "." after record name',
     )
-    const method = this.consume(
-      'IDENTIFIER',
+    const method = this.consumeCallableName(
       'Expected simulated method name',
     )
 
@@ -2829,6 +3012,23 @@ class Parser {
     throw this.error(
       this.peek(),
       'Expected semaphore name',
+    )
+  }
+
+  private consumeCallableName(
+    message: string,
+  ): Token {
+    if (
+      this.check('IDENTIFIER')
+      || this.check('SEND')
+      || this.check('RECEIVE')
+    ) {
+      return this.advance()
+    }
+
+    throw this.error(
+      this.peek(),
+      message,
     )
   }
 

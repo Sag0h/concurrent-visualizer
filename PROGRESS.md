@@ -26,9 +26,10 @@ waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
 **Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
-PMA, PMS y CSP. El siguiente ticket formal es M13.2: incorporar al modelo y al
-parser un canal PMA escalar tipado junto con `chan`, `send` y `receive`. Aún no
-hay primitivas de mensajes ejecutables en el runtime.
+PMA, PMS y CSP. M13.2 ya incorporó al modelo y al parser canales PMA escalares
+tipados junto con `chan`, `send` y `receive`. El siguiente ticket agrega arrays
+de canales y referencias indexadas; aún no hay primitivas de mensajes
+ejecutables en el runtime.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2551,3 +2552,34 @@ semáforos y monitores.
 El próximo ticket es la primera parte de M13.2: `ChannelDefinition`, referencia
 escalar de canal y AST/parser de `chan`, `send` y `receive`. Runtime, arrays de
 canales, `empty`, interfaz y `sync_send` avanzarán en cambios independientes.
+
+Como extensión futura M10.5 queda registrada la posibilidad de usar consultas
+no mutantes como `cola.size()` y `pila.isEmpty()` directamente dentro de
+expresiones y guardas de control, además de incorporar tamaño/vacío para
+arrays. Actualmente las consultas de colas y pilas sólo pueden asignarse a una
+variable local; el diseño futuro deberá conservar la granularidad observable
+si la estructura consultada es compartida y distinguir `isEmpty()` del
+`empty(canal)` académico de PMA.
+
+## 2026-09-08 --- M13.2 parcial: sintaxis escalar de PMA
+
+`Program` incorpora definiciones de canales y el tokenizer reconoce `chan`,
+`send` y `receive`. El parser acepta canales escalares con uno o más payloads
+primitivos o registros declarados previamente. Cada `send` conserva sus
+expresiones y cada `receive` una lista de destinos asignables, incluidos
+elementos de array y campos de registro.
+
+La aridad se valida contra la definición del canal. También se rechazan
+payloads vacíos, canales duplicados, uso antes de la declaración y argumentos
+de recepción que no puedan recibir una asignación. Los rangos fuente cubren la
+instrucción completa para preparar el resaltado visual.
+
+`send` y `receive` son palabras contextuales: al comenzar una instrucción
+representan PMA, pero siguen permitidas como nombres de procedures de monitor.
+Esto conserva los programas de M12 como `Buffer.send(...)` y
+`Buffer.receive(...)`.
+
+El runtime todavía no intenta simular estas instrucciones y devuelve un error
+explícito de M13.3 si se ejecutan. Los siguientes pasos de M13.2 son arrays de
+canales, referencias indexadas, validación estática adicional y
+`empty(canal)`.

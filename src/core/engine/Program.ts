@@ -4,6 +4,7 @@ import type { FunctionDefinition } from '../language/FunctionDefinition'
 import type { Semaphore } from '../semaphores/Semaphore'
 import type { RecordDefinition } from '../language/RecordDefinition'
 import type { MonitorDefinition } from '../monitors/MonitorDefinition'
+import type { ChannelDefinition } from '../channels/ChannelDefinition'
 
 export interface Program {
   readonly processes: Process[]
@@ -12,4 +13,5 @@ export interface Program {
   readonly semaphores?: Record<string, Semaphore>
   readonly recordDefinitions?: Record<string, RecordDefinition>
   readonly monitors?: Record<string, MonitorDefinition>
+  readonly channels?: Record<string, ChannelDefinition>
 }

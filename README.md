@@ -24,9 +24,11 @@ La vertical principal de M11 está cerrada. M12 ya dispone de monitores
 ejecutables con estado privado, exclusión mutua implícita, procedures,
 parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
 `signal_all`. El buffer limitado completa M12 con una variante problemática y
-otra corregida. M13.1 ya fijó la semántica académica de PMA, PMS y CSP; el
-próximo ticket agrega el modelo y parser inicial de canales PMA. `chan`, `send`
-y `receive` todavía no son ejecutables.
+otra corregida. M13.1 ya fijó la semántica académica de PMA, PMS y CSP. La
+primera parte de M13.2 incorpora el modelo y parser de canales PMA escalares:
+`chan`, `send` y `receive` se reconocen y validan, pero todavía no son
+ejecutables. El próximo ticket agrega arrays de canales y referencias
+indexadas.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su
@@ -846,7 +848,7 @@ En curso:
 
 ``` text
 M13.1 Semántica y alcance de mensajes             completado
-M13.2 Modelo, tokenizer y parser de PMA           siguiente
+M13.2 Modelo, tokenizer y parser de PMA           en curso
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

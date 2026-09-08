@@ -475,6 +475,11 @@ directamente a la derecha de una declaración o asignación **local**.
 Todavía no se admiten como parte de expresiones compuestas, condiciones o
 escrituras directas a otra variable compartida.
 
+M10.5 registra la extensión para permitir `size()` e `isEmpty()` directamente
+en guardas de `if`, `while`, `repeat/until`, `for` y `await`, y para ofrecer
+consultas equivalentes sobre arrays. Hasta entonces debe usarse una variable
+local auxiliar.
+
 El argumento de `enqueue` puede usar literales y memoria local. Una
 lectura compartida debe hacerse primero mediante una asignación normal y
 después insertar el valor local, para que la lectura siga apareciendo en
@@ -1531,6 +1536,43 @@ interleavings producidos por el scheduler.
 
 ------------------------------------------------------------------------
 
+## Pasaje de mensajes: sintaxis en construcción
+
+M13.2 reconoce canales PMA escalares con uno o más tipos de payload:
+
+``` text
+record Fallo {
+    int id;
+    string detalle;
+}
+
+chan trabajos(int, string);
+chan fallos(Fallo);
+```
+
+Los canales deben declararse antes de los procesos que los utilizan. `send`
+acepta expresiones y `receive` exige destinos asignables con la misma aridad:
+
+``` text
+process Productor {
+    int base = 9;
+    send trabajos(base + 1, "temperatura");
+}
+
+process Consumidor {
+    int id;
+    string detalle;
+    receive trabajos(id, detalle);
+}
+```
+
+Esta sección describe una sintaxis parseable pero **todavía no ejecutable**.
+Hacer Step o Run sobre `send`/`receive` produce un error explícito hasta que el
+runtime PMA de M13.3 esté implementado. Todavía no se admiten arrays de
+canales, referencias indexadas ni `empty(canal)`.
+
+------------------------------------------------------------------------
+
 ## Características todavía no disponibles
 
 Las siguientes características forman parte del roadmap pero todavía no
@@ -1540,11 +1582,12 @@ están disponibles:
 sleep
 yield
 
-chan
-send
-receive
 sync_send
 ```
+
+`chan`, `send` y `receive` escalares ya son reconocidos por el parser, pero su
+runtime sigue pendiente. Arrays de canales y `empty(canal)` también permanecen
+fuera del alcance ejecutable actual.
 
 `wait`, `signal` y `signal_all` ya están disponibles dentro de procedures de
 monitor; no son operaciones globales.
