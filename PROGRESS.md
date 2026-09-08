@@ -5,9 +5,9 @@
 
 ## Estado actual
 
-**Fase:** M12.2 --- Variables condición de monitores.
+**Fase:** M13.1 --- Semántica académica y alcance del pasaje de mensajes.
 
-**Último milestone completado:** M10.3 --- Colecciones de registros.
+**Último milestone completado:** M12 --- Monitores.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -25,12 +25,10 @@ diagnósticos de memoria/exclusión mutua y análisis conservador de busy
 waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
-**Próximo objetivo:** la vertical principal de M11 está cerrada y sus
-mejoras restantes son opcionales. M12.1 está completado y M12.2 ya dispone
-de tokenizer/parser, runtime de monitores, exclusión mutua y parámetros
-`in`/`out` ejecutables. El siguiente ticket formal son las variables
-condición con `wait`, `signal` y `signal_all`. Las assertions explícitas
-quedaron como extensión futura del lenguaje.
+**Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
+PMA, PMS y CSP. El siguiente ticket formal es M13.2: incorporar al modelo y al
+parser un canal PMA escalar tipado junto con `chan`, `send` y `receive`. Aún no
+hay primitivas de mensajes ejecutables en el runtime.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2136,7 +2134,7 @@ contención. Esas instrucciones no sincronizan ni forman parte de la
 solución: el deadlock se evita mediante el orden asimétrico de
 adquisición.
 
-Cuando M13.5 incorpore `sleep(ticks)`, `yield` o una operación simulada de
+Cuando M15 incorpore `sleep(ticks)`, `yield` o una operación simulada de
 trabajo equivalente, estos incrementos deberán reemplazarse por esa
 primitiva explícita y determinista.
 
@@ -2523,3 +2521,33 @@ y verifican deadlock, colas de esperadores, resultado, señales e historial.
 
 Con este caso se cierra M12. Arrays de condiciones quedan como extensión futura;
 el siguiente milestone activo es M13, pasaje de mensajes.
+
+## 2026-09-08 --- M13.1: semántica académica y alcance
+
+Se contrastaron la explicación práctica de PMA, las clases teóricas de memoria
+distribuida/PMA y PMS/CSP, y la Práctica 4. La implementación se dividirá en
+verticales para conservar una diferencia que es central en la materia:
+
+-   en PMA, `send` encola y no bloquea; `receive` bloquea sobre un mailbox
+    vacío y consume el mensaje FIFO más antiguo;
+-   en PMS, `sync_send` y `receive` deben hacer matching y ambos pueden quedar
+    bloqueados; el mensaje pendiente no se modela como una cola asincrónica;
+-   CSP agrega nombres directos de procesos, ports, comodines y comunicación
+    guardada, y permanece separado en M14.
+
+Los canales PMA serán globales y tipados, mientras la memoria ordinaria será
+local a cada proceso en el modo educativo estricto. Un mensaje podrá contener
+uno o más valores y se copiará al enviarse. Los arrays de canales se expandirán
+en nombres concretos desde índice cero. `empty` será una observación
+instantánea: no reserva el mensaje ni vuelve seguro el patrón
+`if (!empty(c)) receive c(...)` cuando existen varios receptores.
+
+Un `receive` que se bloquee conservará el canal concreto que resolvió. La
+llegada de un mensaje reactivará receptores sin reservarlo; el scheduler
+elegirá quién consume. Colas, mensajes y esperas se incorporarán al mismo
+historial, snapshots, Step Back, BFS y diagnóstico de deadlock que ya usan
+semáforos y monitores.
+
+El próximo ticket es la primera parte de M13.2: `ChannelDefinition`, referencia
+escalar de canal y AST/parser de `chan`, `send` y `receive`. Runtime, arrays de
+canales, `empty`, interfaz y `sync_send` avanzarán en cambios independientes.

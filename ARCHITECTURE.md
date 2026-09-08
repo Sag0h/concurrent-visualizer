@@ -826,7 +826,7 @@ Simulation Engine
 ├── Shared Memory Subsystem
 │   ├── ordinary shared memory
 │   └── synchronization resources
-└── Message Passing Subsystem (futuro)
+└── Message Passing Subsystem (M13)
 ```
 
 Memoria compartida soporta actualmente:
@@ -907,8 +907,67 @@ Step Back y claves semánticas. `ExecutionEvent.monitorConditionEvent`
 permite que la UI muestre espera, señal, broadcast, reentrada y señal sin
 esperadores sin analizar descripciones textuales.
 
-Pasaje de mensajes permanece futuro: canales, `send`, `receive`,
-comunicación asincrónica/sincrónica, RPC y Rendezvous.
+M13.1 fija el límite del subsistema de mensajes antes de modificar el parser o
+el runtime. `Program` incorporará definiciones de canales tipados y las
+instrucciones conservarán una referencia al canal, posiblemente indexada. El
+estado mutable no vivirá en la definición:
+
+``` text
+Program
+└── ChannelDefinition[]
+    ├── name
+    ├── payloadTypes[]
+    └── optional array length
+
+ExecutionState
+└── channelStates[canonicalChannelName]
+    └── messages: MessageEnvelope[]
+
+MessageEnvelope
+└── values: RuntimeValue[]
+```
+
+Un array de canales se expande en canales concretos con nombres canónicos como
+`respuestas[0]`, del mismo modo que los arrays de semáforos. La primera vertical
+utilizará tamaños literales positivos e índices desde cero, coherentes con los
+arrays del lenguaje. Cada mensaje es una tupla ordenada cuya aridad y tipos
+coinciden con la declaración. `send` evalúa y copia profundamente sus valores
+en el momento del envío; modificaciones locales posteriores no alteran el
+mensaje ya depositado.
+
+En PMA cada canal concreto es un mailbox FIFO conceptualmente ilimitado.
+`send` agrega al final de forma atómica y nunca bloquea. `receive` toma el
+mensaje más antiguo y escribe sus componentes en destinos de asignación
+locales. Si no hay mensaje, captura la referencia concreta al canal y deja el
+proceso `BLOCKED`; una modificación posterior de la expresión usada como
+índice no cambia aquello que el proceso está esperando.
+
+La llegada de un mensaje vuelve `READY`, sin reservar el mensaje, a los
+receptores bloqueados sobre ese canal. El scheduler decide cuál ejecuta el
+`receive`; los demás reevalúan y pueden bloquearse nuevamente. Esto evita
+inventar una política FIFO entre receptores que el material académico no
+garantiza. `empty(canal)` sólo observa el estado instantáneo y tampoco reserva
+el siguiente mensaje.
+
+Snapshots, forks y claves semánticas deberán copiar tanto los mensajes como la
+referencia suspendida del receptor. Los eventos de ejecución distinguirán
+envío, recepción, bloqueo y reactivación, para que la UI no tenga que inferirlos
+desde descripciones. El adaptador de deadlock representará cada canal concreto
+como un recurso y relacionará la espera con procesos que todavía podrían
+producir un mensaje.
+
+PMS será una segunda vertical. Mantendrá las declaraciones `chan` para la
+notación introductoria de la cátedra, pero reemplazará `send` por `sync_send`.
+El valor pendiente permanecerá en el frame bloqueado del emisor: no existirá
+una cola asincrónica y emisor/receptor progresarán mediante una transferencia
+atómica cuando hagan matching. Un mismo canal base no podrá mezclar `send` y
+`sync_send`, y `empty` no será válido sobre un canal sincrónico.
+
+La notación CSP `Destino!port` / `Fuente?port`, la selección de cualquier
+emisor de un arreglo y las comunicaciones guardadas requieren modelar matching
+entre procesos y selección no determinística de guardas. Permanecen en M14,
+junto con RPC y Rendezvous de nivel superior, en lugar de ocultarse detrás de
+la primera implementación de `sync_send`.
 
 El modo híbrido podrá existir, aunque la UI educativa podrá restringir
 mecanismos según el paradigma estudiado.
@@ -970,8 +1029,8 @@ la resolución de una referencia utilizada por `P` / `V` ocurre
 actualmente en runtime. Un nombre inexistente produce un error de
 ejecución.
 
-Próximas extensiones relevantes incluyen el buffer limitado con monitor,
-pasaje de mensajes y tiempo simulado.
+Las próximas extensiones relevantes son el modelo y parser de canales PMA,
+su runtime asincrónico y, más adelante, PMS y tiempo simulado.
 
 ## 20. Análisis de errores
 
@@ -1479,8 +1538,9 @@ semánticas concretas deben contrastarse con el enfoque vigente de la
 cátedra.
 
 Actualmente `await`, semáforos, los diagnósticos de M8, la exploración de M9 y
-los monitores de M12 están completados. M13 continuará sobre el mismo núcleo
-con pasaje de mensajes.
+los monitores de M12 están completados. M13.1 ya definió el contrato académico
+del pasaje de mensajes; M13.2 comenzará con canales PMA escalares y tipados,
+`send` y `receive` en el modelo y el parser.
 
 Las primitivas futuras deben reutilizar procesos, scheduling, bloqueo,
 historial, snapshots, análisis y el modelo de transición de M9, sin

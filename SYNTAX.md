@@ -1540,15 +1540,14 @@ están disponibles:
 sleep
 yield
 
-wait
-signal
-broadcast
-
-channels
+chan
 send
 receive
 sync_send
 ```
+
+`wait`, `signal` y `signal_all` ya están disponibles dentro de procedures de
+monitor; no son operaciones globales.
 
 También permanecen fuera del alcance actual:
 

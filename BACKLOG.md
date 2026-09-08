@@ -1127,27 +1127,118 @@ motor general.
 
 ## M13 --- Pasaje de mensajes
 
-Se reutiliza el mismo motor de simulación.
+Se reutiliza el mismo motor de simulación. La implementación comienza por
+pasaje de mensajes asincrónico (PMA) y recién después incorpora pasaje de
+mensajes sincrónico (PMS): ambos comparten procesos, scheduling, historial,
+snapshots y diagnósticos, pero no la misma semántica de envío.
 
--   [ ] Variables locales aisladas.
--   [ ] Canales.
--   [ ] Mensajes.
--   [ ] `send`.
--   [ ] `receive`.
--   [ ] Pasaje de mensajes asincrónico.
--   [ ] Colas de mensajes.
--   [ ] Pasaje de mensajes sincrónico.
--   [ ] `sync_send`.
--   [ ] Bloqueo del emisor.
--   [ ] Deadlocks de comunicación.
--   [ ] Visualización de canales.
--   [ ] Animación de mensajes.
--   [ ] Restricciones educativas por paradigma.
--   [ ] Modo híbrido/avanzado.
+### M13.1 --- Semántica académica y alcance
+
+-   [x] Contrastar la teoría y la práctica de PMA y PMS de la cátedra.
+-   [x] Definir PMA estricto: procesos con memoria local y canales globales,
+    sin variables compartidas ni mecanismos de exclusión mutua.
+-   [x] Definir canales PMA tipados, de capacidad conceptual ilimitada y con
+    mensajes atendidos en orden FIFO.
+-   [x] Definir `send` no bloqueante y `receive` bloqueante cuando el canal
+    está vacío.
+-   [x] Definir que `empty(canal)` es sólo una observación instantánea y no
+    reserva mensajes; con múltiples receptores su resultado puede quedar
+    desactualizado antes del `receive`.
+-   [x] Separar PMS de PMA: `sync_send` bloquea al emisor hasta que exista un
+    `receive` compatible y no utiliza una cola asincrónica.
+-   [x] Postergar la notación CSP `Destino!port` / `Fuente?port`, el comodín
+    de origen y la comunicación guardada para M14.
+
+### M13.2 --- Modelo, tokenizer y parser de PMA
+
+-   [ ] Incorporar definiciones de canales escalares al `Program`.
+-   [ ] Incorporar arrays de canales con tamaño literal positivo y convención
+    de índices desde cero.
+-   [ ] Representar cada mensaje como una tupla ordenada de valores tipados.
+-   [ ] Aceptar tipos primitivos, registros y estructuras de datos ya
+    soportadas cuando puedan copiarse como valores de un mensaje.
+-   [ ] Parsear `chan nombre(tipo1, tipo2, ...);`.
+-   [ ] Parsear `chan nombre[cantidad](tipo1, tipo2, ...);`.
+-   [ ] Parsear `send canal(expr1, expr2, ...);`.
+-   [ ] Parsear `receive canal(destino1, destino2, ...);`.
+-   [ ] Parsear referencias indexadas como `send respuestas[id](valor);` y
+    `receive respuestas[id](valor);`.
+-   [ ] Parsear `empty(canal)` y `empty(canales[indice])` como expresiones
+    booleanas.
+-   [ ] Validar aridad, tipos, canales duplicados, tamaño de arrays e índices
+    en tiempo de compilación cuando sea posible.
+-   [ ] Agregar errores de sintaxis y tipos con línea y columna precisas.
+
+### M13.3 --- Runtime de PMA
+
+-   [ ] Crear `ChannelRuntimeState` y colas FIFO independientes por canal
+    concreto.
+-   [ ] Copiar los valores al ejecutar `send` para que un cambio posterior en
+    la memoria local del emisor no modifique el mensaje enviado.
+-   [ ] Hacer que `send` encole atómicamente, emita un evento estructurado y
+    deje al emisor listo para continuar.
+-   [ ] Hacer que `receive` retire atómicamente el mensaje más antiguo y
+    escriba sus componentes en destinos locales.
+-   [ ] Bloquear un `receive` sobre un canal vacío y conservar el canal
+    concreto elegido aunque luego cambie la expresión usada como índice.
+-   [ ] Reactivar sin reserva a los receptores compatibles cuando llega un
+    mensaje; el scheduler decide cuál consume y los demás pueden volver a
+    bloquearse.
+-   [ ] Incorporar canales, mensajes y esperas a clones, snapshots, forks,
+    Reset, Step Back y claves semánticas de exploración.
+-   [ ] Integrar esperas por recepción con límite de pasos, bloqueo terminal,
+    wait-for graph y búsqueda BFS.
+-   [ ] Agregar tests unitarios, de parser, runtime, rewind y exploración.
+
+### M13.4 --- Visualización y casos educativos de PMA
+
+-   [ ] Mostrar cada canal, su tipo, mensajes pendientes y receptores
+    bloqueados.
+-   [ ] Mostrar eventos de envío, recepción, bloqueo y reactivación en el
+    historial.
+-   [ ] Resaltar el movimiento de mensajes sin convertir la animación en
+    parte de la semántica.
+-   [ ] Incorporar un primer ejemplo finito de clientes y servidor con canal
+    de pedidos y array de canales de respuesta.
+-   [ ] Incorporar una variante que demuestre el peligro de `empty` con
+    múltiples receptores.
+-   [ ] Agregar soluciones por mensajes a los problemas del catálogo que
+    admitan este paradigma.
+
+### M13.5 --- Pasaje de mensajes sincrónico
+
+-   [ ] Parsear `sync_send canal(expr1, expr2, ...);` sobre canales declarados
+    como links punto a punto.
+-   [ ] Modelar el rendezvous: envío y recepción progresan juntos únicamente
+    cuando sus aridades y tipos son compatibles.
+-   [ ] Bloquear al emisor hasta encontrar un receptor y bloquear al receptor
+    hasta encontrar un emisor.
+-   [ ] Evitar una cola FIFO asincrónica para `sync_send`; el valor pendiente
+    pertenece al frame suspendido del emisor.
+-   [ ] Validar el uso punto a punto cuando los participantes puedan
+    determinarse estáticamente y diagnosticar usos ambiguos.
+-   [ ] Incorporar esperas de emisores, matching y transferencia atómica a
+    snapshots, Step Back, exploración y visualización.
+-   [ ] Detectar deadlocks de comunicación, incluido el caso en que dos
+    procesos comienzan con `sync_send` incompatibles.
+-   [ ] Agregar el ejemplo productor/consumidor y el intercambio de valores
+    con y sin deadlock.
+
+### M13.6 --- Modos educativos
+
+-   [ ] Agregar un modo PMA estricto que rechace variables compartidas,
+    semáforos y monitores, pero permita definiciones de tipos y memoria local.
+-   [ ] Agregar un modo PMS estricto con las restricciones correspondientes.
+-   [ ] Mantener el modo híbrido/avanzado como opción explícita, no como
+    comportamiento educativo predeterminado.
+-   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
+
+**Estado:** M13.1 COMPLETADO. El próximo ticket es M13.2: canal escalar
+tipado, tokenizer/parser y AST para `chan`, `send` y `receive`.
 
 ------------------------------------------------------------------------
 
-## M13.5 --- Scheduling avanzado y tiempo simulado
+## M15 --- Scheduling avanzado y tiempo simulado
 
 Estas funcionalidades se separan del lenguaje secuencial porque
 modifican la relación entre procesos, scheduler y progreso temporal de

@@ -1661,3 +1661,51 @@ un ticket separado.
 
 **Motivo:** introducir ejemplos de M12 de forma extensible y preservar la regla
 de que los errores deben emerger de la ejecución real.
+
+------------------------------------------------------------------------
+
+## ADR-046 --- M13 comienza por mailboxes asincrónicos tipados
+
+**Estado:** Aceptada
+
+**Contexto:** el material académico distingue PMA, PMS y CSP. En PMA los
+canales son mailboxes FIFO compartidos, `send` no bloquea y `receive` bloquea
+cuando no hay mensajes. En PMS el envío también bloquea y debe hacer matching
+con una recepción. CSP agrega otra notación, enlaces directos entre procesos y
+comunicación guardada. Implementarlos como una sola primitiva ocultaría las
+diferencias que el simulador debe enseñar.
+
+**Decisión:** M13 se implementará por verticales. La primera será PMA con:
+
+-   memoria ordinaria exclusivamente local a cada proceso;
+-   canales globales declarados mediante `chan`, escalares o indexados;
+-   mensajes tipados de uno o más valores, copiados al enviarse;
+-   cola FIFO conceptualmente ilimitada por canal concreto;
+-   `send` atómico y no bloqueante;
+-   `receive` atómico y bloqueante sobre canal vacío;
+-   `empty` como consulta instantánea sin reserva.
+
+Un receptor bloqueado conserva el canal concreto que resolvió al llegar a la
+instrucción. Cuando se encola un mensaje, todos los receptores compatibles
+pueden volver a `READY`, pero ninguno recibe una reserva: el scheduler decide
+quién consume. Así se preserva el orden FIFO de mensajes sin imponer una
+política de fairness entre procesos que la teoría no especifica.
+
+La segunda vertical de M13 incorporará `sync_send` sobre los mismos canales
+declarados, sin permitir que un canal base mezcle envíos asincrónicos y
+sincrónicos. El emisor conservará el valor pendiente en su frame hasta el
+matching con `receive`; no se simulará PMS mediante una cola de capacidad uno.
+
+La notación CSP `Destino!port` / `Fuente?port`, el comodín de proceso emisor y
+los `if`/`do` con comunicación guardada permanecen en M14. El modo educativo
+PMA rechazará variables compartidas, semáforos y monitores; un modo híbrido
+podrá habilitarlos después de forma explícita.
+
+**Consecuencia:** el primer ticket ejecutable puede concentrarse en canal
+escalar, tokenizer/parser y AST sin adelantar matching sincrónico ni selección
+no determinística. El runtime común seguirá aportando scheduler, estados,
+historial, snapshots, Step Back, exploración y deadlock a ambas verticales.
+
+**Motivo:** entregar una porción pequeña y verificable que reproduzca fielmente
+los ejercicios de PMA, manteniendo visibles las diferencias semánticas con PMS
+y CSP.
