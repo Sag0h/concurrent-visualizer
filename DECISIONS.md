@@ -1632,3 +1632,32 @@ señalada como bloqueo terminal.
 
 **Motivo:** ejecutar fielmente la semántica académica de monitores sin perder el
 estado suspendido ni confundir una señal con un permiso de semáforo.
+
+------------------------------------------------------------------------
+
+## ADR-045 --- El catálogo agrupa variantes por mecanismo
+
+**Estado:** Aceptada
+
+**Contexto:** el catálogo nació con nueve pares exclusivos de semáforos y un
+selector dividido solamente entre problema y solución. Al agregar monitores,
+dos implementaciones de buffer limitado comparten el tema pero no las mismas
+primitivas ni el mismo defecto demostrativo.
+
+**Decisión:** `ProgramExample.category` admite `SEMAPHORES` y `MONITORS`; el
+selector crea grupos por mecanismo y variante. La identidad comprobada por los
+tests es `(category, topicId, variant)`, mientras el `topicId` común permite
+relacionar soluciones del mismo problema entre categorías.
+
+El primer par de monitor utiliza una cola privada de capacidad dos. La variante
+incorrecta omite `signal(notFull)` y reproduce un bloqueo terminal; la correcta
+emite la notificación y transfiere tres valores. Ambas son pseudocódigo ordinario
+consumido por tokenizer, parser y engine, no escenarios especiales de UI.
+
+**Consecuencia:** el catálogo puede crecer por paradigma sin duplicar el motor
+ni mostrar opciones indistinguibles. Todavía no existe una vista centrada en un
+problema que compare todas sus soluciones; ese refinamiento continuará siendo
+un ticket separado.
+
+**Motivo:** introducir ejemplos de M12 de forma extensible y preservar la regla
+de que los errores deben emerger de la ejecución real.

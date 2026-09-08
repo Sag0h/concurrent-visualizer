@@ -1428,6 +1428,45 @@ un permiso. Por esta razón una variable condición no equivale a un semáforo.
 Como el estado puede volver a cambiar antes de la reentrada, normalmente la
 condición se comprueba con `while` y no con `if`.
 
+Un buffer limitado puede combinar una cola privada con un contador. El
+contador permite usar la condición directamente; en la sintaxis actual
+`items.size()` debe asignarse primero a una variable y no puede aparecer como
+subexpresión del `while`:
+
+``` text
+monitor BoundedBuffer {
+    queue<int> items = queue[];
+    int capacity = 2;
+    int count = 0;
+    cond notFull, notEmpty;
+
+    procedure put(in int value) {
+        while (count == capacity) {
+            wait(notFull);
+        }
+
+        items.enqueue(value);
+        count = count + 1;
+        signal(notEmpty);
+    }
+
+    procedure take(out int value) {
+        while (count == 0) {
+            wait(notEmpty);
+        }
+
+        value = items.dequeue();
+        count = count - 1;
+        signal(notFull);
+    }
+}
+```
+
+`notFull` y `notEmpty` no almacenan el valor lógico de las condiciones: ese
+estado está representado por `count`. Las variables condición sólo contienen
+procesos suspendidos. Por eso omitir `signal(notFull)` puede dejar bloqueado a
+un productor incluso cuando `count < capacity`.
+
 La interfaz muestra la cola de cada condición, la transición del proceso a
 espera o reentrada y los eventos `wait`, `signal` y `signal_all` en el
 historial. Las condiciones participan en Reset, Step Back, forks, exploración

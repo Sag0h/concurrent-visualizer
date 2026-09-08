@@ -991,13 +991,17 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [ ] Incorporar progresivamente pares problema/solución de otros
     milestones, incluyendo memoria compartida, `atomic`, `await`,
     colas, pilas y registros.
--   [ ] Permitir varias soluciones correctas para un mismo problema,
+-   [ ] Generalizar la navegación de varias soluciones correctas para un
+    mismo problema,
     identificando el mecanismo utilizado: semáforos, monitores o pasaje
     de mensajes. El problema debe describirse de forma independiente al
     mecanismo; los errores específicos de una primitiva pueden vivir
-    como variantes adicionales.
--   [ ] Al completar M12, agregar primero soluciones con monitor para
-    buffer limitado y otros problemas clásicos compatibles.
+    como variantes adicionales. El primer cruce ya existe para buffer
+    limitado con semáforo y monitor, agrupado por mecanismo.
+-   [x] Al completar M12, agregar una solución con monitor para buffer
+    limitado y su variante con una notificación omitida.
+-   [ ] Agregar soluciones con monitor para otros problemas clásicos
+    compatibles.
 -   [ ] Al completar M13, agregar soluciones mediante mensajes para
     productor/consumidor, señalización y los demás casos pertinentes.
 
@@ -1102,7 +1106,15 @@ memoria compartida, `atomic`, `await`, monitores y futuros mecanismos.
 -   [x] Parámetros `in` / `out` ejecutables y write-back de salidas.
 -   [x] Integrar condiciones con snapshots, forks, Reset, Step Back,
     claves semánticas, BFS y diagnóstico de bloqueo terminal.
--   [ ] Buffer limitado con monitor.
+-   [x] Buffer limitado con monitor, cola FIFO, capacidad dos y variantes
+    problema/solución ejecutadas por el catálogo.
+
+**Estado:** M12 COMPLETADO. Monitores, exclusión implícita, parámetros,
+condiciones, diagnóstico y primer caso académico están integrados en el
+motor general.
+
+### Extensiones posteriores
+
 -   [ ] Evaluar arrays de variables condición cuando un ejercicio real
     los requiera.
 

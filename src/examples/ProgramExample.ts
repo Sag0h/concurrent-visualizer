@@ -1,6 +1,8 @@
 import type { SchedulerType } from '../core/scheduler/SchedulerType'
 
-export type ProgramExampleCategory = 'SEMAPHORES'
+export type ProgramExampleCategory =
+  | 'SEMAPHORES'
+  | 'MONITORS'
 export type ProgramExampleVariant = 'PROBLEM' | 'SOLUTION'
 
 export interface ProgramExample {

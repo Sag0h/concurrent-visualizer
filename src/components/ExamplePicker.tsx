@@ -16,12 +16,6 @@ export function ExamplePicker({
   const selectedExample = examples.find(
     (example) => example.id === selectedExampleId,
   )
-  const problemExamples = examples.filter(
-    (example) => example.variant === 'PROBLEM',
-  )
-  const solutionExamples = examples.filter(
-    (example) => example.variant === 'SOLUTION',
-  )
 
   return (
     <section
@@ -46,7 +40,7 @@ export function ExamplePicker({
       </div>
 
       <label htmlFor="program-example">
-        Semaphore cases
+        Concurrent cases
       </label>
       <select
         id="program-example"
@@ -54,13 +48,15 @@ export function ExamplePicker({
         onChange={(event) => onSelect(event.target.value)}
       >
         <option value="">Choose an example</option>
-        <ExampleOptions
-          label="With problem"
-          examples={problemExamples}
+        <ExampleCategoryOptions
+          category="SEMAPHORES"
+          label="Semaphores"
+          examples={examples}
         />
-        <ExampleOptions
-          label="Correct solution"
-          examples={solutionExamples}
+        <ExampleCategoryOptions
+          category="MONITORS"
+          label="Monitors"
+          examples={examples}
         />
       </select>
 
@@ -74,6 +70,8 @@ export function ExamplePicker({
           <strong>{selectedExample.title}</strong>
           <p>{selectedExample.description}</p>
           <span>
+            Mechanism: {categoryLabel(selectedExample.category)}
+            {' · '}
             Recommended scheduler:{' '}
             {schedulerLabel(
               selectedExample.recommendedScheduler,
@@ -86,6 +84,41 @@ export function ExamplePicker({
         </p>
       )}
     </section>
+  )
+}
+
+function ExampleCategoryOptions({
+  category,
+  label,
+  examples,
+}: {
+  readonly category: ProgramExample['category']
+  readonly label: string
+  readonly examples: readonly ProgramExample[]
+}) {
+  const categoryExamples = examples.filter(
+    (example) => example.category === category,
+  )
+
+  if (categoryExamples.length === 0) {
+    return null
+  }
+
+  return (
+    <>
+      <ExampleOptions
+        label={`${label} — with problem`}
+        examples={categoryExamples.filter(
+          (example) => example.variant === 'PROBLEM',
+        )}
+      />
+      <ExampleOptions
+        label={`${label} — correct solution`}
+        examples={categoryExamples.filter(
+          (example) => example.variant === 'SOLUTION',
+        )}
+      />
+    </>
   )
 }
 
@@ -120,5 +153,16 @@ function schedulerLabel(
       return 'Round Robin'
     case 'RANDOM':
       return 'Random'
+  }
+}
+
+function categoryLabel(
+  category: ProgramExample['category'],
+): string {
+  switch (category) {
+    case 'SEMAPHORES':
+      return 'Semaphores'
+    case 'MONITORS':
+      return 'Monitors'
   }
 }

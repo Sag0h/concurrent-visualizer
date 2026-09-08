@@ -2501,3 +2501,25 @@ el diagnóstico representa la condición como recurso propio. La interfaz muestr
 las colas por monitor, la fase de bloqueo y eventos estructurados de espera,
 señal, broadcast y reentrada. El próximo ticket de M12.2 es el ejemplo completo
 de buffer limitado; arrays de condiciones permanecen como extensión posterior.
+
+## 2026-09-08 --- M12 completado: buffer limitado y catálogo por mecanismo
+
+El catálogo admite ahora las categorías Semaphores y Monitors y presenta para
+cada una grupos separados de código problemático y solución correcta. El
+`topicId` `counted-buffer` relaciona la implementación previa con semáforos y el
+nuevo par con monitor, sin modificar el flujo Build/Step/Run del motor.
+
+El monitor `BoundedBuffer` protege una `queue<int>` privada de capacidad dos.
+`count`, `notFull` y `notEmpty` expresan su invariante: el productor espera
+mientras la cola está llena y el consumidor mientras está vacía. Con First
+Ready, el productor intenta insertar `10`, `20` y `30`; la capacidad fuerza una
+espera observable antes de que el consumidor libere espacio.
+
+La variante problemática omite `signal(notFull)`. Aunque el consumidor retire
+dos elementos, el productor no se reactiva automáticamente y ambos terminan
+esperando condiciones diferentes. La solución agrega esa notificación, consume
+`[10, 20, 30]`, vacía la cola y finaliza. Los tests ejecutan ambas fuentes reales
+y verifican deadlock, colas de esperadores, resultado, señales e historial.
+
+Con este caso se cierra M12. Arrays de condiciones quedan como extensión futura;
+el siguiente milestone activo es M13, pasaje de mensajes.

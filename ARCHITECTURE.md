@@ -1441,19 +1441,20 @@ misma fuente. La UI sólo copia el source al editor y aplica el scheduler
 recomendado: parseo, ejecución y análisis continúan recorriendo el flujo
 ordinario del motor después de que el usuario solicita `Build`.
 
-Dos ejemplos con el mismo `topicId` forman un par educativo. La variante
-`PROBLEM` contiene un defecto que el motor puede reproducir con su
-scheduler recomendado; la variante `SOLUTION` presenta la corrección del
-mismo tema. El catálogo de M7 tiene nueve pares y sus pruebas comprueban
-tanto la estructura como el resultado observable de cada defecto.
+La identidad educativa combina `category` y `topicId`. Dentro de cada
+mecanismo, la variante `PROBLEM` contiene un defecto que el motor puede
+reproducir con su scheduler recomendado y `SOLUTION` presenta la corrección.
+El catálogo de M7 tiene nueve pares de semáforos; M12 agrega el primer par de
+monitores para buffer limitado. Sus pruebas comprueban tanto la estructura
+como el resultado observable de cada defecto.
 
-En el futuro un `topicId` podrá contener más de una solución, cada una
-identificada por su mecanismo concurrente: semáforo, monitor o pasaje de
-mensajes. El escenario y su propiedad esperada deben ser independientes
-del mecanismo. Un defecto como omitir una operación `V` se conserva como
-variante específica de semáforos, no como definición general del
-problema. Las variantes sólo se habilitarán cuando el lenguaje implemente
-fielmente la primitiva correspondiente.
+Un mismo `topicId` ya puede aparecer en categorías diferentes. El selector
+agrupa primero por mecanismo y luego por problema/solución, por lo que buffer
+limitado ofrece versiones con semáforos y con monitor sin mezclar sus errores.
+La navegación específica por problema y la descripción de propiedades
+independientes del mecanismo quedan como evolución del catálogo. Un defecto
+como omitir `V` o `signal` se conserva como variante de su primitiva, no como
+definición general del problema.
 
 Algunos ejemplos actuales consumen pasos mediante asignaciones locales
 sin relevancia semántica, como los contadores `espera` y `bocados` de
@@ -1477,9 +1478,9 @@ El material histórico puede orientar extensibilidad, pero las decisiones
 semánticas concretas deben contrastarse con el enfoque vigente de la
 cátedra.
 
-Actualmente `await`, semáforos y los diagnósticos de M8 están
-completados. M9 continúa sobre el mismo núcleo con exploración acotada
-de interleavings y contraejemplos reproducibles.
+Actualmente `await`, semáforos, los diagnósticos de M8, la exploración de M9 y
+los monitores de M12 están completados. M13 continuará sobre el mismo núcleo
+con pasaje de mensajes.
 
 Las primitivas futuras deben reutilizar procesos, scheduling, bloqueo,
 historial, snapshots, análisis y el modelo de transición de M9, sin

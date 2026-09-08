@@ -16,20 +16,22 @@ scheduler y de los interleavings producidos por el motor.
 
 ## Estado del proyecto
 
-**Milestone actual:** M12 --- **Monitores**.
+**Milestone actual:** M13 --- **Pasaje de mensajes**.
 
-**Último milestone completado:** M10.3 --- **Colecciones de registros**.
+**Último milestone completado:** M12 --- **Monitores**.
 
 La vertical principal de M11 está cerrada. M12 ya dispone de monitores
 ejecutables con estado privado, exclusión mutua implícita, procedures,
 parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
-`signal_all`. El próximo frente es el caso completo de buffer limitado.
+`signal_all`. El buffer limitado completa M12 con una variante problemática y
+otra corregida; el próximo frente es el pasaje de mensajes de M13.
 
-El catálogo incluye los nueve temas académicos de
-semáforos. Cada tema ofrece el código con un problema reproducible y su
-solución correcta. Los 18 programas comparten su pseudocódigo con las
-pruebas, seleccionan un scheduler recomendado y nunca se construyen o
-ejecutan automáticamente.
+El catálogo incluye los nueve temas académicos de semáforos y el primer caso
+con monitor. Cada tema ofrece el código con un problema reproducible y su
+solución correcta. Los 20 programas comparten su pseudocódigo con las pruebas,
+seleccionan un scheduler recomendado y nunca se construyen o ejecutan
+automáticamente. El selector separa Semaphores y Monitors, mientras
+`topicId` relaciona las soluciones del mismo problema entre mecanismos.
 
 La simulación puede recorrerse con `Step`, completarse inmediatamente
 con `Run` o reproducirse con `Play/Pause` a 0.5×, 1×, 2× o 4×. La
@@ -69,10 +71,10 @@ La interfaz admite teclado en pestañas y Settings, conserva indicadores de
 foco visibles, anuncia errores de compilación, respeta movimiento reducido
 y mantiene contraste WCAG en los estados revisados de Light y Dark.
 
-Cuando M12 y M13 estén disponibles, un mismo problema del catálogo podrá
-comparar soluciones con semáforos, monitores y pasaje de mensajes. El
-escenario general se mantendrá separado de los errores específicos de
-cada mecanismo.
+El buffer limitado ya puede compararse con semáforos o monitor dentro del
+mismo catálogo. Cuando M13 esté disponible se agregarán alternativas mediante
+pasaje de mensajes. El escenario general se mantendrá separado de los errores
+específicos de cada mecanismo.
 
 M7 está completado en sus siete fases:
 
@@ -811,14 +813,14 @@ Exploración acotada
         ↓
 Estructuras de datos académicas
         ↓
-Monitores  ← actual
+Monitores
         ↓
-Pasaje de mensajes
+Pasaje de mensajes  ← actual
         ↓
 Visualización y análisis avanzado
 ```
 
-### Último milestone completado --- M10.3: Colecciones de registros
+### Último milestone completado --- M12: Monitores
 
 Completado:
 
@@ -835,12 +837,13 @@ M9    Exploración de ejecuciones
 M10.1 Colas FIFO, colas de prioridad, pilas y procesos parametrizados
 M10.2 Registros, campos, getters y operaciones simuladas
 M10.3 Arrays, colas y pilas de registros homogéneos
+M12   Monitores, parámetros in/out, condiciones y buffer limitado
 ```
 
 En curso:
 
 ``` text
-M12  Monitores: buffer limitado y ejemplos educativos
+M13  Pasaje de mensajes
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
@@ -859,8 +862,8 @@ concurrentes**.
 
 Entre los objetivos futuros se encuentran:
 
--   completar el buffer limitado y ejemplos educativos con monitores;
 -   pasaje de mensajes;
+-   ampliar el catálogo con más soluciones alternativas por mecanismo;
 -   canales síncronos y asíncronos;
 -   análisis más preciso de race conditions;
 -   visualización de la exploración de múltiples interleavings;
