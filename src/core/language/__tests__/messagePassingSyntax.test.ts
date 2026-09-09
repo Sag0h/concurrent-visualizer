@@ -174,6 +174,165 @@ process Receiver {
     )
   })
 
+  it('validates statically known send payload types', () => {
+    expect(() => parseProgram(
+      'chan jobs(int);\nprocess Producer {\n  send jobs("wrong");\n}',
+    )).toThrow(
+      'Channel "jobs" payload 1 expects int, but send expression has type string at line 3, column 13',
+    )
+
+    expect(() => parseProgram(`
+      chan jobs(string);
+      shared int value = 10;
+
+      process Producer {
+        send jobs(value + 1);
+      }
+    `)).toThrow(
+      'Channel "jobs" payload 1 expects string, but send expression has type int',
+    )
+  })
+
+  it('validates record, array, getter and collection-query payloads', () => {
+    const program = parseProgram(`
+      record Failure {
+        int id;
+        string detail;
+      }
+
+      chan reports(Failure, int, string, bool);
+
+      process Producer {
+        Failure failure = Failure { id: 7, detail: "network" };
+        int[] attempts = [1, 2];
+        send reports(
+          failure,
+          attempts[0] + attempts.size(),
+          failure.getDetail(),
+          attempts.isEmpty()
+        );
+      }
+
+      process Consumer {
+        Failure received;
+        int attempt;
+        string detail;
+        bool empty;
+        receive reports(received, attempt, detail, empty);
+      }
+    `)
+
+    expect(program.processes[0].instructions.at(-1)?.type).toBe('SEND')
+    expect(program.processes[1].instructions.at(-1)?.type).toBe('RECEIVE')
+  })
+
+  it('rejects nominally incompatible record payloads', () => {
+    expect(() => parseProgram(`
+      record Failure { int id; }
+      record Person { int id; }
+      chan failures(Failure);
+
+      process Producer {
+        Person person = Person { id: 1 };
+        send failures(person);
+      }
+    `)).toThrow(
+      'Channel "failures" payload 1 expects Failure, but send expression has type Person',
+    )
+  })
+
+  it('validates receive target types including arrays and record fields', () => {
+    expect(() => parseProgram(
+      'chan jobs(int);\nprocess Consumer {\n  string value;\n  receive jobs(value);\n}',
+    )).toThrow(
+      'Channel "jobs" payload 1 provides int, but receive target requires string at line 4, column 16',
+    )
+
+    expect(() => parseProgram(`
+      chan jobs(string);
+      process Consumer {
+        int[] values = [0];
+        receive jobs(values[0]);
+      }
+    `)).toThrow(
+      'Channel "jobs" payload 1 provides string, but receive target requires int',
+    )
+
+    expect(() => parseProgram(`
+      record Result { int value; }
+      chan jobs(string);
+      process Consumer {
+        Result result;
+        receive jobs(result.value);
+      }
+    `)).toThrow(
+      'Channel "jobs" payload 1 provides string, but receive target requires int',
+    )
+  })
+
+  it('rejects statically non-integer channel indexes', () => {
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        string key = "first";
+        send replies[key]("ready");
+      }
+    `)).toThrow(
+      'Channel array "replies" index must be int, but expression has type string',
+    )
+
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        bool useFirst = true;
+        string response;
+        receive replies[useFirst](response);
+      }
+    `)).toThrow(
+      'Channel array "replies" index must be int, but expression has type bool',
+    )
+  })
+
+  it('uses function and monitor parameter types during validation', () => {
+    expect(() => parseProgram(`
+      chan messages(string);
+
+      function forward(int value) {
+        send messages(value);
+      }
+    `)).toThrow(
+      'Channel "messages" payload 1 expects string, but send expression has type int',
+    )
+
+    expect(() => parseProgram(`
+      chan messages(string);
+
+      monitor Forwarder {
+        procedure forward(in int value) {
+          send messages(value);
+        }
+      }
+    `)).toThrow(
+      'Channel "messages" payload 1 expects string, but send expression has type int',
+    )
+  })
+
+  it('defers send expressions with unknown function return types', () => {
+    const program = parseProgram(`
+      chan values(string);
+
+      function identity(int value) {
+        return value;
+      }
+
+      process Producer {
+        send values(identity(10));
+      }
+    `)
+
+    expect(program.processes[0].instructions[0].type).toBe('SEND')
+  })
+
   it('rejects non-assignable receive arguments', () => {
     expect(() => parseProgram(`
       chan jobs(int);

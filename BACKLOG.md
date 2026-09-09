@@ -1189,9 +1189,9 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
     `receive respuestas[id](valor);`.
 -   [ ] Parsear `empty(canal)` y `empty(canales[indice])` como expresiones
     booleanas.
--   [ ] Validar aridad, tipos, canales duplicados, tamaño de arrays e índices
+-   [x] Validar aridad, tipos, canales duplicados, tamaño de arrays e índices
     en tiempo de compilación cuando sea posible.
--   [ ] Agregar errores de sintaxis y tipos con línea y columna precisas.
+-   [x] Agregar errores de sintaxis y tipos con línea y columna precisas.
 -   [x] Rechazar canales duplicados, canales usados antes de declararse,
     payload vacío, aridad incorrecta y destinos no asignables.
 -   [x] Rechazar tamaño no literal, cero, expansión excesiva, uso de un array
@@ -1200,9 +1200,10 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
 -   [x] Conservar `send` y `receive` como nombres contextuales de procedures
     existentes cuando aparecen después de `procedure` o de un monitor.
 
-**Estado parcial:** modelo, tokenizer y parser de canales escalares e indexados
-completados. Faltan validación estática completa de tipos y `empty(canal)`
-antes de cerrar M13.2.
+**Estado parcial:** modelo, tokenizer, parser y validación estática conservadora
+de canales escalares e indexados completados. Falta `empty(canal)` antes de
+cerrar M13.2. Las llamadas a funciones se difieren porque el lenguaje todavía
+no declara tipos de retorno.
 
 ### M13.3 --- Runtime de PMA
 
@@ -1269,8 +1270,8 @@ antes de cerrar M13.2.
 -   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
 
 **Estado:** M13.1 COMPLETADO. M13.2 EN CURSO: canales escalares y arrays ya
-están parseados; el próximo ticket es validación estática de payloads y
-destinos.
+están parseados y sus tipos conocidos se validan durante Build; el próximo
+ticket es `empty(canal)`.
 
 ------------------------------------------------------------------------
 

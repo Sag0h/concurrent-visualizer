@@ -1010,14 +1010,20 @@ La capa concurrente ejecutable soporta actualmente:
 M13.2 agrega al modelo `ChannelDefinition` y reconoce en tokenizer/parser
 canales escalares o arrays tipados, `send` con expresiones y `receive` con
 destinos de asignación. Los tipos de payload pueden ser primitivos o registros
-declarados previamente, y la aridad se comprueba durante el parsing. Una
-definición indexada conserva su longitud; cada instrucción mantiene la
+declarados previamente. Aridad y tipos conocidos se comprueban durante el
+parsing mediante una tabla de símbolos contextual y una inferencia
+conservadora; cada incompatibilidad apunta al argumento o destino concreto.
+
+Una definición indexada conserva su longitud y cada instrucción mantiene la
 expresión de índice para resolverla al ejecutarse. Tamaños e índices literales
-se validan anticipadamente, mientras los índices dinámicos quedarán a cargo del
-runtime. Esta sintaxis todavía no es ejecutable: el engine produce un error
-explícito hasta que M13.3 agregue el estado y las transiciones PMA.
-`empty(canal)` y la validación estática completa de payloads siguen pendientes
-dentro de M13.2.
+se validan anticipadamente; un índice dinámico de tipo conocido también debe
+ser `int`, mientras su valor y rango efectivos quedan a cargo del runtime. Las
+llamadas a funciones permanecen sin tipo estático porque `FunctionDefinition`
+todavía no declara retorno.
+
+Esta sintaxis aún no es ejecutable: el engine produce un error explícito hasta
+que M13.3 agregue el estado y las transiciones PMA. `empty(canal)` es el último
+ticket pendiente dentro de M13.2.
 
 Pipeline vigente:
 

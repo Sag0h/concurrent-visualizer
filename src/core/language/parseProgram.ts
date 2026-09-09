@@ -44,6 +44,10 @@ import {
   createPriorityQueueValue,
   createQueueValue,
   createStackValue,
+  isPriorityQueueValue,
+  isQueueValue,
+  isRecordValue,
+  isStackValue,
   type PriorityQueueItem,
   type ArrayValue,
   type CollectionElementType,
@@ -80,6 +84,11 @@ import {
 } from '../monitors/monitorFactories'
 import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { ChannelDefinition } from '../channels/ChannelDefinition'
+import {
+  declaredValueTypesEqual,
+  formatDeclaredType,
+  formatDeclaredValueType,
+} from './DeclaredTypeUtils'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
 const MAX_CHANNEL_ARRAY_LENGTH = 1000
@@ -109,6 +118,12 @@ class Parser {
     string,
     ChannelDefinition
   > = {}
+  private readonly sharedDeclaredTypes = new Map<
+    string,
+    DeclaredType
+  >()
+  private currentVariableTypes:
+    Map<string, DeclaredType> | undefined
   private monitorProcedureDepth = 0
 
   constructor(tokens: Token[]) {
@@ -378,7 +393,9 @@ class Parser {
       }
 
       if (this.match('PROCEDURE')) {
-        const procedure = this.parseMonitorProcedureDefinition()
+        const procedure = this.parseMonitorProcedureDefinition(
+          definition,
+        )
 
         if (definition.procedures[procedure.name]) {
           throw this.error(
@@ -506,7 +523,9 @@ class Parser {
     )
   }
 
-  private parseMonitorProcedureDefinition(): MonitorProcedureDefinition {
+  private parseMonitorProcedureDefinition(
+    monitor: MonitorDefinition,
+  ): MonitorProcedureDefinition {
     const name = this.consumeCallableName(
       'Expected procedure name',
     )
@@ -516,6 +535,7 @@ class Parser {
     )
 
     const parameters: MonitorProcedureDefinition['parameters'] = []
+    const parameterTypes = new Map<string, DeclaredType>()
 
     if (!this.check('RIGHT_PAREN')) {
       do {
@@ -552,6 +572,10 @@ class Parser {
           mode,
           declaredType,
         })
+        parameterTypes.set(
+          parameterName.lexeme,
+          declaredType,
+        )
       } while (this.match('COMMA'))
     }
 
@@ -561,6 +585,20 @@ class Parser {
     )
 
     this.monitorProcedureDepth += 1
+    const previousVariableTypes = this.currentVariableTypes
+    this.currentVariableTypes = new Map(
+      monitor.state.map((state) => [
+        state.name,
+        state.declaredType,
+      ]),
+    )
+
+    for (const [parameterName, declaredType] of parameterTypes) {
+      this.currentVariableTypes.set(
+        parameterName,
+        declaredType,
+      )
+    }
 
     try {
       return {
@@ -569,6 +607,7 @@ class Parser {
         body: this.parseInstructionBlock(),
       }
     } finally {
+      this.currentVariableTypes = previousVariableTypes
       this.monitorProcedureDepth -= 1
     }
   }
@@ -622,6 +661,11 @@ class Parser {
     const name = this.consume(
       'IDENTIFIER',
       'Expected variable name',
+    )
+
+    this.sharedDeclaredTypes.set(
+      name.lexeme,
+      declaredType,
     )
 
     this.consume(
@@ -815,20 +859,33 @@ class Parser {
     )
 
     const instructions: Instruction[] = []
+    const previousVariableTypes = this.currentVariableTypes
+    this.currentVariableTypes = new Map()
 
-    while (
-      !this.check('RIGHT_BRACE')
-      && !this.isAtEnd()
-    ) {
-      instructions.push(
-        this.parseProcessInstruction(),
+    if (range) {
+      this.currentVariableTypes.set(
+        range.indexName,
+        primitiveDeclaredType('int'),
       )
     }
 
-    this.consume(
-      'RIGHT_BRACE',
-      'Expected "}" after process body',
-    )
+    try {
+      while (
+        !this.check('RIGHT_BRACE')
+        && !this.isAtEnd()
+      ) {
+        instructions.push(
+          this.parseProcessInstruction(),
+        )
+      }
+
+      this.consume(
+        'RIGHT_BRACE',
+        'Expected "}" after process body',
+      )
+    } finally {
+      this.currentVariableTypes = previousVariableTypes
+    }
 
     const createProcess = (
       id: string,
@@ -1010,6 +1067,11 @@ class Parser {
     const name = this.consume(
       'IDENTIFIER',
       'Expected variable name',
+    )
+
+    this.currentVariableTypes?.set(
+      name.lexeme,
+      declaredType,
     )
 
     if (this.match('SEMICOLON')) {
@@ -1674,9 +1736,11 @@ class Parser {
     )
 
     const args: Expression[] = []
+    const argumentTokens: Token[] = []
 
     if (!this.check('RIGHT_PAREN')) {
       do {
+        argumentTokens.push(this.peek())
         args.push(this.parseExpression())
       } while (this.match('COMMA'))
     }
@@ -1690,6 +1754,11 @@ class Parser {
       args.length,
       'send',
       closingParenthesis,
+    )
+    this.assertChannelSendTypes(
+      channel.definition,
+      args,
+      argumentTokens,
     )
     this.consume(
       'SEMICOLON',
@@ -1712,9 +1781,11 @@ class Parser {
     )
 
     const targets: AssignmentTarget[] = []
+    const targetTokens: Token[] = []
 
     if (!this.check('RIGHT_PAREN')) {
       do {
+        targetTokens.push(this.peek())
         targets.push(this.parseAssignmentTarget(
           'Expected assignable target in receive',
         ))
@@ -1730,6 +1801,11 @@ class Parser {
       targets.length,
       'receive',
       closingParenthesis,
+    )
+    this.assertChannelReceiveTypes(
+      channel.definition,
+      targets,
+      targetTokens,
     )
     this.consume(
       'SEMICOLON',
@@ -1766,6 +1842,7 @@ class Parser {
     let index: Expression | undefined
 
     if (this.match('LEFT_BRACKET')) {
+      const indexToken = this.peek()
       index = this.parseExpression()
       const closingBracket = this.consume(
         'RIGHT_BRACKET',
@@ -1783,6 +1860,11 @@ class Parser {
         definition,
         index,
         closingBracket,
+      )
+      this.assertChannelIndexType(
+        definition,
+        index,
+        indexToken,
       )
     } else if (definition.arrayLength !== undefined) {
       throw this.error(
@@ -1838,6 +1920,264 @@ class Parser {
       token,
       `Channel "${definition.name}" expects ${expected} value(s), but ${operation} provides ${actual}`,
     )
+  }
+
+  private assertChannelIndexType(
+    definition: ChannelDefinition,
+    index: Expression,
+    token: Token,
+  ): void {
+    const actualType = this.inferExpressionType(index)
+
+    if (
+      !actualType
+      || (
+        actualType.container === 'SCALAR'
+        && actualType.valueType.kind === 'PRIMITIVE'
+        && actualType.valueType.primitiveType === 'int'
+      )
+    ) {
+      return
+    }
+
+    throw this.error(
+      token,
+      `Channel array "${definition.name}" index must be int, but expression has type ${formatDeclaredType(actualType)}`,
+    )
+  }
+
+  private assertChannelSendTypes(
+    definition: ChannelDefinition,
+    args: Expression[],
+    tokens: Token[],
+  ): void {
+    args.forEach((argument, index) => {
+      const actualType = this.inferExpressionType(argument)
+      const expectedType = definition.payloadTypes[index]
+
+      if (
+        !actualType
+        || !expectedType
+        || (
+          actualType.container === 'SCALAR'
+          && declaredValueTypesEqual(
+            actualType.valueType,
+            expectedType,
+          )
+        )
+      ) {
+        return
+      }
+
+      throw this.error(
+        tokens[index] ?? this.peek(),
+        `Channel "${definition.name}" payload ${index + 1} expects ${formatDeclaredValueType(expectedType)}, but send expression has type ${formatDeclaredType(actualType)}`,
+      )
+    })
+  }
+
+  private assertChannelReceiveTypes(
+    definition: ChannelDefinition,
+    targets: AssignmentTarget[],
+    tokens: Token[],
+  ): void {
+    targets.forEach((target, index) => {
+      const targetType = this.inferAssignmentTargetType(target)
+      const payloadType = definition.payloadTypes[index]
+
+      if (
+        !targetType
+        || !payloadType
+        || (
+          targetType.container === 'SCALAR'
+          && declaredValueTypesEqual(
+            targetType.valueType,
+            payloadType,
+          )
+        )
+      ) {
+        return
+      }
+
+      throw this.error(
+        tokens[index] ?? this.peek(),
+        `Channel "${definition.name}" payload ${index + 1} provides ${formatDeclaredValueType(payloadType)}, but receive target requires ${formatDeclaredType(targetType)}`,
+      )
+    })
+  }
+
+  private inferExpressionType(
+    expression: Expression,
+  ): DeclaredType | undefined {
+    switch (expression.type) {
+      case 'LITERAL':
+        return inferLiteralDeclaredType(expression.value)
+
+      case 'VARIABLE':
+        return this.lookupVariableType(expression.name)
+
+      case 'UNARY':
+        return primitiveDeclaredType(
+          expression.operator === '!'
+            ? 'bool'
+            : 'int',
+        )
+
+      case 'BINARY':
+        if (
+          expression.operator === '=='
+          || expression.operator === '!='
+          || expression.operator === '<'
+          || expression.operator === '<='
+          || expression.operator === '>'
+          || expression.operator === '>='
+          || expression.operator === '&&'
+          || expression.operator === '||'
+        ) {
+          return primitiveDeclaredType('bool')
+        }
+
+        if (expression.operator === '+') {
+          const leftType = this.inferExpressionType(expression.left)
+          const rightType = this.inferExpressionType(expression.right)
+
+          if (
+            isPrimitiveScalarType(leftType, 'string')
+            && isPrimitiveScalarType(rightType, 'string')
+          ) {
+            return primitiveDeclaredType('string')
+          }
+        }
+
+        return primitiveDeclaredType('int')
+
+      case 'ARRAY_ACCESS': {
+        const arrayType = this.inferExpressionType(expression.array)
+
+        return arrayType?.container === 'ARRAY'
+          ? scalarDeclaredType(arrayType.elementType)
+          : undefined
+      }
+
+      case 'FUNCTION_CALL':
+        return undefined
+
+      case 'FIELD_ACCESS':
+        return this.inferRecordFieldType(
+          expression.record,
+          expression.fieldName,
+          false,
+        )
+
+      case 'RECORD_GETTER':
+        return this.inferRecordFieldType(
+          expression.record,
+          expression.getterName,
+          true,
+        )
+
+      case 'COLLECTION_QUERY':
+        return primitiveDeclaredType(
+          expression.query === 'SIZE'
+            ? 'int'
+            : 'bool',
+        )
+    }
+  }
+
+  private inferAssignmentTargetType(
+    target: AssignmentTarget,
+  ): DeclaredType | undefined {
+    const declaredType = this.lookupVariableType(
+      target.type === 'VARIABLE'
+        ? target.name
+        : target.type === 'ARRAY_ACCESS'
+          || target.type === 'ARRAY_RECORD_FIELD'
+          ? target.arrayName
+          : target.recordName,
+    )
+
+    if (!declaredType) {
+      return undefined
+    }
+
+    switch (target.type) {
+      case 'VARIABLE':
+        return declaredType
+
+      case 'ARRAY_ACCESS':
+        return declaredType.container === 'ARRAY'
+          ? scalarDeclaredType(declaredType.elementType)
+          : undefined
+
+      case 'RECORD_FIELD':
+        return this.inferRecordFieldFromDeclaredType(
+          declaredType,
+          target.fieldName,
+          false,
+        )
+
+      case 'ARRAY_RECORD_FIELD':
+        return declaredType.container === 'ARRAY'
+          ? this.inferRecordFieldFromDeclaredType(
+              scalarDeclaredType(declaredType.elementType),
+              target.fieldName,
+              false,
+            )
+          : undefined
+    }
+  }
+
+  private inferRecordFieldType(
+    record: Expression,
+    requestedName: string,
+    isGetter: boolean,
+  ): DeclaredType | undefined {
+    const recordType = this.inferExpressionType(record)
+
+    return recordType
+      ? this.inferRecordFieldFromDeclaredType(
+          recordType,
+          requestedName,
+          isGetter,
+        )
+      : undefined
+  }
+
+  private inferRecordFieldFromDeclaredType(
+    declaredType: DeclaredType,
+    requestedName: string,
+    isGetter: boolean,
+  ): DeclaredType | undefined {
+    if (
+      declaredType.container !== 'SCALAR'
+      || declaredType.valueType.kind !== 'RECORD'
+    ) {
+      return undefined
+    }
+
+    const definition = this.recordDefinitions[
+      declaredType.valueType.recordType
+    ]
+    const fieldName = isGetter
+      ? requestedName.slice(3).toLocaleLowerCase()
+      : requestedName
+    const field = definition?.fields.find((candidate) =>
+      isGetter
+        ? candidate.name.toLocaleLowerCase() === fieldName
+        : candidate.name === fieldName,
+    )
+
+    return field
+      ? primitiveDeclaredType(field.type)
+      : undefined
+  }
+
+  private lookupVariableType(
+    name: string,
+  ): DeclaredType | undefined {
+    return this.currentVariableTypes?.get(name)
+      ?? this.sharedDeclaredTypes.get(name)
   }
 
   private parsePrintInstruction(): Instruction {
@@ -2571,6 +2911,11 @@ class Parser {
       'Expected FOR variable name',
     )
 
+    this.currentVariableTypes?.set(
+      variableName.lexeme,
+      declaredType,
+    )
+
     this.consume(
       'ASSIGN',
       'Expected "=" in FOR initializer',
@@ -2887,6 +3232,21 @@ class Parser {
     const collection =
       this.parseExpression()
 
+    const collectionType =
+      this.inferExpressionType(collection)
+
+    if (
+      collectionType
+      && collectionType.container !== 'SCALAR'
+    ) {
+      this.currentVariableTypes?.set(
+        item.lexeme,
+        scalarDeclaredType(
+          collectionType.elementType,
+        ),
+      )
+    }
+
     this.consume(
       'RIGHT_PAREN',
       'Expected ")" after FOREACH collection',
@@ -2914,10 +3274,11 @@ class Parser {
     )
 
     const parameters: string[] = []
+    const parameterTypes = new Map<string, DeclaredType>()
 
     if (!this.check('RIGHT_PAREN')) {
       do {
-        this.parseType()
+        const declaredType = this.parseType()
 
         const parameter = this.consume(
           'IDENTIFIER',
@@ -2927,6 +3288,10 @@ class Parser {
         parameters.push(
           parameter.lexeme,
         )
+        parameterTypes.set(
+          parameter.lexeme,
+          declaredType,
+        )
       } while (this.match('COMMA'))
     }
 
@@ -2935,8 +3300,15 @@ class Parser {
       'Expected ")" after parameters',
     )
 
-    const body =
-      this.parseInstructionBlock()
+    const previousVariableTypes = this.currentVariableTypes
+    this.currentVariableTypes = parameterTypes
+    let body: Instruction[]
+
+    try {
+      body = this.parseInstructionBlock()
+    } finally {
+      this.currentVariableTypes = previousVariableTypes
+    }
 
     return {
       name: name.lexeme,
@@ -3178,6 +3550,120 @@ function matchesPrimitiveType(
     || (type === 'bool' && typeof value === 'boolean')
     || (type === 'string' && typeof value === 'string')
   )
+}
+
+function scalarDeclaredType(
+  valueType: DeclaredValueType,
+): DeclaredType {
+  return {
+    container: 'SCALAR',
+    valueType,
+  }
+}
+
+function primitiveDeclaredType(
+  primitiveType: PrimitiveType,
+): DeclaredType {
+  return scalarDeclaredType({
+    kind: 'PRIMITIVE',
+    primitiveType,
+  })
+}
+
+function collectionElementDeclaredValueType(
+  elementType: CollectionElementType,
+): DeclaredValueType {
+  return typeof elementType === 'string'
+    ? {
+        kind: 'PRIMITIVE',
+        primitiveType: elementType,
+      }
+    : elementType
+}
+
+function inferLiteralDeclaredType(
+  value: RuntimeValue,
+): DeclaredType | undefined {
+  if (typeof value === 'number') {
+    return primitiveDeclaredType('int')
+  }
+
+  if (typeof value === 'boolean') {
+    return primitiveDeclaredType('bool')
+  }
+
+  if (typeof value === 'string') {
+    return primitiveDeclaredType('string')
+  }
+
+  if (isRecordValue(value)) {
+    return scalarDeclaredType({
+      kind: 'RECORD',
+      recordType: value.recordType,
+    })
+  }
+
+  if (isQueueValue(value)) {
+    return {
+      container: 'QUEUE',
+      elementType:
+        collectionElementDeclaredValueType(value.elementType),
+    }
+  }
+
+  if (isPriorityQueueValue(value)) {
+    return {
+      container: 'PRIORITY_QUEUE',
+      elementType:
+        collectionElementDeclaredValueType(value.elementType),
+    }
+  }
+
+  if (isStackValue(value)) {
+    return {
+      container: 'STACK',
+      elementType:
+        collectionElementDeclaredValueType(value.elementType),
+    }
+  }
+
+  if (Array.isArray(value)) {
+    const firstType = value.length > 0
+      ? inferLiteralDeclaredType(value[0])
+      : undefined
+
+    if (!firstType || firstType.container !== 'SCALAR') {
+      return undefined
+    }
+
+    const isHomogeneous = value.every((element) => {
+      const elementType = inferLiteralDeclaredType(element)
+
+      return elementType?.container === 'SCALAR'
+        && declaredValueTypesEqual(
+          elementType.valueType,
+          firstType.valueType,
+        )
+    })
+
+    return isHomogeneous
+      ? {
+          container: 'ARRAY',
+          elementType: firstType.valueType,
+        }
+      : undefined
+  }
+
+  return undefined
+}
+
+function isPrimitiveScalarType(
+  type: DeclaredType | undefined,
+  primitiveType: PrimitiveType,
+): boolean {
+  return type?.container === 'SCALAR'
+    && type.valueType.kind === 'PRIMITIVE'
+    && type.valueType.primitiveType === primitiveType
 }
 
 function literalIntegerValue(

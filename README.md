@@ -26,10 +26,10 @@ parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
 `signal_all`. El buffer limitado completa M12 con una variante problemática y
 otra corregida. M13.1 ya fijó la semántica académica de PMA, PMS y CSP. La
 primera parte de M13.2 incorpora el modelo y parser de canales PMA escalares:
-`chan`, `send` y `receive` se reconocen y validan, pero todavía no son
-ejecutables. La segunda parte agrega arrays de hasta 1000 canales y referencias
-indexadas mediante expresiones. El próximo ticket completa la validación
-estática de payloads y destinos.
+`chan`, `send` y `receive` se reconocen, pero todavía no son ejecutables. La
+segunda parte agrega arrays de hasta 1000 canales, referencias indexadas y
+validación estática conservadora de payloads, destinos e índices. El próximo
+ticket completa M13.2 con `empty(canal)`.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su

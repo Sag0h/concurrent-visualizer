@@ -26,10 +26,10 @@ waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
 **Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
-PMA, PMS y CSP. M13.2 ya incorporó al modelo y al parser canales PMA escalares
-e indexados junto con `chan`, `send` y `receive`. El siguiente ticket completa
-la validación estática de payloads y destinos; aún no hay primitivas de
-mensajes ejecutables en el runtime.
+PMA, PMS y CSP. M13.2 ya incorporó canales PMA escalares e indexados,
+`chan`, `send`, `receive` y validación estática conservadora de tipos. El
+siguiente ticket agrega `empty(canal)`; aún no hay primitivas de mensajes
+ejecutables en el runtime.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2619,3 +2619,24 @@ sustitución de expresiones y diagnóstico de loops.
 La cobertura incluye parser de expresiones y todas las guardas, colas FIFO
 compartidas, arrays locales/compartidos, pilas, colas de prioridad, reactivación
 de `await`, errores de receptor/argumentos y restauración mediante Step Back.
+
+## 2026-09-09 --- M13.2: validación estática de mensajes
+
+El parser mantiene una tabla de tipos por proceso, función o procedure de
+monitor, con prioridad de variables locales sobre declaraciones compartidas.
+`send` compara cada expresión cuyo tipo puede inferirse con la posición
+correspondiente del canal; `receive` compara el payload con variables,
+elementos de array y campos de registro de destino.
+
+La inferencia cubre literales, variables, operaciones aritméticas y booleanas,
+arrays, registros nominales, campos, getters y consultas de colecciones. Los
+índices calculados de arrays de canales también se rechazan anticipadamente si
+su tipo conocido no es `int`. Los errores señalan la posición concreta del
+argumento o destino incompatible.
+
+La estrategia es conservadora: una llamada a función queda sin tipo estático
+porque la sintaxis actual no declara retorno, por lo que no se rechaza durante
+Build y deberá validarse al enviar en M13.3. La cobertura incluye tipos
+primitivos, registros nominales, arrays, getters, consultas, memoria
+compartida, parámetros de funciones/monitores e índices de canal. El siguiente
+ticket de M13.2 es `empty(canal)`.

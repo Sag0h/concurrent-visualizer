@@ -1573,7 +1573,8 @@ chan respuestas[4](string);
 ```
 
 Los canales deben declararse antes de los procesos que los utilizan. `send`
-acepta expresiones y `receive` exige destinos asignables con la misma aridad:
+acepta expresiones y `receive` exige destinos asignables con la misma aridad y
+tipos compatibles:
 
 ``` text
 process Productor {
@@ -1596,8 +1597,25 @@ process Cliente[id:0..3] {
 
 Los arrays de canales usan una longitud literal positiva, admiten hasta 1000
 elementos y se indexan desde cero. El índice de `send` o `receive` puede ser
-una expresión entera. Un índice literal se comprueba durante el parsing; los
-índices calculados se validarán al ejecutarse cuando exista el runtime PMA.
+una expresión entera. Los índices literales se comprueban por rango durante el
+parsing. Un índice calculado cuyo tipo conocido no sea `int` también se rechaza
+durante Build; su valor concreto se validará al ejecutarse.
+
+La validación estática reconoce literales, variables, expresiones aritméticas o
+booleanas, registros nominales, elementos de arrays, campos/getters y
+`size()`/`isEmpty()`. Por ejemplo, este envío se rechaza con línea y columna:
+
+``` text
+chan numeros(int);
+
+process Productor {
+    send numeros("texto");
+}
+```
+
+Las llamadas a funciones todavía no tienen un tipo de retorno declarado. Si
+un payload depende de una, Build lo acepta de forma conservadora y el runtime
+de M13.3 deberá validar el valor efectivo antes de encolarlo.
 
 Esta sección describe una sintaxis parseable pero **todavía no ejecutable**.
 Hacer Step o Run sobre `send`/`receive` produce un error explícito hasta que el

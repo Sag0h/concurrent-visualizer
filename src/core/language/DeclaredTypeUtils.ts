@@ -123,7 +123,7 @@ function collectionElementTypeMatches(
       && actual.recordType === declared.recordType
 }
 
-function formatDeclaredValueType(
+export function formatDeclaredValueType(
   declaredType: DeclaredValueType,
 ): string {
   return declaredType.kind === 'PRIMITIVE'
@@ -131,7 +131,7 @@ function formatDeclaredValueType(
     : formatCollectionElementType(declaredType)
 }
 
-function declaredValueTypesEqual(
+export function declaredValueTypesEqual(
   left: DeclaredValueType,
   right: DeclaredValueType,
 ): boolean {
