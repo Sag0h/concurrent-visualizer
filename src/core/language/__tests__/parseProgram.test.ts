@@ -96,12 +96,18 @@ describe('parseProgram', () => {
         operation: 'POP',
       },
       {
-        type: 'DATA_STRUCTURE_OPERATION',
-        operation: 'SIZE',
+        type: 'DECLARE',
+        initialValue: {
+          type: 'COLLECTION_QUERY',
+          query: 'SIZE',
+        },
       },
       {
-        type: 'DATA_STRUCTURE_OPERATION',
-        operation: 'IS_EMPTY',
+        type: 'DECLARE',
+        initialValue: {
+          type: 'COLLECTION_QUERY',
+          query: 'IS_EMPTY',
+        },
       },
     ])
   })
@@ -204,19 +210,17 @@ describe('parseProgram', () => {
         },
       },
       {
-        type: 'DATA_STRUCTURE_OPERATION',
-        operation: 'IS_EMPTY',
-        resultTarget: {
-          type: 'DECLARE',
-          name: 'empty',
+        type: 'DECLARE',
+        initialValue: {
+          type: 'COLLECTION_QUERY',
+          query: 'IS_EMPTY',
         },
       },
       {
-        type: 'DATA_STRUCTURE_OPERATION',
-        operation: 'SIZE',
-        resultTarget: {
-          type: 'DECLARE',
-          name: 'size',
+        type: 'DECLARE',
+        initialValue: {
+          type: 'COLLECTION_QUERY',
+          query: 'SIZE',
         },
       },
     ])

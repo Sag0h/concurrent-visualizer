@@ -5,7 +5,7 @@
 
 ## Estado actual
 
-**Fase:** M13.1 --- Semántica académica y alcance del pasaje de mensajes.
+**Fase:** M13.2 --- Modelo, tokenizer y parser de PMA.
 
 **Último milestone completado:** M12 --- Monitores.
 
@@ -27,9 +27,9 @@ pasos.
 
 **Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
 PMA, PMS y CSP. M13.2 ya incorporó al modelo y al parser canales PMA escalares
-tipados junto con `chan`, `send` y `receive`. El siguiente ticket agrega arrays
-de canales y referencias indexadas; aún no hay primitivas de mensajes
-ejecutables en el runtime.
+e indexados junto con `chan`, `send` y `receive`. El siguiente ticket completa
+la validación estática de payloads y destinos; aún no hay primitivas de
+mensajes ejecutables en el runtime.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2583,3 +2583,39 @@ El runtime todavía no intenta simular estas instrucciones y devuelve un error
 explícito de M13.3 si se ejecutan. Los siguientes pasos de M13.2 son arrays de
 canales, referencias indexadas, validación estática adicional y
 `empty(canal)`.
+
+## 2026-09-08 --- M13.2: arrays de canales
+
+Las declaraciones aceptan una longitud literal positiva mediante
+`chan respuestas[4](string);`. La longitud máxima inicial es 1000 y se conserva
+en `ChannelDefinition`; los canales concretos se materializarán recién en el
+runtime para no confundir definición inmutable con estado de sus colas.
+
+`send` y `receive` aceptan referencias como `respuestas[id]` y guardan la
+expresión del índice en el AST. El parser detecta un array usado sin índice, un
+canal escalar indexado y valores literales fuera del rango `0..longitud-1`.
+Los índices calculados se aceptan y deberán producir un entero válido en
+M13.3.
+
+Las pruebas nuevas cubren definición, índices variables y compuestos, rangos
+fuente, longitudes cero o excesivas y todas las combinaciones escalares e
+indexadas inválidas. El siguiente ticket es la validación estática de tipos de
+payload y destinos; luego se incorporará `empty(canal)`.
+
+## 2026-09-08 --- M10.5: consultas de colecciones como expresiones
+
+`size()` e `isEmpty()` dejaron de estar limitados al lado derecho completo de
+una asignación. El AST incorpora `CollectionQueryExpression` y el evaluador lo
+resuelve sin mutar el receptor, por lo que ambas consultas funcionan dentro de
+cálculos, `print` y guardas de `if`, `while`, `repeat/until`, `for` y `await`.
+
+La misma API se habilitó para arrays locales y compartidos. Se conserva
+`isEmpty()` como nombre canónico y no se agregó `.length`; `empty(canal)`
+seguirá siendo una operación distinta de M13. Las consultas se evalúan como
+parte del step contenedor y no producen un evento mutante de estructura. Las
+referencias compartidas siguen participando en el recorrido de lecturas,
+sustitución de expresiones y diagnóstico de loops.
+
+La cobertura incluye parser de expresiones y todas las guardas, colas FIFO
+compartidas, arrays locales/compartidos, pilas, colas de prioridad, reactivación
+de `await`, errores de receptor/argumentos y restauración mediante Step Back.

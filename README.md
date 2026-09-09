@@ -27,8 +27,9 @@ parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
 otra corregida. M13.1 ya fijó la semántica académica de PMA, PMS y CSP. La
 primera parte de M13.2 incorpora el modelo y parser de canales PMA escalares:
 `chan`, `send` y `receive` se reconocen y validan, pero todavía no son
-ejecutables. El próximo ticket agrega arrays de canales y referencias
-indexadas.
+ejecutables. La segunda parte agrega arrays de hasta 1000 canales y referencias
+indexadas mediante expresiones. El próximo ticket completa la validación
+estática de payloads y destinos.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su
@@ -139,9 +140,11 @@ primitivos o registros homogéneos. Pueden declararse como memoria local o compa
 ofrecen `enqueue`, `dequeue`, `front`, `size` e `isEmpty`. En una
 `priority_queue<T>`, el número más alto tiene mayor prioridad y los
 empates conservan FIFO. Las pilas ofrecen `push`, `pop`, `top`, `size` e
-`isEmpty`, con orden LIFO. Cada operación es un paso atómico, queda
-registrada en el historial y sus contenidos participan en snapshots,
-forks y exploración.
+`isEmpty`, con orden LIFO. `size()` e `isEmpty()` también funcionan sobre
+arrays y dentro de cálculos, `print` y guardas como
+`while (!recursos.isEmpty())`. Las operaciones mutantes son pasos atómicos;
+las consultas anidadas forman parte del paso que las contiene. Todos sus
+contenidos participan en snapshots, forks y exploración.
 
 Los procesos parametrizados permiten declarar familias mediante rangos
 inclusivos, por ejemplo `process Worker[i:0..3]`. El parser los expande

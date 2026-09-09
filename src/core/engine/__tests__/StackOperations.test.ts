@@ -73,7 +73,7 @@ describe('stack operations', () => {
     const events = engine.getState().history
       .filter((event) => event.dataStructureEvent)
 
-    expect(events).toHaveLength(7)
+    expect(events).toHaveLength(5)
     expect(events[0].dataStructureEvent).toMatchObject({
       operation: 'PUSH',
       structureName: 'values',

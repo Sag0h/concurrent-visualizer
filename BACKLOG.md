@@ -944,25 +944,24 @@ un nombre escalar por elemento.
 
 ### M10.5 --- Consultas de colecciones como expresiones
 
-Extensión futura para evitar variables auxiliares cuando el tamaño o el estado
-vacío de una estructura forma parte natural de una guarda.
+Extensión para evitar variables auxiliares cuando el tamaño o el estado vacío
+de una estructura forma parte natural de una guarda.
 
--   [ ] Modelar `size()` e `isEmpty()` como expresiones de consulta sin
+-   [x] Modelar `size()` e `isEmpty()` como expresiones de consulta sin
     mutación para `queue`, `priority_queue` y `stack`.
--   [ ] Incorporar consultas equivalentes para arrays; decidir si se conserva
-    la misma sintaxis o se expone además `length`.
--   [ ] Permitir estas consultas dentro de expresiones compuestas y guardas de
+-   [x] Incorporar consultas equivalentes para arrays con la misma sintaxis;
+    `length` no se agrega en esta versión.
+-   [x] Permitir estas consultas dentro de expresiones compuestas y guardas de
     `if`, `while`, `repeat/until`, `for` y `await`.
--   [ ] Mantener `isEmpty()` como nombre canónico o evaluar `empty()` como
-    alias explícito sin confundirlo con el futuro `empty(canal)` de PMA.
--   [ ] Definir la granularidad observable al consultar una colección
+-   [x] Mantener `isEmpty()` como nombre canónico; `empty()` queda reservado
+    para canales de PMA y no es un alias de colección.
+-   [x] Definir la granularidad observable al consultar una colección
     compartida y conservar sus accesos en microoperaciones y diagnósticos.
--   [ ] Agregar pruebas de parser, tipos, runtime, Step Back y guardas sobre
+-   [x] Agregar pruebas de parser, tipos, runtime, Step Back y guardas sobre
     colecciones locales y compartidas.
 
-**Estado:** FUTURO. No bloquea M13; la primera implementación de
-`empty(canal)` tendrá un nodo propio y no resolverá implícitamente estas
-consultas de colecciones.
+**Estado:** M10.5 COMPLETADO. Las consultas se evalúan dentro del step de la
+instrucción que las contiene. `empty(canal)` tendrá un nodo propio en M13.
 
 Flujo vigente:
 
@@ -1174,18 +1173,19 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
 ### M13.2 --- Modelo, tokenizer y parser de PMA
 
 -   [x] Incorporar definiciones de canales escalares al `Program`.
--   [ ] Incorporar arrays de canales con tamaño literal positivo y convención
+-   [x] Incorporar arrays de canales con tamaño literal positivo y convención
     de índices desde cero.
 -   [ ] Representar cada mensaje como una tupla ordenada de valores tipados.
 -   [ ] Aceptar tipos primitivos, registros y estructuras de datos ya
     soportadas cuando puedan copiarse como valores de un mensaje.
 -   [x] Parsear `chan nombre(tipo1, tipo2, ...);` para tipos primitivos y
     registros declarados previamente.
--   [ ] Parsear `chan nombre[cantidad](tipo1, tipo2, ...);`.
+-   [x] Parsear `chan nombre[cantidad](tipo1, tipo2, ...);` con un máximo
+    inicial de 1000 canales concretos.
 -   [x] Parsear `send canal(expr1, expr2, ...);` sobre un canal escalar.
 -   [x] Parsear `receive canal(destino1, destino2, ...);` sobre un canal
     escalar y destinos asignables.
--   [ ] Parsear referencias indexadas como `send respuestas[id](valor);` y
+-   [x] Parsear referencias indexadas como `send respuestas[id](valor);` y
     `receive respuestas[id](valor);`.
 -   [ ] Parsear `empty(canal)` y `empty(canales[indice])` como expresiones
     booleanas.
@@ -1194,12 +1194,15 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
 -   [ ] Agregar errores de sintaxis y tipos con línea y columna precisas.
 -   [x] Rechazar canales duplicados, canales usados antes de declararse,
     payload vacío, aridad incorrecta y destinos no asignables.
+-   [x] Rechazar tamaño no literal, cero, expansión excesiva, uso de un array
+    sin índice, indexación de un canal escalar e índices literales fuera de
+    rango.
 -   [x] Conservar `send` y `receive` como nombres contextuales de procedures
     existentes cuando aparecen después de `procedure` o de un monitor.
 
-**Estado parcial:** modelo, tokenizer y parser de canales escalares completados.
-Faltan arrays de canales, validación estática completa de tipos y
-`empty(canal)` antes de cerrar M13.2.
+**Estado parcial:** modelo, tokenizer y parser de canales escalares e indexados
+completados. Faltan validación estática completa de tipos y `empty(canal)`
+antes de cerrar M13.2.
 
 ### M13.3 --- Runtime de PMA
 
@@ -1265,8 +1268,9 @@ Faltan arrays de canales, validación estática completa de tipos y
     comportamiento educativo predeterminado.
 -   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
 
-**Estado:** M13.1 COMPLETADO. M13.2 EN CURSO: la sintaxis escalar ya está
-parseada; el próximo ticket son arrays de canales y referencias indexadas.
+**Estado:** M13.1 COMPLETADO. M13.2 EN CURSO: canales escalares y arrays ya
+están parseados; el próximo ticket es validación estática de payloads y
+destinos.
 
 ------------------------------------------------------------------------
 

@@ -8,6 +8,7 @@ import {
   functionCall,
   fieldAccess,
   recordGetter,
+  collectionQuery,
 } from '../expressions/expressionFactories'
 import type { Instruction } from '../instructions/Instruction'
 import {
@@ -81,6 +82,7 @@ import type { AssignmentTarget } from '../instructions/AssignmentTarget'
 import type { ChannelDefinition } from '../channels/ChannelDefinition'
 
 const MAX_PARAMETERIZED_PROCESS_COUNT = 1000
+const MAX_CHANNEL_ARRAY_LENGTH = 1000
 
 export function parseProgram(
   source: string,
@@ -217,6 +219,38 @@ class Parser {
       )
     }
 
+    let arrayLength: number | undefined
+
+    if (this.match('LEFT_BRACKET')) {
+      const length = this.consume(
+        'NUMBER',
+        'Expected positive integer channel array length',
+      )
+      arrayLength = Number(length.lexeme)
+
+      if (
+        !Number.isSafeInteger(arrayLength)
+        || arrayLength <= 0
+      ) {
+        throw this.error(
+          length,
+          'Channel array length must be a positive integer',
+        )
+      }
+
+      if (arrayLength > MAX_CHANNEL_ARRAY_LENGTH) {
+        throw this.error(
+          length,
+          `Channel array length ${arrayLength} exceeds maximum ${MAX_CHANNEL_ARRAY_LENGTH}`,
+        )
+      }
+
+      this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after channel array length',
+      )
+    }
+
     this.consume(
       'LEFT_PAREN',
       'Expected "(" after channel name',
@@ -247,6 +281,9 @@ class Parser {
     this.channelDefinitions[name.lexeme] = {
       name: name.lexeme,
       payloadTypes,
+      ...(arrayLength !== undefined
+        ? { arrayLength }
+        : {}),
     }
   }
 
@@ -988,7 +1025,7 @@ class Parser {
       'Expected "=" after variable name',
     )
 
-    if (this.isDataStructureOperationCallStart()) {
+    if (this.isMutatingOrRemovingDataStructureCallStart()) {
       if (
         declaredType.container !== 'SCALAR'
       ) {
@@ -1385,28 +1422,49 @@ class Parser {
         )
 
         if (this.match('LEFT_PAREN')) {
-          if (!field.lexeme.startsWith('get')) {
+          if (
+            field.lexeme === 'size'
+            || field.lexeme === 'isEmpty'
+          ) {
+            if (!this.check('RIGHT_PAREN')) {
+              throw this.error(
+                this.peek(),
+                `${field.lexeme}() does not accept arguments`,
+              )
+            }
+
+            this.consume(
+              'RIGHT_PAREN',
+              `Expected ")" after "${field.lexeme}"`,
+            )
+            expression = collectionQuery(
+              expression,
+              field.lexeme === 'size'
+                ? 'SIZE'
+                : 'IS_EMPTY',
+            )
+          } else if (!field.lexeme.startsWith('get')) {
             throw this.error(
               field,
-              'Only record getters can return a value currently',
+              'Only record getters and collection queries can return a value currently',
+            )
+          } else {
+            if (!this.check('RIGHT_PAREN')) {
+              throw this.error(
+                this.peek(),
+                `Getter "${field.lexeme}" does not accept arguments`,
+              )
+            }
+
+            this.consume(
+              'RIGHT_PAREN',
+              `Expected ")" after getter "${field.lexeme}"`,
+            )
+            expression = recordGetter(
+              expression,
+              field.lexeme,
             )
           }
-
-          if (!this.check('RIGHT_PAREN')) {
-            throw this.error(
-              this.peek(),
-              `Getter "${field.lexeme}" does not accept arguments`,
-            )
-          }
-
-          this.consume(
-            'RIGHT_PAREN',
-            `Expected ")" after getter "${field.lexeme}"`,
-          )
-          expression = recordGetter(
-            expression,
-            field.lexeme,
-          )
         } else {
           expression = fieldAccess(
             expression,
@@ -1608,8 +1666,7 @@ class Parser {
   }
 
   private parseSendInstruction(): Instruction {
-    const channel = this.consumeChannelName('send')
-    const definition = this.channelDefinitions[channel.lexeme]
+    const channel = this.parseChannelReference('send')
 
     this.consume(
       'LEFT_PAREN',
@@ -1629,7 +1686,7 @@ class Parser {
       'Expected ")" after send arguments',
     )
     this.assertChannelArity(
-      definition,
+      channel.definition,
       args.length,
       'send',
       closingParenthesis,
@@ -1642,12 +1699,12 @@ class Parser {
     return sendInstruction(
       channel.lexeme,
       args,
+      channel.index,
     )
   }
 
   private parseReceiveInstruction(): Instruction {
-    const channel = this.consumeChannelName('receive')
-    const definition = this.channelDefinitions[channel.lexeme]
+    const channel = this.parseChannelReference('receive')
 
     this.consume(
       'LEFT_PAREN',
@@ -1669,7 +1726,7 @@ class Parser {
       'Expected ")" after receive targets',
     )
     this.assertChannelArity(
-      definition,
+      channel.definition,
       targets.length,
       'receive',
       closingParenthesis,
@@ -1682,25 +1739,87 @@ class Parser {
     return receiveInstruction(
       channel.lexeme,
       targets,
+      channel.index,
     )
   }
 
-  private consumeChannelName(
+  private parseChannelReference(
     operation: 'send' | 'receive',
-  ): Token {
+  ): {
+    readonly lexeme: string
+    readonly definition: ChannelDefinition
+    readonly index?: Expression
+  } {
     const channel = this.consume(
       'IDENTIFIER',
       `Expected channel name after "${operation}"`,
     )
+    const definition = this.channelDefinitions[channel.lexeme]
 
-    if (!this.channelDefinitions[channel.lexeme]) {
+    if (!definition) {
       throw this.error(
         channel,
         `Channel "${channel.lexeme}" is not defined; declare it before processes`,
       )
     }
 
-    return channel
+    let index: Expression | undefined
+
+    if (this.match('LEFT_BRACKET')) {
+      index = this.parseExpression()
+      const closingBracket = this.consume(
+        'RIGHT_BRACKET',
+        'Expected "]" after channel index',
+      )
+
+      if (definition.arrayLength === undefined) {
+        throw this.error(
+          channel,
+          `Channel "${channel.lexeme}" is not an array`,
+        )
+      }
+
+      this.assertLiteralChannelIndex(
+        definition,
+        index,
+        closingBracket,
+      )
+    } else if (definition.arrayLength !== undefined) {
+      throw this.error(
+        channel,
+        `Channel array "${channel.lexeme}" requires an index`,
+      )
+    }
+
+    return {
+      lexeme: channel.lexeme,
+      definition,
+      index,
+    }
+  }
+
+  private assertLiteralChannelIndex(
+    definition: ChannelDefinition,
+    index: Expression,
+    token: Token,
+  ): void {
+    const value = literalIntegerValue(index)
+
+    if (value === undefined) {
+      return
+    }
+
+    const length = definition.arrayLength
+
+    if (
+      length !== undefined
+      && (value < 0 || value >= length)
+    ) {
+      throw this.error(
+        token,
+        `Channel index ${value} is outside "${definition.name}" range 0..${length - 1}`,
+      )
+    }
   }
 
   private assertChannelArity(
@@ -2548,7 +2667,7 @@ class Parser {
         'Expected "=" after assignment target',
       )
 
-      if (this.isDataStructureOperationCallStart()) {
+      if (this.isMutatingOrRemovingDataStructureCallStart()) {
         return this.parseDataStructureResultInstruction(
           {
             type: 'ASSIGN',
@@ -2594,7 +2713,7 @@ class Parser {
       'Expected "=" after assignment target',
     )
 
-    if (this.isDataStructureOperationCallStart()) {
+    if (this.isMutatingOrRemovingDataStructureCallStart()) {
       return this.parseDataStructureResultInstruction(
         {
           type: 'ASSIGN',
@@ -2737,6 +2856,16 @@ class Parser {
         this.tokens[this.current + 2]?.lexeme,
       )
     )
+  }
+
+  private isMutatingOrRemovingDataStructureCallStart(): boolean {
+    if (!this.isDataStructureOperationCallStart()) {
+      return false
+    }
+
+    const method = this.tokens[this.current + 2]?.lexeme
+
+    return method !== 'size' && method !== 'isEmpty'
   }
 
   private parseForeachInstruction(): Instruction {
@@ -3049,6 +3178,30 @@ function matchesPrimitiveType(
     || (type === 'bool' && typeof value === 'boolean')
     || (type === 'string' && typeof value === 'string')
   )
+}
+
+function literalIntegerValue(
+  expression: Expression,
+): number | undefined {
+  if (
+    expression.type === 'LITERAL'
+    && typeof expression.value === 'number'
+    && Number.isInteger(expression.value)
+  ) {
+    return expression.value
+  }
+
+  if (
+    expression.type === 'UNARY'
+    && expression.operator === '-'
+    && expression.operand.type === 'LITERAL'
+    && typeof expression.operand.value === 'number'
+    && Number.isInteger(expression.operand.value)
+  ) {
+    return -expression.operand.value
+  }
+
+  return undefined
 }
 
 function monitorConditionKeyword(

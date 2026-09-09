@@ -183,10 +183,131 @@ process Receiver {
     `)).toThrow('Expected assignable target in receive')
   })
 
-  it('keeps channel arrays outside the first parser vertical', () => {
+  it('parses channel arrays and indexed send/receive references', () => {
+    const source = `chan replies[4](string);
+
+process Worker[id:0..3] {
+  string response;
+  send replies[id]("ready");
+  receive replies[id](response);
+}`
+    const program = parseProgram(source)
+    const [declaration, send, receive] =
+      program.processes[0].instructions
+
+    expect(program.channels?.replies).toEqual({
+      name: 'replies',
+      arrayLength: 4,
+      payloadTypes: [
+        {
+          kind: 'PRIMITIVE',
+          primitiveType: 'string',
+        },
+      ],
+    })
+    expect(declaration.type).toBe('DECLARE')
+    expect(send).toMatchObject({
+      type: 'SEND',
+      channelName: 'replies',
+      channelIndex: {
+        type: 'VARIABLE',
+        name: 'id',
+      },
+    })
+    expect(receive).toMatchObject({
+      type: 'RECEIVE',
+      channelName: 'replies',
+      channelIndex: {
+        type: 'VARIABLE',
+        name: 'id',
+      },
+    })
+    expect(sourceFragment(source, send)).toBe(
+      'send replies[id]("ready");',
+    )
+    expect(sourceFragment(source, receive)).toBe(
+      'receive replies[id](response);',
+    )
+  })
+
+  it('accepts expressions as channel indexes', () => {
+    const program = parseProgram(`
+      chan replies[4](int);
+      process Worker {
+        int id = 1;
+        send replies[id + 1](10);
+      }
+    `)
+    const send = program.processes[0].instructions[1]
+
+    expect(send).toMatchObject({
+      type: 'SEND',
+      channelIndex: {
+        type: 'BINARY',
+        operator: '+',
+      },
+    })
+  })
+
+  it('validates channel array lengths', () => {
     expect(() => parseProgram(
-      'chan replies[2](string);',
-    )).toThrow('Expected "(" after channel name')
+      'chan replies[0](string);',
+    )).toThrow(
+      'Channel array length must be a positive integer',
+    )
+
+    expect(() => parseProgram(
+      'chan replies[1001](string);',
+    )).toThrow(
+      'Channel array length 1001 exceeds maximum 1000',
+    )
+
+    expect(() => parseProgram(
+      'chan replies[size](string);',
+    )).toThrow(
+      'Expected positive integer channel array length',
+    )
+  })
+
+  it('distinguishes scalar and array channel references', () => {
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        send replies("ready");
+      }
+    `)).toThrow(
+      'Channel array "replies" requires an index',
+    )
+
+    expect(() => parseProgram(`
+      chan reply(string);
+      process Worker {
+        send reply[0]("ready");
+      }
+    `)).toThrow(
+      'Channel "reply" is not an array',
+    )
+  })
+
+  it('rejects literal channel indexes outside the declaration', () => {
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        send replies[2]("ready");
+      }
+    `)).toThrow(
+      'Channel index 2 is outside "replies" range 0..1',
+    )
+
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        string response;
+        receive replies[-1](response);
+      }
+    `)).toThrow(
+      'Channel index -1 is outside "replies" range 0..1',
+    )
   })
 })
 

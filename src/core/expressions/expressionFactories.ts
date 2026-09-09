@@ -9,6 +9,7 @@ import type {
   FunctionCallExpression,
   FieldAccessExpression,
   RecordGetterExpression,
+  CollectionQueryExpression,
 } from './Expression'
 
 export function literal(value: RuntimeValue): LiteralExpression {
@@ -90,5 +91,16 @@ export function recordGetter(
     type: 'RECORD_GETTER',
     record,
     getterName,
+  }
+}
+
+export function collectionQuery(
+  collection: Expression,
+  query: CollectionQueryExpression['query'],
+): CollectionQueryExpression {
+  return {
+    type: 'COLLECTION_QUERY',
+    collection,
+    query,
   }
 }

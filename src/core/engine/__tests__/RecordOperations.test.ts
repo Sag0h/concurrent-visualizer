@@ -205,7 +205,7 @@ describe('record operations', () => {
         int nivel = fallo.procesar();
       }
     `)).toThrow(
-      'Only record getters can return a value currently',
+      'Only record getters and collection queries can return a value currently',
     )
 
     expect(() => runToCompletion(`

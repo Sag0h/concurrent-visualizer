@@ -346,6 +346,20 @@ Los índices comienzan en cero.
 
 Los índices pueden ser expresiones.
 
+Los arrays también ofrecen consultas que no modifican sus elementos:
+
+``` text
+int cantidad = numbers.size();
+bool sinElementos = numbers.isEmpty();
+
+if (!numbers.isEmpty() && numbers.size() > 2) {
+    print(numbers.size());
+}
+```
+
+Se usa la misma sintaxis para arrays, colas FIFO, colas de prioridad y pilas.
+No existe `.length` en esta versión.
+
 Cuando un target de un array compartido depende de variables
 compartidas, las lecturas necesarias para resolver el índice forman
 parte de la ejecución concurrente.
@@ -470,23 +484,28 @@ Retorna la cantidad actual de elementos sin modificar la cola:
 int cantidad = trabajos.size();
 ```
 
-En esta primera versión, los métodos que retornan valores deben aparecer
-directamente a la derecha de una declaración o asignación **local**.
-Todavía no se admiten como parte de expresiones compuestas, condiciones o
-escrituras directas a otra variable compartida.
+`size()` e `isEmpty()` son consultas puras y pueden aparecer en expresiones
+compuestas, `print` y guardas de `if`, `while`, `repeat/until`, `for` y
+`await`:
 
-M10.5 registra la extensión para permitir `size()` e `isEmpty()` directamente
-en guardas de `if`, `while`, `repeat/until`, `for` y `await`, y para ofrecer
-consultas equivalentes sobre arrays. Hasta entonces debe usarse una variable
-local auxiliar.
+``` text
+while (!trabajos.isEmpty()) {
+    print("restantes", trabajos.size());
+    int trabajo = trabajos.dequeue();
+}
+```
+
+`isEmpty()` es el nombre canónico para colecciones. `empty()` no es un alias:
+queda reservado para consultar canales de pasaje de mensajes.
 
 El argumento de `enqueue` puede usar literales y memoria local. Una
 lectura compartida debe hacerse primero mediante una asignación normal y
 después insertar el valor local, para que la lectura siga apareciendo en
 las microoperaciones y el análisis de interferencia.
 
-Cada método constituye una operación atómica de un step. Esto evita un
-estado estructural intermedio de la cola, pero no vuelve atómica una
+Las consultas se evalúan dentro del step de la declaración, asignación, salida
+o guarda que las contiene. Las operaciones que modifican o extraen elementos
+continúan siendo atómicas individualmente. Nada de esto vuelve atómica una
 secuencia completa:
 
 ``` text
@@ -547,9 +566,10 @@ Fallo siguiente = urgentes.dequeue();
 ```
 
 `dequeue`, `front`, `size` e `isEmpty` se utilizan igual que en una cola
-FIFO y retornan el valor, no la prioridad. Todas las operaciones siguen
-siendo atómicas individualmente y admiten las mismas restricciones sobre
-resultados locales, llamadas a funciones y lecturas compartidas.
+FIFO y retornan el valor, no la prioridad. `size()` e `isEmpty()` admiten los
+mismos contextos de expresión que para las demás colecciones; las
+restricciones de argumentos y resultados de las operaciones mutantes se
+mantienen.
 
 ### Pilas
 
@@ -572,10 +592,10 @@ En este ejemplo, tanto `top()` como `pop()` retornan `30`, pero sólo
 `pop()` lo elimina. Después de ambas operaciones, `20` vuelve a quedar en
 la cima. Una pila vacía se declara con `stack[]`.
 
-Las pilas pueden ser locales o compartidas. Cada método consume un step
-atómico y sigue las mismas restricciones que las colas: los resultados
-se escriben directamente en memoria local y `push` no admite llamadas a
-funciones ni lecturas compartidas dentro de su argumento.
+Las pilas pueden ser locales o compartidas. `size()` e `isEmpty()` pueden
+usarse dentro de expresiones y guardas. `push`, `pop` y `top` mantienen el
+modelo de operación explícita; `push` no admite llamadas a funciones ni
+lecturas compartidas dentro de su argumento.
 
 Para registros se usa el mismo tipo nominal y la misma sintaxis literal:
 
@@ -1434,9 +1454,9 @@ Como el estado puede volver a cambiar antes de la reentrada, normalmente la
 condición se comprueba con `while` y no con `if`.
 
 Un buffer limitado puede combinar una cola privada con un contador. El
-contador permite usar la condición directamente; en la sintaxis actual
-`items.size()` debe asignarse primero a una variable y no puede aparecer como
-subexpresión del `while`:
+contador deja explícito el invariante de capacidad, aunque también es válido
+consultar la cola directamente con `items.size()` o `items.isEmpty()` dentro
+de una condición.
 
 ``` text
 monitor BoundedBuffer {
@@ -1538,7 +1558,8 @@ interleavings producidos por el scheduler.
 
 ## Pasaje de mensajes: sintaxis en construcción
 
-M13.2 reconoce canales PMA escalares con uno o más tipos de payload:
+M13.2 reconoce canales PMA escalares o indexados con uno o más tipos de
+payload:
 
 ``` text
 record Fallo {
@@ -1548,6 +1569,7 @@ record Fallo {
 
 chan trabajos(int, string);
 chan fallos(Fallo);
+chan respuestas[4](string);
 ```
 
 Los canales deben declararse antes de los procesos que los utilizan. `send`
@@ -1564,12 +1586,23 @@ process Consumidor {
     string detalle;
     receive trabajos(id, detalle);
 }
+
+process Cliente[id:0..3] {
+    string respuesta;
+    send trabajos(id, "reporte");
+    receive respuestas[id](respuesta);
+}
 ```
+
+Los arrays de canales usan una longitud literal positiva, admiten hasta 1000
+elementos y se indexan desde cero. El índice de `send` o `receive` puede ser
+una expresión entera. Un índice literal se comprueba durante el parsing; los
+índices calculados se validarán al ejecutarse cuando exista el runtime PMA.
 
 Esta sección describe una sintaxis parseable pero **todavía no ejecutable**.
 Hacer Step o Run sobre `send`/`receive` produce un error explícito hasta que el
-runtime PMA de M13.3 esté implementado. Todavía no se admiten arrays de
-canales, referencias indexadas ni `empty(canal)`.
+runtime PMA de M13.3 esté implementado. `empty(canal)` todavía no forma parte
+de la sintaxis.
 
 ------------------------------------------------------------------------
 
@@ -1585,9 +1618,9 @@ yield
 sync_send
 ```
 
-`chan`, `send` y `receive` escalares ya son reconocidos por el parser, pero su
-runtime sigue pendiente. Arrays de canales y `empty(canal)` también permanecen
-fuera del alcance ejecutable actual.
+`chan`, `send` y `receive`, tanto escalares como indexados, ya son reconocidos
+por el parser, pero su runtime sigue pendiente. `empty(canal)` también
+permanece fuera del alcance actual.
 
 `wait`, `signal` y `signal_all` ya están disponibles dentro de procedures de
 monitor; no son operaciones globales.

@@ -1008,12 +1008,16 @@ La capa concurrente ejecutable soporta actualmente:
 -   condiciones `cond`, `wait`, `signal` y `signal_all`.
 
 M13.2 agrega al modelo `ChannelDefinition` y reconoce en tokenizer/parser
-canales escalares tipados, `send` con expresiones y `receive` con destinos de
-asignación. Los tipos de payload pueden ser primitivos o registros declarados
-previamente, y la aridad se comprueba durante el parsing. Esta sintaxis todavía
-no es ejecutable: el engine produce un error explícito hasta que M13.3 agregue
-el estado y las transiciones PMA. Arrays de canales y `empty(canal)` siguen
-pendientes dentro de M13.2.
+canales escalares o arrays tipados, `send` con expresiones y `receive` con
+destinos de asignación. Los tipos de payload pueden ser primitivos o registros
+declarados previamente, y la aridad se comprueba durante el parsing. Una
+definición indexada conserva su longitud; cada instrucción mantiene la
+expresión de índice para resolverla al ejecutarse. Tamaños e índices literales
+se validan anticipadamente, mientras los índices dinámicos quedarán a cargo del
+runtime. Esta sintaxis todavía no es ejecutable: el engine produce un error
+explícito hasta que M13.3 agregue el estado y las transiciones PMA.
+`empty(canal)` y la validación estática completa de payloads siguen pendientes
+dentro de M13.2.
 
 Pipeline vigente:
 
@@ -1303,13 +1307,25 @@ de prioridad estables y las pilas reutilizan el mismo modelo general.
 Una cola local pertenece al estado privado del proceso. Si es compartida,
 sus contenidos y orden forman parte del estado semántico global: se
 clonan de forma independiente y participan en la identidad canónica de
-M9. `enqueue`, `dequeue`, `front`, `size` e `isEmpty` son operaciones
-atómicas de un step. Las operaciones de cola y pila generan un
-`DataStructureExecutionEvent`, que indica si la estructura es FIFO, de
-prioridad o una pila; en una inserción priorizada registra también la
-prioridad. Esa atomicidad no se extiende a secuencias compuestas de
-consultas, extracciones y otras variables; esas invariantes siguen
-requiriendo `P` / `V` u otro protocolo.
+M9. `enqueue`, `dequeue`, `front`, `push`, `pop` y `top` son operaciones
+explícitas y atómicas de un step. Las consultas `size` e `isEmpty` se modelan
+además mediante `CollectionQueryExpression`, por lo que pueden participar en
+expresiones y guardas sin introducir mutación. Toda consulta se evalúa dentro
+de la instrucción contenedora. Las operaciones explícitas generan un
+`DataStructureExecutionEvent`, que distingue FIFO, prioridad o pila y, en una
+inserción priorizada, registra también la prioridad.
+
+Las referencias compartidas bajo una consulta recorren los mismos caminos de
+análisis, sustitución suspendible y detección de lecturas que el resto de las
+expresiones. Una guarda se observa como un único step, igual que cualquier
+otra condición compartida; una asignación conserva sus microoperaciones de
+lectura/escritura. Esa granularidad no vuelve atómica una secuencia compuesta
+de consulta, extracción y otras variables: las invariantes siguen requiriendo
+`P` / `V`, monitor u otro protocolo.
+
+Los arrays usan la misma interfaz pública `size()` / `isEmpty()` sin agregar
+`.length`. `isEmpty()` queda separado del futuro `empty(canal)` de PMA para
+evitar que dos conceptos con semántica diferente compartan un nodo del AST.
 
 `QueueValue` es un valor etiquetado de `RuntimeValue`, con un descriptor
 de elemento primitivo o registro nominal y un array ordenado desde frente

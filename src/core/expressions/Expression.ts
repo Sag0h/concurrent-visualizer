@@ -59,6 +59,12 @@ export interface RecordGetterExpression {
   readonly getterName: string
 }
 
+export interface CollectionQueryExpression {
+  readonly type: 'COLLECTION_QUERY'
+  readonly collection: Expression
+  readonly query: 'SIZE' | 'IS_EMPTY'
+}
+
 export type Expression =
   | LiteralExpression
   | VariableExpression
@@ -68,3 +74,4 @@ export type Expression =
   | FunctionCallExpression
   | FieldAccessExpression
   | RecordGetterExpression
+  | CollectionQueryExpression

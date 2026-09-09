@@ -50,6 +50,13 @@ export function formatExpression(
 
     case 'RECORD_GETTER':
       return `${formatExpression(expression.record)}.${expression.getterName}()`
+
+    case 'COLLECTION_QUERY':
+      return `${formatExpression(expression.collection)}.${
+        expression.query === 'SIZE'
+          ? 'size'
+          : 'isEmpty'
+      }()`
   }
 }
 

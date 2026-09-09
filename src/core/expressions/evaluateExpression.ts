@@ -1,4 +1,5 @@
 import {
+  isDataStructureValue,
   isRecordValue,
   isUninitializedOutValue,
   isUninitializedVariableValue,
@@ -68,6 +69,32 @@ export function evaluateExpression(
           expression.getterName,
         )
       ]
+    }
+
+    case 'COLLECTION_QUERY': {
+      const collection = evaluateExpression(
+        expression.collection,
+        context,
+      )
+      const size = Array.isArray(collection)
+        ? collection.length
+        : isDataStructureValue(collection)
+          ? collection.items.length
+          : undefined
+
+      if (size === undefined) {
+        const method = expression.query === 'SIZE'
+          ? 'size'
+          : 'isEmpty'
+
+        throw new Error(
+          `${method}() requires an array, queue, priority_queue or stack`,
+        )
+      }
+
+      return expression.query === 'SIZE'
+        ? size
+        : size === 0
     }
     
   }

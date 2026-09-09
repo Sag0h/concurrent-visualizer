@@ -1247,6 +1247,10 @@ export class SimulationEngine {
           visit(candidate.record)
           return
 
+        case 'COLLECTION_QUERY':
+          visit(candidate.collection)
+          return
+
         case 'FUNCTION_CALL':
           candidate.arguments.forEach(visit)
           return
@@ -1797,6 +1801,11 @@ export class SimulationEngine {
       case 'RECORD_GETTER':
         return this.containsFunctionCall(
           expression.record,
+        )
+
+      case 'COLLECTION_QUERY':
+        return this.containsFunctionCall(
+          expression.collection,
         )
 
       default:
@@ -2359,6 +2368,11 @@ export class SimulationEngine {
           expression.record,
         )
 
+      case 'COLLECTION_QUERY':
+        return this.findNextFunctionCall(
+          expression.collection,
+        )
+
       default:
         return undefined
     }
@@ -2444,6 +2458,17 @@ export class SimulationEngine {
           record:
             this.replaceFunctionCallWithValue(
               expression.record,
+              target,
+              value,
+            ),
+        }
+
+      case 'COLLECTION_QUERY':
+        return {
+          ...expression,
+          collection:
+            this.replaceFunctionCallWithValue(
+              expression.collection,
               target,
               value,
             ),
@@ -2905,6 +2930,12 @@ export class SimulationEngine {
         )
       }
 
+      case 'COLLECTION_QUERY':
+        return this.findNextSharedMemoryRead(
+          process,
+          expression.collection,
+        )
+
       case 'FUNCTION_CALL':
         for (const argument of expression.arguments) {
           const read =
@@ -2998,6 +3029,17 @@ export class SimulationEngine {
           record:
             this.replaceExpressionWithValue(
               expression.record,
+              target,
+              value,
+            ),
+        }
+
+      case 'COLLECTION_QUERY':
+        return {
+          ...expression,
+          collection:
+            this.replaceExpressionWithValue(
+              expression.collection,
               target,
               value,
             ),

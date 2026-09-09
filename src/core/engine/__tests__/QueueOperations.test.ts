@@ -76,7 +76,7 @@ describe('FIFO queue operations', () => {
     const events = engine.getState().history
       .filter((event) => event.dataStructureEvent)
 
-    expect(events).toHaveLength(7)
+    expect(events).toHaveLength(5)
     expect(events[0].dataStructureEvent).toMatchObject({
       operation: 'ENQUEUE',
       structureName: 'jobs',
@@ -85,16 +85,6 @@ describe('FIFO queue operations', () => {
       sizeBefore: 2,
       sizeAfter: 3,
       value: 30,
-    })
-    expect(events.at(-2)?.dataStructureEvent).toMatchObject({
-      operation: 'SIZE',
-      value: 0,
-      sizeBefore: 0,
-      sizeAfter: 0,
-    })
-    expect(events.at(-1)?.dataStructureEvent).toMatchObject({
-      operation: 'IS_EMPTY',
-      value: true,
     })
   })
 
