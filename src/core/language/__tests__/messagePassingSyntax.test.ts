@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseProgram } from '../parseProgram'
 import { tokenize } from '../tokenize'
+import { formatExpression } from '../../expressions/formatExpression'
 
 describe('message passing syntax', () => {
   it('tokenizes channel declarations, send and receive', () => {
@@ -406,6 +407,135 @@ process Worker[id:0..3] {
         operator: '+',
       },
     })
+  })
+
+  it('parses empty for scalar and indexed channels as a bool expression', () => {
+    const program = parseProgram(`
+      chan jobs(int);
+      chan replies[4](string);
+      chan states(bool);
+
+      process Worker[id:0..3] {
+        bool noJobs = empty(jobs);
+
+        if (!empty(replies[id])) {
+          send states(empty(jobs));
+        }
+      }
+    `)
+    const [declaration, condition] =
+      program.processes[0].instructions
+
+    expect(declaration).toMatchObject({
+      type: 'DECLARE',
+      initialValue: {
+        type: 'CHANNEL_EMPTY',
+        channelName: 'jobs',
+      },
+    })
+    expect(condition).toMatchObject({
+      type: 'IF',
+      condition: {
+        type: 'UNARY',
+        operand: {
+          type: 'CHANNEL_EMPTY',
+          channelName: 'replies',
+          channelIndex: {
+            type: 'VARIABLE',
+            name: 'id',
+          },
+        },
+      },
+      thenBranch: [{
+        type: 'SEND',
+        arguments: [{
+          type: 'CHANNEL_EMPTY',
+        }],
+      }],
+    })
+
+    if (
+      declaration.type !== 'DECLARE'
+      || !declaration.initialValue
+    ) {
+      throw new Error('Expected initialized declaration')
+    }
+
+    expect(formatExpression(declaration.initialValue)).toBe(
+      'empty(jobs)',
+    )
+
+    if (condition.type !== 'IF') {
+      throw new Error('Expected IF instruction')
+    }
+
+    const operand = condition.condition.type === 'UNARY'
+      ? condition.condition.operand
+      : condition.condition
+
+    expect(formatExpression(operand)).toBe(
+      'empty(replies[id])',
+    )
+  })
+
+  it('validates channel references used by empty', () => {
+    expect(() => parseProgram(`
+      process Worker {
+        bool result = empty(missing);
+      }
+    `)).toThrow(
+      'Channel "missing" is not defined; declare it before processes',
+    )
+
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        bool result = empty(replies);
+      }
+    `)).toThrow(
+      'Channel array "replies" requires an index',
+    )
+
+    expect(() => parseProgram(`
+      chan jobs(int);
+      process Worker {
+        bool result = empty(jobs[0]);
+      }
+    `)).toThrow(
+      'Channel "jobs" is not an array',
+    )
+
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        bool result = empty(replies[2]);
+      }
+    `)).toThrow(
+      'Channel index 2 is outside "replies" range 0..1',
+    )
+  })
+
+  it('validates calculated index types inside empty', () => {
+    expect(() => parseProgram(`
+      chan replies[2](string);
+      process Worker {
+        string index = "first";
+        bool result = empty(replies[index]);
+      }
+    `)).toThrow(
+      'Channel array "replies" index must be int, but expression has type string',
+    )
+  })
+
+  it('rejects extra arguments passed to empty', () => {
+    expect(() => parseProgram(`
+      chan jobs(int);
+      process Worker {
+        bool result = empty(jobs, jobs);
+      }
+    `)).toThrow(
+      'Expected ")" after channel reference in empty',
+    )
   })
 
   it('validates channel array lengths', () => {

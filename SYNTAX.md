@@ -1617,10 +1617,26 @@ Las llamadas a funciones todavía no tienen un tipo de retorno declarado. Si
 un payload depende de una, Build lo acepta de forma conservadora y el runtime
 de M13.3 deberá validar el valor efectivo antes de encolarlo.
 
+`empty(canal)` consulta si el mailbox no contiene mensajes y produce un
+booleano. También acepta un canal indexado:
+
+``` text
+bool sinTrabajos = empty(trabajos);
+
+if (!empty(respuestas[id])) {
+    receive respuestas[id](respuesta);
+}
+```
+
+`empty` es contextual: puede seguir usándose como nombre de variable, pero la
+forma `empty(...)` queda reservada para canales. No equivale a
+`cola.isEmpty()`. Además, la observación no reserva el mensaje; entre
+`!empty(canal)` y `receive` otro proceso puede consumirlo.
+
 Esta sección describe una sintaxis parseable pero **todavía no ejecutable**.
 Hacer Step o Run sobre `send`/`receive` produce un error explícito hasta que el
-runtime PMA de M13.3 esté implementado. `empty(canal)` todavía no forma parte
-de la sintaxis.
+runtime PMA de M13.3 esté implementado. Lo mismo ocurre al intentar evaluar
+`empty(canal)`, ya que todavía no existe el estado de los mailboxes.
 
 ------------------------------------------------------------------------
 
@@ -1636,9 +1652,8 @@ yield
 sync_send
 ```
 
-`chan`, `send` y `receive`, tanto escalares como indexados, ya son reconocidos
-por el parser, pero su runtime sigue pendiente. `empty(canal)` también
-permanece fuera del alcance actual.
+`chan`, `send`, `receive` y `empty(canal)`, tanto escalares como indexados, ya
+son reconocidos por el parser, pero su runtime sigue pendiente.
 
 `wait`, `signal` y `signal_all` ya están disponibles dentro de procedures de
 monitor; no son operaciones globales.

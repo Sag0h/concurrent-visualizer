@@ -25,4 +25,25 @@ describe('message passing pending runtime', () => {
       engine.getState().program.processes[0].programCounter,
     ).toBe(0)
   })
+
+  it('fails explicitly when empty needs channel runtime state', () => {
+    const program = parseProgram(`
+      chan jobs(int);
+      process Observer {
+        bool result = empty(jobs);
+      }
+    `)
+    const engine = new SimulationEngine(
+      createExecutionState(program),
+      new FirstReadyScheduler(),
+    )
+
+    expect(() => engine.step()).toThrow(
+      'Message passing syntax is available, but its runtime will be implemented in M13.3',
+    )
+    expect(engine.getState().stepCount).toBe(0)
+    expect(
+      engine.getState().program.processes[0].programCounter,
+    ).toBe(0)
+  })
 })

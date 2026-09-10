@@ -2,6 +2,28 @@ import { describe, expect, it } from 'vitest'
 import { tokenize } from '../tokenize'
 
 describe('tokenize', () => {
+  it('keeps empty contextual for channel queries', () => {
+    const tokens = tokenize(
+      'bool available = !empty(replies[id]);',
+    )
+
+    expect(tokens.map((token) => token.type)).toEqual([
+      'BOOL',
+      'IDENTIFIER',
+      'ASSIGN',
+      'NOT',
+      'IDENTIFIER',
+      'LEFT_PAREN',
+      'IDENTIFIER',
+      'LEFT_BRACKET',
+      'IDENTIFIER',
+      'RIGHT_BRACKET',
+      'RIGHT_PAREN',
+      'SEMICOLON',
+      'EOF',
+    ])
+  })
+
   it('tokenizes monitor declarations and parameter modes', () => {
     const tokens = tokenize(
       'monitor Buffer { procedure take(in int id, out int value) { } }',

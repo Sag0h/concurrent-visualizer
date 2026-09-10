@@ -10,6 +10,7 @@ import type {
   FieldAccessExpression,
   RecordGetterExpression,
   CollectionQueryExpression,
+  ChannelEmptyExpression,
 } from './Expression'
 
 export function literal(value: RuntimeValue): LiteralExpression {
@@ -102,5 +103,16 @@ export function collectionQuery(
     type: 'COLLECTION_QUERY',
     collection,
     query,
+  }
+}
+
+export function channelEmpty(
+  channelName: string,
+  channelIndex?: Expression,
+): ChannelEmptyExpression {
+  return {
+    type: 'CHANNEL_EMPTY',
+    channelName,
+    channelIndex,
   }
 }

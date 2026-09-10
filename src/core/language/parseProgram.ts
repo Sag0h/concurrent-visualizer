@@ -9,6 +9,7 @@ import {
   fieldAccess,
   recordGetter,
   collectionQuery,
+  channelEmpty,
 } from '../expressions/expressionFactories'
 import type { Instruction } from '../instructions/Instruction'
 import {
@@ -1440,6 +1441,19 @@ class Parser {
       const name = this.previous().lexeme
 
       if (this.match('LEFT_PAREN')) {
+        if (name === 'empty') {
+          const channel = this.parseChannelReference('empty')
+          this.consume(
+            'RIGHT_PAREN',
+            'Expected ")" after channel reference in empty',
+          )
+
+          return channelEmpty(
+            channel.lexeme,
+            channel.index,
+          )
+        }
+
         const args: Expression[] = []
 
         if (!this.check('RIGHT_PAREN')) {
@@ -1820,7 +1834,7 @@ class Parser {
   }
 
   private parseChannelReference(
-    operation: 'send' | 'receive',
+    operation: 'send' | 'receive' | 'empty',
   ): {
     readonly lexeme: string
     readonly definition: ChannelDefinition
@@ -2082,6 +2096,9 @@ class Parser {
             ? 'int'
             : 'bool',
         )
+
+      case 'CHANNEL_EMPTY':
+        return primitiveDeclaredType('bool')
     }
   }
 

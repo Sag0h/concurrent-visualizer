@@ -1021,9 +1021,15 @@ ser `int`, mientras su valor y rango efectivos quedan a cargo del runtime. Las
 llamadas a funciones permanecen sin tipo estático porque `FunctionDefinition`
 todavía no declara retorno.
 
+`ChannelEmptyExpression` representa por separado la consulta
+`empty(canal)`/`empty(canales[indice])` y tiene tipo estático `bool`. El índice
+participa en los mismos recorridos de funciones suspendibles, reemplazos y
+lecturas que cualquier expresión. `empty` permanece como identificador
+contextual, de modo que una variable homónima no rompe compatibilidad.
+
 Esta sintaxis aún no es ejecutable: el engine produce un error explícito hasta
-que M13.3 agregue el estado y las transiciones PMA. `empty(canal)` es el último
-ticket pendiente dentro de M13.2.
+que M13.3 agregue el estado y las transiciones PMA. Con la consulta de mailbox,
+M13.2 queda cerrado.
 
 Pipeline vigente:
 

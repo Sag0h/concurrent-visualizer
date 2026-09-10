@@ -1251,6 +1251,12 @@ export class SimulationEngine {
           visit(candidate.collection)
           return
 
+        case 'CHANNEL_EMPTY':
+          if (candidate.channelIndex) {
+            visit(candidate.channelIndex)
+          }
+          return
+
         case 'FUNCTION_CALL':
           candidate.arguments.forEach(visit)
           return
@@ -1807,6 +1813,13 @@ export class SimulationEngine {
         return this.containsFunctionCall(
           expression.collection,
         )
+
+      case 'CHANNEL_EMPTY':
+        return expression.channelIndex
+          ? this.containsFunctionCall(
+              expression.channelIndex,
+            )
+          : false
 
       default:
         return false
@@ -2373,6 +2386,13 @@ export class SimulationEngine {
           expression.collection,
         )
 
+      case 'CHANNEL_EMPTY':
+        return expression.channelIndex
+          ? this.findNextFunctionCall(
+              expression.channelIndex,
+            )
+          : undefined
+
       default:
         return undefined
     }
@@ -2473,6 +2493,19 @@ export class SimulationEngine {
               value,
             ),
         }
+
+      case 'CHANNEL_EMPTY':
+        return expression.channelIndex
+          ? {
+              ...expression,
+              channelIndex:
+                this.replaceFunctionCallWithValue(
+                  expression.channelIndex,
+                  target,
+                  value,
+                ),
+            }
+          : expression
 
       case 'FUNCTION_CALL':
         return {
@@ -2936,6 +2969,14 @@ export class SimulationEngine {
           expression.collection,
         )
 
+      case 'CHANNEL_EMPTY':
+        return expression.channelIndex
+          ? this.findNextSharedMemoryRead(
+              process,
+              expression.channelIndex,
+            )
+          : undefined
+
       case 'FUNCTION_CALL':
         for (const argument of expression.arguments) {
           const read =
@@ -3044,6 +3085,19 @@ export class SimulationEngine {
               value,
             ),
         }
+
+      case 'CHANNEL_EMPTY':
+        return expression.channelIndex
+          ? {
+              ...expression,
+              channelIndex:
+                this.replaceExpressionWithValue(
+                  expression.channelIndex,
+                  target,
+                  value,
+                ),
+            }
+          : expression
 
       case 'FUNCTION_CALL':
         return {

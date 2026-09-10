@@ -65,6 +65,12 @@ export interface CollectionQueryExpression {
   readonly query: 'SIZE' | 'IS_EMPTY'
 }
 
+export interface ChannelEmptyExpression {
+  readonly type: 'CHANNEL_EMPTY'
+  readonly channelName: string
+  readonly channelIndex?: Expression
+}
+
 export type Expression =
   | LiteralExpression
   | VariableExpression
@@ -75,3 +81,4 @@ export type Expression =
   | FieldAccessExpression
   | RecordGetterExpression
   | CollectionQueryExpression
+  | ChannelEmptyExpression

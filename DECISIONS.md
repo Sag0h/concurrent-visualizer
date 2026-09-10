@@ -1709,3 +1709,36 @@ historial, snapshots, Step Back, exploración y deadlock a ambas verticales.
 **Motivo:** entregar una porción pequeña y verificable que reproduzca fielmente
 los ejercicios de PMA, manteniendo visibles las diferencias semánticas con PMS
 y CSP.
+
+------------------------------------------------------------------------
+
+## ADR-047 --- `empty(canal)` es una consulta contextual propia
+
+**Estado:** Aceptada
+
+**Contexto:** el lenguaje ya utiliza `isEmpty()` para arrays, colas y pilas,
+mientras la notación académica de PMA usa `empty(canal)`. Tratar ambas formas
+como la misma expresión confundiría una estructura de datos ordinaria con un
+mailbox concurrente. Reservar completamente la palabra `empty`, por otro lado,
+rompería variables existentes como `bool empty;`.
+
+**Decisión:** `empty(canal)` y `empty(canales[indice])` se modelan mediante
+`ChannelEmptyExpression`, con resultado `bool` y sin mutación ni reserva de
+mensajes. El parser reconoce `empty` contextualmente sólo en la forma de
+llamada; como identificador de variable continúa permitido. La referencia de
+canal reutiliza las validaciones escalares/indexadas de `send` y `receive`.
+
+Los esquemas de M13 inicial aceptan payloads primitivos y registros nominales.
+Enviar colecciones completas se posterga hasta contar con un caso académico
+que justifique ampliar la gramática y el runtime de tipos. Hasta M13.3, evaluar
+la consulta falla explícitamente porque todavía no existe un mailbox que
+observar.
+
+**Consecuencia:** `empty(canal)` puede aparecer desde M13.2 en `if`, `while`,
+`await` y expresiones compuestas sin colisionar con `coleccion.isEmpty()` ni con
+variables homónimas. Su semántica observable se implementará junto con el
+estado FIFO de PMA y seguirá siendo una lectura instantánea susceptible a
+carreras antes de un `receive` posterior.
+
+**Motivo:** conservar la notación de la cátedra y la compatibilidad del
+lenguaje, manteniendo explícita la diferencia entre mailboxes y colecciones.

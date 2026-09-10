@@ -57,6 +57,13 @@ export function formatExpression(
           ? 'size'
           : 'isEmpty'
       }()`
+
+    case 'CHANNEL_EMPTY':
+      return `empty(${expression.channelName}${
+        expression.channelIndex
+          ? `[${formatExpression(expression.channelIndex)}]`
+          : ''
+      })`
   }
 }
 

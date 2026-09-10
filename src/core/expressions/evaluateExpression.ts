@@ -96,6 +96,11 @@ export function evaluateExpression(
         ? size
         : size === 0
     }
+
+    case 'CHANNEL_EMPTY':
+      throw new Error(
+        'Message passing syntax is available, but its runtime will be implemented in M13.3',
+      )
     
   }
 }

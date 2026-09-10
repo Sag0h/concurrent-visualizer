@@ -1175,9 +1175,10 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
 -   [x] Incorporar definiciones de canales escalares al `Program`.
 -   [x] Incorporar arrays de canales con tamaño literal positivo y convención
     de índices desde cero.
--   [ ] Representar cada mensaje como una tupla ordenada de valores tipados.
--   [ ] Aceptar tipos primitivos, registros y estructuras de datos ya
-    soportadas cuando puedan copiarse como valores de un mensaje.
+-   [x] Representar el esquema de cada mensaje como una tupla ordenada de
+    tipos; las instancias y sus valores pertenecen al runtime de M13.3.
+-   [x] Aceptar inicialmente tipos primitivos y registros nominales. El envío
+    de colecciones completas queda como extensión posterior a M13.
 -   [x] Parsear `chan nombre(tipo1, tipo2, ...);` para tipos primitivos y
     registros declarados previamente.
 -   [x] Parsear `chan nombre[cantidad](tipo1, tipo2, ...);` con un máximo
@@ -1187,7 +1188,7 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
     escalar y destinos asignables.
 -   [x] Parsear referencias indexadas como `send respuestas[id](valor);` y
     `receive respuestas[id](valor);`.
--   [ ] Parsear `empty(canal)` y `empty(canales[indice])` como expresiones
+-   [x] Parsear `empty(canal)` y `empty(canales[indice])` como expresiones
     booleanas.
 -   [x] Validar aridad, tipos, canales duplicados, tamaño de arrays e índices
     en tiempo de compilación cuando sea posible.
@@ -1200,10 +1201,10 @@ snapshots y diagnósticos, pero no la misma semántica de envío.
 -   [x] Conservar `send` y `receive` como nombres contextuales de procedures
     existentes cuando aparecen después de `procedure` o de un monitor.
 
-**Estado parcial:** modelo, tokenizer, parser y validación estática conservadora
-de canales escalares e indexados completados. Falta `empty(canal)` antes de
-cerrar M13.2. Las llamadas a funciones se difieren porque el lenguaje todavía
-no declara tipos de retorno.
+**Estado:** M13.2 COMPLETADO. Modelo, tokenizer, parser, validación estática y
+`empty(canal)` están disponibles para canales escalares e indexados. Las
+llamadas a funciones se difieren porque el lenguaje todavía no declara tipos
+de retorno; las colas y valores efectivos comienzan en M13.3.
 
 ### M13.3 --- Runtime de PMA
 
@@ -1269,9 +1270,8 @@ no declara tipos de retorno.
     comportamiento educativo predeterminado.
 -   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
 
-**Estado:** M13.1 COMPLETADO. M13.2 EN CURSO: canales escalares y arrays ya
-están parseados y sus tipos conocidos se validan durante Build; el próximo
-ticket es `empty(canal)`.
+**Estado:** M13.1 y M13.2 COMPLETADOS. El próximo ticket inicia M13.3 con el
+estado FIFO de canales y la primera ejecución de `send`.
 
 ------------------------------------------------------------------------
 

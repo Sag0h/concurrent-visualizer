@@ -5,7 +5,7 @@
 
 ## Estado actual
 
-**Fase:** M13.2 --- Modelo, tokenizer y parser de PMA.
+**Fase:** M13.3 --- Runtime de PMA.
 
 **Último milestone completado:** M12 --- Monitores.
 
@@ -26,10 +26,9 @@ waiting, riesgo de starvation y no terminación al alcanzar el límite de
 pasos.
 
 **Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
-PMA, PMS y CSP. M13.2 ya incorporó canales PMA escalares e indexados,
-`chan`, `send`, `receive` y validación estática conservadora de tipos. El
-siguiente ticket agrega `empty(canal)`; aún no hay primitivas de mensajes
-ejecutables en el runtime.
+PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
+`receive`, `empty(canal)` y validación estática conservadora. El siguiente
+ticket inicia M13.3 con estado FIFO clonable y `send` no bloqueante.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2640,3 +2639,23 @@ Build y deberá validarse al enviar en M13.3. La cobertura incluye tipos
 primitivos, registros nominales, arrays, getters, consultas, memoria
 compartida, parámetros de funciones/monitores e índices de canal. El siguiente
 ticket de M13.2 es `empty(canal)`.
+
+## 2026-09-09 --- M13.2 completado: `empty(canal)`
+
+El AST incorpora `ChannelEmptyExpression`, separado de
+`CollectionQueryExpression`: `empty(canal)` observa un mailbox, mientras
+`coleccion.isEmpty()` consulta una estructura de datos ordinaria. La expresión
+retorna `bool`, puede anidarse en cálculos y guardas, y conserva opcionalmente
+el índice de un array de canales para resolverlo en runtime.
+
+`empty` se reconoce de forma contextual al aparecer como llamada. Por eso una
+variable como `bool empty;` continúa siendo válida, pero `empty(...)` queda
+reservado para canales. Se reutilizan todas las validaciones de referencias:
+existencia, distinción escalar/array, rango literal y tipo `int` conocido para
+el índice calculado. El formateador y los recorridos de llamadas, reemplazos y
+lecturas compartidas incluyen el nuevo nodo.
+
+Hasta M13.3, evaluar la consulta produce el mismo error explícito de runtime
+pendiente que `send` y `receive`; Build sí acepta y valida la fuente. Con esto
+M13.2 queda completado. El próximo corte implementa el estado FIFO clonable de
+cada canal concreto y el primer `send` asincrónico no bloqueante.

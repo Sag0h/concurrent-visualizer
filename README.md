@@ -27,9 +27,10 @@ parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
 otra corregida. M13.1 ya fijó la semántica académica de PMA, PMS y CSP. La
 primera parte de M13.2 incorpora el modelo y parser de canales PMA escalares:
 `chan`, `send` y `receive` se reconocen, pero todavía no son ejecutables. La
-segunda parte agrega arrays de hasta 1000 canales, referencias indexadas y
-validación estática conservadora de payloads, destinos e índices. El próximo
-ticket completa M13.2 con `empty(canal)`.
+segunda parte agrega arrays de hasta 1000 canales, referencias indexadas,
+validación estática conservadora y `empty(canal)` como expresión booleana. Con
+M13.2 completo, el próximo ticket inicia el estado FIFO y `send` ejecutable de
+M13.3.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su
@@ -851,7 +852,8 @@ En curso:
 
 ``` text
 M13.1 Semántica y alcance de mensajes             completado
-M13.2 Modelo, tokenizer y parser de PMA           en curso
+M13.2 Modelo, tokenizer y parser de PMA           completado
+M13.3 Runtime de PMA                              próximo
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
