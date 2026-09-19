@@ -4,7 +4,7 @@ import { evaluateExpression } from '../expressions/evaluateExpression'
 import { writeVariable } from '../memory/writeVariable'
 import type { SimulationSnapshot } from './SimulationSnapshot'
 import type { Process } from '../process/Process'
-import type { CallInstruction, DataStructureOperationInstruction, ForeachInstruction, IfInstruction, Instruction, WhileInstruction } from '../instructions/Instruction'
+import type { CallInstruction, DataStructureOperationInstruction, ForeachInstruction, IfInstruction, Instruction, ReceiveInstruction, SendInstruction, WhileInstruction } from '../instructions/Instruction'
 import type { ExecutionFrame } from '../process/ExecutionFrame'
 import {
   assertPriority,
@@ -64,6 +64,7 @@ import type {
   SemaphoreExecutionEvent,
   MonitorConditionExecutionEvent,
   SimulatedOperationExecutionEvent,
+  MessagePassingExecutionEvent,
 } from './ExecutionEvent'
 import { analyzeDeadlock } from '../deadlock/analyzeDeadlock'
 import type { ExecutionDiagnostic } from '../deadlock/DeadlockDiagnostic'
@@ -81,6 +82,10 @@ export class SimulationEngine {
   private scheduler: Scheduler
   private readonly initialState: ExecutionState
   private readonly maxSteps: number
+  private completedMessagePassingResult?: {
+    readonly event: MessagePassingExecutionEvent
+    readonly description: string
+  }
 
   constructor(
     state: ExecutionState,
@@ -309,6 +314,7 @@ export class SimulationEngine {
     process: Process,
   ): boolean {
   process.state = 'RUNNING'
+  this.completedMessagePassingResult = undefined
 
   try {
     const instruction =
@@ -339,6 +345,9 @@ export class SimulationEngine {
 
     let simulatedOperationEvent:
       SimulatedOperationExecutionEvent | undefined
+
+    let messagePassingEvent:
+      MessagePassingExecutionEvent | undefined
 
     if (this.hasPendingFunctionArgumentEvaluation(process)) {
       this.continuePendingFunctionArguments(process)
@@ -923,11 +932,27 @@ export class SimulationEngine {
         break
       }
 
-      case 'SEND':
-      case 'RECEIVE':
-        throw new Error(
-          'Message passing syntax is available, but its runtime will be implemented in M13.3',
+      case 'SEND': {
+        const result = this.executeSendInstruction(
+          process,
+          instruction,
         )
+
+        messagePassingEvent = result?.event
+        executionDescription = result?.description
+        break
+      }
+
+      case 'RECEIVE': {
+        const result = this.executeReceiveInstruction(
+          process,
+          instruction,
+        )
+
+        messagePassingEvent = result?.event
+        executionDescription = result?.description
+        break
+      }
 
       case 'MONITOR_WAIT': {
         const result = this.executeMonitorWait(
@@ -994,6 +1019,16 @@ export class SimulationEngine {
       this.syncActiveMonitorState(process)
     }
 
+    const completedMessagePassingResult =
+      this.takeCompletedMessagePassingResult()
+
+    if (completedMessagePassingResult) {
+      messagePassingEvent ??=
+        completedMessagePassingResult.event
+      executionDescription ??=
+        completedMessagePassingResult.description
+    }
+
     const executionEvent: ExecutionEvent = {
       step: this.state.stepCount + 1,
       processId: process.id,
@@ -1011,6 +1046,7 @@ export class SimulationEngine {
       loopConditionEvent,
       dataStructureEvent,
       simulatedOperationEvent,
+      messagePassingEvent,
       description: executionDescription,
     }
 
@@ -2224,6 +2260,35 @@ export class SimulationEngine {
           pending.instruction,
           value,
         )
+        return
+
+      case 'SEND_ARGUMENTS':
+        this.completePendingSendArguments(
+          process,
+          pending.instruction,
+          pending.argumentIndex,
+          value,
+        )
+        return
+
+      case 'SEND_CHANNEL_INDEX':
+        this.executeSendInstruction(process, {
+          ...pending.instruction,
+          channelIndex: {
+            type: 'LITERAL',
+            value,
+          },
+        })
+        return
+
+      case 'RECEIVE_CHANNEL_INDEX':
+        this.executeReceiveInstruction(process, {
+          ...pending.instruction,
+          channelIndex: {
+            type: 'LITERAL',
+            value,
+          },
+        })
         return
 
       case 'ASSIGN_TARGET_INDEX':
@@ -3773,6 +3838,348 @@ export class SimulationEngine {
     )
   }
 
+  private completePendingSendArguments(
+    process: Process,
+    instruction: SendInstruction,
+    argumentIndex: number,
+    value: RuntimeValue,
+  ): void {
+    const resolvedArguments = instruction.arguments.map(
+      (argument, index) =>
+        index === argumentIndex
+          ? {
+              type: 'LITERAL' as const,
+              value,
+            }
+          : argument,
+    )
+    const nextFunctionArgumentIndex =
+      resolvedArguments.findIndex((argument) =>
+        this.containsFunctionCall(argument),
+      )
+
+    if (nextFunctionArgumentIndex !== -1) {
+      this.suspendExpression(
+        process,
+        resolvedArguments[nextFunctionArgumentIndex],
+        {
+          type: 'SEND_ARGUMENTS',
+          instruction: {
+            ...instruction,
+            arguments: resolvedArguments,
+          },
+          argumentIndex: nextFunctionArgumentIndex,
+        },
+      )
+      return
+    }
+
+    this.executeSendInstruction(process, {
+      ...instruction,
+      arguments: resolvedArguments,
+    })
+  }
+
+  private takeCompletedMessagePassingResult(): {
+    readonly event: MessagePassingExecutionEvent
+    readonly description: string
+  } | undefined {
+    const result = this.completedMessagePassingResult
+
+    this.completedMessagePassingResult = undefined
+
+    return result
+  }
+
+  private executeSendInstruction(
+    process: Process,
+    instruction: SendInstruction,
+  ): {
+    readonly event: MessagePassingExecutionEvent
+    readonly description: string
+  } | undefined {
+    if (
+      instruction.channelIndex
+      && this.containsFunctionCall(
+        instruction.channelIndex,
+      )
+    ) {
+      this.suspendExpression(
+        process,
+        instruction.channelIndex,
+        {
+          type: 'SEND_CHANNEL_INDEX',
+          instruction,
+        },
+      )
+      return undefined
+    }
+
+    const functionArgumentIndex =
+      instruction.arguments.findIndex((argument) =>
+        this.containsFunctionCall(argument),
+      )
+
+    if (functionArgumentIndex !== -1) {
+      this.suspendExpression(
+        process,
+        instruction.arguments[functionArgumentIndex],
+        {
+          type: 'SEND_ARGUMENTS',
+          instruction,
+          argumentIndex: functionArgumentIndex,
+        },
+      )
+      return undefined
+    }
+
+    const channelName = this.resolveChannelName(
+      process,
+      instruction,
+    )
+    const channel = this.getChannelState(channelName)
+    const definition = this.getChannelDefinition(
+      instruction.channelName,
+    )
+    const values = instruction.arguments.map((argument) =>
+      evaluateExpression(argument, {
+        localMemory: this.getActiveLocalMemory(process),
+        sharedMemory: this.state.program.sharedMemory,
+      }),
+    )
+
+    values.forEach((value, index) => {
+      const declaredType = definition.payloadTypes[index]
+
+      if (!valueMatchesDeclaredType(value, {
+        container: 'SCALAR',
+        valueType: declaredType,
+      })) {
+        throw new Error(
+          `Channel "${definition.name}" payload ${index + 1} requires ${formatDeclaredValueType(declaredType)} but received ${describeRuntimeType(value)}`,
+        )
+      }
+    })
+
+    const messageCountBefore = channel.messages.length
+    const copiedValues = structuredClone(values)
+
+    channel.messages.push({ values: copiedValues })
+    this.advanceProcess(process)
+
+    const result = {
+      event: {
+        operation: 'SEND' as const,
+        channelName,
+        status: 'SUCCEEDED' as const,
+        messageCountBefore,
+        messageCountAfter: channel.messages.length,
+        values: structuredClone(copiedValues),
+      },
+      description:
+        `send ${channelName}: enqueued message ${JSON.stringify(copiedValues)}`,
+    }
+
+    this.completedMessagePassingResult = result
+
+    return result
+  }
+
+  private executeReceiveInstruction(
+    process: Process,
+    instruction: ReceiveInstruction,
+  ): {
+    readonly event: MessagePassingExecutionEvent
+    readonly description: string
+  } | undefined {
+    if (
+      instruction.channelIndex
+      && this.containsFunctionCall(
+        instruction.channelIndex,
+      )
+    ) {
+      this.suspendExpression(
+        process,
+        instruction.channelIndex,
+        {
+          type: 'RECEIVE_CHANNEL_INDEX',
+          instruction,
+        },
+      )
+      return undefined
+    }
+
+    const channelName = this.resolveChannelName(
+      process,
+      instruction,
+    )
+    const channel = this.getChannelState(channelName)
+    const message = channel.messages[0]
+
+    if (!message) {
+      throw new Error(
+        'Receiving from an empty channel will be implemented in the next M13.3 runtime cut',
+      )
+    }
+
+    const definition = this.getChannelDefinition(
+      instruction.channelName,
+    )
+
+    if (
+      message.values.length !== definition.payloadTypes.length
+      || instruction.targets.length !== message.values.length
+    ) {
+      throw new Error(
+        `Channel "${channelName}" contains an invalid message arity`,
+      )
+    }
+
+    const localMemory = this.getActiveLocalMemory(process)
+    const resolvedTargets = instruction.targets.map(
+      (target, index) => this.resolveReceiveTarget(
+        process,
+        localMemory,
+        target,
+        index,
+      ),
+    )
+    const stagedMemory = structuredClone(localMemory)
+
+    resolvedTargets.forEach((target, index) => {
+      const value = message.values[index]
+      const declaredType = definition.payloadTypes[index]
+
+      this.assertReceiveTargetCompatible(
+        stagedMemory,
+        target,
+        declaredType,
+        value,
+        index,
+      )
+      this.writeResolvedLocalTarget(
+        stagedMemory,
+        target,
+        value,
+      )
+    })
+
+    const messageCountBefore = channel.messages.length
+
+    channel.messages.shift()
+    Object.assign(localMemory, stagedMemory)
+    this.advanceProcess(process)
+
+    const result = {
+      event: {
+        operation: 'RECEIVE' as const,
+        channelName,
+        status: 'SUCCEEDED' as const,
+        messageCountBefore,
+        messageCountAfter: channel.messages.length,
+        values: structuredClone(message.values),
+      },
+      description:
+        `receive ${channelName}: dequeued message ${JSON.stringify(message.values)}`,
+    }
+
+    this.completedMessagePassingResult = result
+
+    return result
+  }
+
+  private resolveReceiveTarget(
+    process: Process,
+    localMemory: Record<string, RuntimeValue>,
+    target: AssignmentTarget,
+    payloadIndex: number,
+  ): ResolvedMonitorOutputTarget {
+    const rootName = target.type === 'VARIABLE'
+      ? target.name
+      : target.type === 'RECORD_FIELD'
+        ? target.recordName
+        : target.arrayName
+
+    if (!(rootName in localMemory)) {
+      if (rootName in this.state.program.sharedMemory) {
+        throw new Error(
+          `Receive target ${payloadIndex + 1} must use local memory; "${rootName}" is shared`,
+        )
+      }
+
+      throw new Error(
+        `Receive target "${rootName}" is not defined in local memory`,
+      )
+    }
+
+    if (
+      target.type === 'VARIABLE'
+      || target.type === 'RECORD_FIELD'
+    ) {
+      return target
+    }
+
+    if (this.containsFunctionCall(target.index)) {
+      throw new Error(
+        `Function calls inside receive target ${payloadIndex + 1} are not supported yet`,
+      )
+    }
+
+    if (this.findNextSharedMemoryRead(process, target.index)) {
+      throw new Error(
+        `Shared-memory reads inside receive target ${payloadIndex + 1} are not supported`,
+      )
+    }
+
+    const index = evaluateExpression(target.index, {
+      localMemory,
+      sharedMemory: this.state.program.sharedMemory,
+    })
+
+    if (typeof index !== 'number' || !Number.isInteger(index)) {
+      throw new Error('Array index must be an integer')
+    }
+
+    return {
+      ...target,
+      index,
+    }
+  }
+
+  private assertReceiveTargetCompatible(
+    memory: Record<string, RuntimeValue>,
+    target: ResolvedMonitorOutputTarget,
+    declaredType: DeclaredValueType,
+    value: RuntimeValue,
+    payloadIndex: number,
+  ): void {
+    if (!valueMatchesDeclaredType(value, {
+      container: 'SCALAR',
+      valueType: declaredType,
+    })) {
+      throw new Error(
+        `Channel payload ${payloadIndex + 1} requires ${formatDeclaredValueType(declaredType)} but contains ${describeRuntimeType(value)}`,
+      )
+    }
+
+    const currentValue = this.readResolvedLocalTarget(
+      memory,
+      target,
+    )
+
+    if (!this.valueOrUninitializedVariableMatchesType(
+      currentValue,
+      {
+        container: 'SCALAR',
+        valueType: declaredType,
+      },
+    )) {
+      throw new Error(
+        `Receive target ${payloadIndex + 1} requires ${describeRuntimeType(currentValue)} but channel provides ${formatDeclaredValueType(declaredType)}`,
+      )
+    }
+  }
+
   private applyForCondition(
     process: Process,
     frame: ExecutionFrame,
@@ -4847,7 +5254,7 @@ export class SimulationEngine {
     this.copyMonitorState(frame.localMemory, runtime)
 
     for (const output of outputValues) {
-      this.writeResolvedMonitorOutput(
+      this.writeResolvedLocalTarget(
         output.callerMemory,
         output.binding.target,
         output.value,
@@ -4920,7 +5327,7 @@ export class SimulationEngine {
         argument.target,
         parameter.name,
       )
-      const currentValue = this.readResolvedMonitorOutput(
+      const currentValue = this.readResolvedLocalTarget(
         activeMemory,
         target,
       )
@@ -5059,7 +5466,7 @@ export class SimulationEngine {
     }
   }
 
-  private readResolvedMonitorOutput(
+  private readResolvedLocalTarget(
     memory: Record<string, RuntimeValue>,
     target: ResolvedMonitorOutputTarget,
   ): RuntimeValue {
@@ -5125,7 +5532,7 @@ export class SimulationEngine {
     binding: MonitorOutputBinding,
     value: RuntimeValue,
   ): void {
-    const currentValue = this.readResolvedMonitorOutput(
+    const currentValue = this.readResolvedLocalTarget(
       memory,
       binding.target,
     )
@@ -5175,7 +5582,7 @@ export class SimulationEngine {
     }
   }
 
-  private writeResolvedMonitorOutput(
+  private writeResolvedLocalTarget(
     memory: Record<string, RuntimeValue>,
     target: ResolvedMonitorOutputTarget,
     value: RuntimeValue,
@@ -5939,6 +6346,88 @@ export class SimulationEngine {
     }
 
     return semaphore
+  }
+
+  private getChannelDefinition(
+    channelName: string,
+  ) {
+    const definition =
+      this.state.program.channels?.[channelName]
+
+    if (!definition) {
+      throw new Error(
+        `Channel "${channelName}" is not defined`,
+      )
+    }
+
+    return definition
+  }
+
+  private getChannelState(
+    channelName: string,
+  ) {
+    const channel = this.state.channelStates[channelName]
+
+    if (!channel) {
+      throw new Error(
+        `Channel "${channelName}" has no runtime state`,
+      )
+    }
+
+    return channel
+  }
+
+  private resolveChannelName(
+    process: Process,
+    instruction: {
+      readonly channelName: string
+      readonly channelIndex?: Expression
+    },
+  ): string {
+    const definition = this.getChannelDefinition(
+      instruction.channelName,
+    )
+
+    if (!instruction.channelIndex) {
+      if (definition.arrayLength !== undefined) {
+        throw new Error(
+          `Channel array "${definition.name}" requires an index`,
+        )
+      }
+
+      return definition.name
+    }
+
+    if (definition.arrayLength === undefined) {
+      throw new Error(
+        `Channel "${definition.name}" is not an array`,
+      )
+    }
+
+    const index = evaluateExpression(
+      instruction.channelIndex,
+      {
+        localMemory: this.getActiveLocalMemory(process),
+        sharedMemory: this.state.program.sharedMemory,
+      },
+    )
+
+    if (
+      typeof index !== 'number'
+      || !Number.isInteger(index)
+    ) {
+      throw new Error(
+        'Channel index must evaluate to an integer',
+      )
+    }
+
+    if (index < 0 || index >= definition.arrayLength) {
+      throw new Error(
+        `Channel index ${index} is out of bounds for "${definition.name}"`,
+      )
+    }
+
+    return `${definition.name}[${index}]`
   }
 
   private resolveSemaphoreName(

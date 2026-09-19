@@ -6,6 +6,8 @@ import type {
   ReturnInstruction,
   CallInstruction,
   ForeachInstruction,
+  SendInstruction,
+  ReceiveInstruction,
 } from '../instructions/Instruction'
 
 import type { ExecutionFrame } from './ExecutionFrame'
@@ -54,9 +56,22 @@ export type PendingInstruction =
     readonly frame: ExecutionFrame
   }
   | {
-    readonly type: 'FOREACH_COLLECTION'
-    readonly instruction: ForeachInstruction
-  }
+      readonly type: 'FOREACH_COLLECTION'
+      readonly instruction: ForeachInstruction
+    }
+  | {
+      readonly type: 'SEND_ARGUMENTS'
+      readonly instruction: SendInstruction
+      readonly argumentIndex: number
+    }
+  | {
+      readonly type: 'SEND_CHANNEL_INDEX'
+      readonly instruction: SendInstruction
+    }
+  | {
+      readonly type: 'RECEIVE_CHANNEL_INDEX'
+      readonly instruction: ReceiveInstruction
+    }
   | {
     readonly type: 'ASSIGN_TARGET_INDEX'
     readonly target: Extract<

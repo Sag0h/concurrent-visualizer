@@ -336,6 +336,7 @@ describe('SimulationEngine', () => {
         program,
         history: [],
         stepCount: 0,
+        channelStates: {},
       },
       new FirstReadyScheduler(),
     )

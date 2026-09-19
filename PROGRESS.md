@@ -27,8 +27,10 @@ pasos.
 
 **Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
 PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
-`receive`, `empty(canal)` y validación estática conservadora. El siguiente
-ticket inicia M13.3 con estado FIFO clonable y `send` no bloqueante.
+`receive`, `empty(canal)` y validación estática conservadora. M13.3 ya dispone
+de estado FIFO clonable, `send` no bloqueante y `receive` atómico sobre un
+mailbox con mensajes; el siguiente corte implementa el bloqueo sobre un canal
+vacío y conserva la referencia concreta elegida.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2659,3 +2661,36 @@ Hasta M13.3, evaluar la consulta produce el mismo error explícito de runtime
 pendiente que `send` y `receive`; Build sí acepta y valida la fuente. Con esto
 M13.2 queda completado. El próximo corte implementa el estado FIFO clonable de
 cada canal concreto y el primer `send` asincrónico no bloqueante.
+
+## 2026-09-19 --- M13.3 parcial: mailboxes FIFO y `send`
+
+Cada canal escalar y cada elemento de un array dispone ahora de un
+`ChannelRuntimeState` con su propia cola FIFO. El estado se crea vacío y queda
+incluido en la clonación estructural del engine, por lo que forks, Reset y Step
+Back no comparten mensajes ni pierden el contenido correspondiente al paso.
+
+`send` resuelve el canal concreto al ejecutarse, evalúa sus argumentos, valida
+los tipos efectivos que no pudieron inferirse durante el parsing y copia
+profundamente la tupla antes de encolarla. La transición es atómica y no
+bloqueante, conserva el orden FIFO y emite un `messagePassingEvent` con canal,
+payload y tamaños anterior/posterior. Las llamadas a función usadas como
+argumentos continúan mediante el runtime suspendible antes del enqueue final.
+
+La cobertura verifica canales escalares/indexados, orden FIFO, eventos, copia
+de registros, validación dinámica y aislamiento de fork/rewind/reset.
+
+## 2026-09-19 --- M13.3 parcial: `receive` exitoso
+
+`receive` retira ahora el mensaje más antiguo de un mailbox no vacío y escribe
+su tupla en variables, elementos de array, campos de registro o campos de
+registros contenidos en arrays. Los destinos deben pertenecer a la memoria
+local activa. Los índices y la compatibilidad se resuelven antes de tocar el
+estado; las escrituras se ensayan sobre una copia, de modo que un error no
+consume el mensaje ni deja una tupla parcialmente asignada.
+
+Los índices de canal que contienen funciones reutilizan la evaluación
+suspendible y la recepción final emite un `messagePassingEvent` estructurado.
+La cobertura verifica FIFO, tuplas, destinos compuestos, índices suspendidos,
+atomicidad ante errores y rechazo de destinos compartidos. El siguiente corte
+implementará el bloqueo sobre un canal vacío y la conservación de su canal
+concreto; luego se agregará la reactivación sin reserva al enviar.

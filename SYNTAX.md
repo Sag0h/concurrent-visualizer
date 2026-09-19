@@ -1633,10 +1633,12 @@ forma `empty(...)` queda reservada para canales. No equivale a
 `cola.isEmpty()`. Además, la observación no reserva el mensaje; entre
 `!empty(canal)` y `receive` otro proceso puede consumirlo.
 
-Esta sección describe una sintaxis parseable pero **todavía no ejecutable**.
-Hacer Step o Run sobre `send`/`receive` produce un error explícito hasta que el
-runtime PMA de M13.3 esté implementado. Lo mismo ocurre al intentar evaluar
-`empty(canal)`, ya que todavía no existe el estado de los mailboxes.
+`send` ya es ejecutable: evalúa el canal concreto y sus argumentos, valida los
+tipos efectivos, copia profundamente el mensaje y lo encola de forma atómica y
+no bloqueante. `receive` también es ejecutable cuando hay un mensaje: retira el
+más antiguo y escribe la tupla completa de forma atómica en destinos locales.
+Un `receive` sobre un canal vacío todavía produce un error explícito hasta que
+se incorpore el bloqueo. También continúa pendiente evaluar `empty(canal)`.
 
 ------------------------------------------------------------------------
 

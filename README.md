@@ -25,12 +25,13 @@ ejecutables con estado privado, exclusión mutua implícita, procedures,
 parámetros `in`/`out` y variables condición escalares con `wait`, `signal` y
 `signal_all`. El buffer limitado completa M12 con una variante problemática y
 otra corregida. M13.1 ya fijó la semántica académica de PMA, PMS y CSP. La
-primera parte de M13.2 incorpora el modelo y parser de canales PMA escalares:
-`chan`, `send` y `receive` se reconocen, pero todavía no son ejecutables. La
-segunda parte agrega arrays de hasta 1000 canales, referencias indexadas,
-validación estática conservadora y `empty(canal)` como expresión booleana. Con
-M13.2 completo, el próximo ticket inicia el estado FIFO y `send` ejecutable de
-M13.3.
+M13.2 incorpora el modelo y parser de canales PMA escalares o indexados,
+referencias de hasta 1000 elementos, validación estática conservadora y
+`empty(canal)` como expresión booleana. El primer corte de M13.3 agrega un
+mailbox FIFO independiente por canal concreto, `send` atómico y no bloqueante,
+y `receive` atómico cuando existe un mensaje. Los payloads se copian, validan
+y escriben transaccionalmente en destinos locales. El bloqueo de `receive`
+sobre un canal vacío y `empty(canal)` todavía no son ejecutables.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su
@@ -853,7 +854,7 @@ En curso:
 ``` text
 M13.1 Semántica y alcance de mensajes             completado
 M13.2 Modelo, tokenizer y parser de PMA           completado
-M13.3 Runtime de PMA                              próximo
+M13.3 Runtime de PMA                              en curso
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

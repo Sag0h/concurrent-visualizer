@@ -72,6 +72,16 @@ export interface SimulatedOperationExecutionEvent {
   }
 }
 
+export interface MessagePassingExecutionEvent {
+  readonly operation: 'SEND' | 'RECEIVE'
+  readonly channelName: string
+  readonly status: 'SUCCEEDED' | 'BLOCKED'
+  readonly messageCountBefore: number
+  readonly messageCountAfter: number
+  readonly values?: RuntimeValue[]
+  readonly awakenedProcessIds?: ProcessId[]
+}
+
 export interface ExecutionEvent {
   readonly step: number
   readonly processId: ProcessId
@@ -84,4 +94,5 @@ export interface ExecutionEvent {
   readonly loopConditionEvent?: LoopConditionExecutionEvent
   readonly dataStructureEvent?: DataStructureExecutionEvent
   readonly simulatedOperationEvent?: SimulatedOperationExecutionEvent
+  readonly messagePassingEvent?: MessagePassingExecutionEvent
 }

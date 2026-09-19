@@ -3,6 +3,7 @@ import type { ExecutionState } from './ExecutionState'
 import { createInitialExecutionAnalysisState } from './ExecutionAnalysisState'
 import { evaluateExpression } from '../expressions/evaluateExpression'
 import type { MonitorRuntimeState } from '../monitors/MonitorRuntimeState'
+import type { ChannelRuntimeState } from '../channels/ChannelRuntimeState'
 
 export function createExecutionState(
   program: Program,
@@ -14,7 +15,27 @@ export function createExecutionState(
     analysisState:
       createInitialExecutionAnalysisState(program),
     monitorStates: createMonitorStates(program),
+    channelStates: createChannelStates(program),
   }
+}
+
+function createChannelStates(
+  program: Program,
+): Record<string, ChannelRuntimeState> {
+  const states: Record<string, ChannelRuntimeState> = {}
+
+  for (const definition of Object.values(program.channels ?? {})) {
+    if (definition.arrayLength === undefined) {
+      states[definition.name] = { messages: [] }
+      continue
+    }
+
+    for (let index = 0; index < definition.arrayLength; index++) {
+      states[`${definition.name}[${index}]`] = { messages: [] }
+    }
+  }
+
+  return states
 }
 
 function createMonitorStates(

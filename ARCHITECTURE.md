@@ -1027,9 +1027,15 @@ participa en los mismos recorridos de funciones suspendibles, reemplazos y
 lecturas que cualquier expresión. `empty` permanece como identificador
 contextual, de modo que una variable homónima no rompe compatibilidad.
 
-Esta sintaxis aún no es ejecutable: el engine produce un error explícito hasta
-que M13.3 agregue el estado y las transiciones PMA. Con la consulta de mailbox,
-M13.2 queda cerrado.
+El primer corte de M13.3 materializa un `ChannelRuntimeState` por canal
+concreto. `send` ya evalúa y valida el payload efectivo, lo copia y lo agrega
+atómicamente al mailbox FIFO; también emite un evento estructurado. Las colas
+forman parte del estado clonable, por lo que Reset, Step Back y forks ya las
+preservan sin compartir referencias. `receive` ya retira el mensaje FIFO y
+escribe su tupla completa en destinos locales como una única transición: todos
+los destinos se resuelven y validan sobre una copia antes de modificar la
+memoria o el mailbox. Las esperas sobre canales vacíos y `empty(canal)`
+continúan pendientes.
 
 Pipeline vigente:
 

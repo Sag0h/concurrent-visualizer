@@ -1208,13 +1208,13 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
 
 ### M13.3 --- Runtime de PMA
 
--   [ ] Crear `ChannelRuntimeState` y colas FIFO independientes por canal
+-   [x] Crear `ChannelRuntimeState` y colas FIFO independientes por canal
     concreto.
--   [ ] Copiar los valores al ejecutar `send` para que un cambio posterior en
+-   [x] Copiar los valores al ejecutar `send` para que un cambio posterior en
     la memoria local del emisor no modifique el mensaje enviado.
--   [ ] Hacer que `send` encole atómicamente, emita un evento estructurado y
+-   [x] Hacer que `send` encole atómicamente, emita un evento estructurado y
     deje al emisor listo para continuar.
--   [ ] Hacer que `receive` retire atómicamente el mensaje más antiguo y
+-   [x] Hacer que `receive` retire atómicamente el mensaje más antiguo y
     escriba sus componentes en destinos locales.
 -   [ ] Bloquear un `receive` sobre un canal vacío y conservar el canal
     concreto elegido aunque luego cambie la expresión usada como índice.
