@@ -176,7 +176,7 @@ describe('PMA channel receive runtime', () => {
     expect(engine.getState().program.sharedMemory.result).toBe(0)
   })
 
-  it('keeps empty-channel blocking for the next runtime cut', () => {
+  it('blocks on an empty channel without advancing', () => {
     const engine = createEngine(`
       chan jobs(int);
       process Consumer {
@@ -186,9 +186,23 @@ describe('PMA channel receive runtime', () => {
     `)
 
     expect(engine.step()).toBe(true)
-    expect(() => engine.step()).toThrow(
-      'Receiving from an empty channel will be implemented in the next M13.3 runtime cut',
-    )
+    expect(engine.step()).toBe(true)
+    expect(engine.getState().program.processes[0]).toMatchObject({
+      state: 'BLOCKED',
+      programCounter: 1,
+      blockingReason: {
+        type: 'CHANNEL_RECEIVE',
+        channelName: 'jobs',
+      },
+    })
     expect(engine.getState().channelStates.jobs.messages).toEqual([])
+    expect(engine.getState().history.at(-1)?.messagePassingEvent)
+      .toEqual({
+        operation: 'RECEIVE',
+        channelName: 'jobs',
+        status: 'BLOCKED',
+        messageCountBefore: 0,
+        messageCountAfter: 0,
+      })
   })
 })

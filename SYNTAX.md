@@ -1637,8 +1637,10 @@ forma `empty(...)` queda reservada para canales. No equivale a
 tipos efectivos, copia profundamente el mensaje y lo encola de forma atómica y
 no bloqueante. `receive` también es ejecutable cuando hay un mensaje: retira el
 más antiguo y escribe la tupla completa de forma atómica en destinos locales.
-Un `receive` sobre un canal vacío todavía produce un error explícito hasta que
-se incorpore el bloqueo. También continúa pendiente evaluar `empty(canal)`.
+Un `receive` sobre un canal vacío bloquea y conserva el canal concreto elegido.
+Cuando llega un mensaje, todos los receptores compatibles vuelven a competir
+sin reserva; el scheduler determina cuál consume. Continúa pendiente evaluar
+`empty(canal)`.
 
 ------------------------------------------------------------------------
 

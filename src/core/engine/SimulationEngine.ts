@@ -3965,6 +3965,8 @@ export class SimulationEngine {
     const copiedValues = structuredClone(values)
 
     channel.messages.push({ values: copiedValues })
+    const awakenedProcessIds =
+      this.reactivateChannelReceivers(channelName)
     this.advanceProcess(process)
 
     const result = {
@@ -3975,6 +3977,9 @@ export class SimulationEngine {
         messageCountBefore,
         messageCountAfter: channel.messages.length,
         values: structuredClone(copiedValues),
+        ...(awakenedProcessIds.length > 0
+          ? { awakenedProcessIds }
+          : {}),
       },
       description:
         `send ${channelName}: enqueued message ${JSON.stringify(copiedValues)}`,
@@ -4009,17 +4014,38 @@ export class SimulationEngine {
       return undefined
     }
 
-    const channelName = this.resolveChannelName(
-      process,
-      instruction,
-    )
+    const channelName =
+      process.blockingReason?.type === 'CHANNEL_RECEIVE'
+        ? process.blockingReason.channelName
+        : this.resolveChannelName(
+            process,
+            instruction,
+          )
     const channel = this.getChannelState(channelName)
     const message = channel.messages[0]
 
     if (!message) {
-      throw new Error(
-        'Receiving from an empty channel will be implemented in the next M13.3 runtime cut',
-      )
+      process.state = 'BLOCKED'
+      process.blockingReason = {
+        type: 'CHANNEL_RECEIVE',
+        channelName,
+      }
+
+      const result = {
+        event: {
+          operation: 'RECEIVE' as const,
+          channelName,
+          status: 'BLOCKED' as const,
+          messageCountBefore: 0,
+          messageCountAfter: 0,
+        },
+        description:
+          `receive ${channelName} blocked: channel is empty`,
+      }
+
+      this.completedMessagePassingResult = result
+
+      return result
     }
 
     const definition = this.getChannelDefinition(
@@ -4068,6 +4094,7 @@ export class SimulationEngine {
 
     channel.messages.shift()
     Object.assign(localMemory, stagedMemory)
+    process.blockingReason = undefined
     this.advanceProcess(process)
 
     const result = {
@@ -4086,6 +4113,29 @@ export class SimulationEngine {
     this.completedMessagePassingResult = result
 
     return result
+  }
+
+  private reactivateChannelReceivers(
+    channelName: string,
+  ): Process['id'][] {
+    const awakenedProcessIds: Process['id'][] = []
+
+    for (const candidate of this.state.program.processes) {
+      if (
+        candidate.state !== 'BLOCKED'
+        || candidate.blockingReason?.type
+          !== 'CHANNEL_RECEIVE'
+        || candidate.blockingReason.channelName
+          !== channelName
+      ) {
+        continue
+      }
+
+      candidate.state = 'READY'
+      awakenedProcessIds.push(candidate.id)
+    }
+
+    return awakenedProcessIds
   }
 
   private resolveReceiveTarget(
@@ -4741,6 +4791,8 @@ export class SimulationEngine {
           process.blockingReason.type !== 'SEMAPHORE_P'
           && process.blockingReason.type
             !== 'MONITOR_CONDITION'
+          && process.blockingReason.type
+            !== 'CHANNEL_RECEIVE'
         ) {
           process.blockingReason = undefined
         }
@@ -4800,6 +4852,11 @@ export class SimulationEngine {
           && this.getMonitorRuntime(
             reason.monitorName,
           ).ownerProcessId === undefined
+
+      case 'CHANNEL_RECEIVE':
+        return this.getChannelState(
+          reason.channelName,
+        ).messages.length > 0
     }
   }
 

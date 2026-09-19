@@ -28,9 +28,9 @@ pasos.
 **Próximo objetivo:** M13.1 fijó la semántica y separó la implementación de
 PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
 `receive`, `empty(canal)` y validación estática conservadora. M13.3 ya dispone
-de estado FIFO clonable, `send` no bloqueante y `receive` atómico sobre un
-mailbox con mensajes; el siguiente corte implementa el bloqueo sobre un canal
-vacío y conserva la referencia concreta elegida.
+de estado FIFO clonable, `send` no bloqueante y `receive` atómico y bloqueante.
+El siguiente corte incorpora canales y esperas a snapshots, claves semánticas,
+deadlock y exploración BFS.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2694,3 +2694,21 @@ La cobertura verifica FIFO, tuplas, destinos compuestos, índices suspendidos,
 atomicidad ante errores y rechazo de destinos compartidos. El siguiente corte
 implementará el bloqueo sobre un canal vacío y la conservación de su canal
 concreto; luego se agregará la reactivación sin reserva al enviar.
+
+## 2026-09-19 --- M13.3 parcial: bloqueo y reactivación de receptores
+
+Un `receive` sobre un mailbox vacío deja ahora el proceso `BLOCKED` con un
+`BlockingReason.CHANNEL_RECEIVE`. La razón conserva el nombre canónico ya
+resuelto, por lo que cambios posteriores en las variables del índice no
+redirigen la espera. El evento de recepción registra el bloqueo sin avanzar el
+program counter.
+
+Al encolar, `send` vuelve `READY` a todos los receptores bloqueados sobre ese
+canal y registra sus ids en el evento. El mensaje no queda reservado: el
+scheduler elige quién reintenta primero y los demás vuelven a bloquearse si el
+mailbox queda vacío. La UI muestra el canal esperado en la tarjeta del proceso.
+
+La cobertura verifica conservación de referencias indexadas, despertar
+múltiple sin reserva, re-bloqueo y bloqueo terminal cuando ningún proceso puede
+avanzar. El siguiente checkpoint integra este estado con snapshots de canales,
+claves semánticas, wait-for graph y exploración BFS.

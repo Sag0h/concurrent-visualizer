@@ -19,3 +19,7 @@ export type BlockingReason =
       readonly conditionName: string
       readonly phase: 'WAITING' | 'REACQUIRE'
     }
+  | {
+      readonly type: 'CHANNEL_RECEIVE'
+      readonly channelName: string
+    }

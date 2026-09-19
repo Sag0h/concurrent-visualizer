@@ -30,8 +30,9 @@ referencias de hasta 1000 elementos, validación estática conservadora y
 `empty(canal)` como expresión booleana. El primer corte de M13.3 agrega un
 mailbox FIFO independiente por canal concreto, `send` atómico y no bloqueante,
 y `receive` atómico cuando existe un mensaje. Los payloads se copian, validan
-y escriben transaccionalmente en destinos locales. El bloqueo de `receive`
-sobre un canal vacío y `empty(canal)` todavía no son ejecutables.
+y escriben transaccionalmente en destinos locales. `receive` bloquea sobre un
+canal vacío y conserva la instancia concreta; un envío despierta sin reserva a
+todos los receptores compatibles. `empty(canal)` todavía no es ejecutable.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su

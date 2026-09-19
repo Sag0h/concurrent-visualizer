@@ -1579,6 +1579,16 @@ function App() {
                           </div>
                         )}
 
+                        {process.blockingReason?.type === 'CHANNEL_RECEIVE' && (
+                          <div className="semaphore-blocking-reason">
+                            <strong>Waiting to receive</strong>
+
+                            <code>
+                              {process.blockingReason.channelName}
+                            </code>
+                          </div>
+                        )}
+
                         <h4>
                           Local memory
                         </h4>

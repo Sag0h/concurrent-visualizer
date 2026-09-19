@@ -1216,9 +1216,9 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     deje al emisor listo para continuar.
 -   [x] Hacer que `receive` retire atómicamente el mensaje más antiguo y
     escriba sus componentes en destinos locales.
--   [ ] Bloquear un `receive` sobre un canal vacío y conservar el canal
+-   [x] Bloquear un `receive` sobre un canal vacío y conservar el canal
     concreto elegido aunque luego cambie la expresión usada como índice.
--   [ ] Reactivar sin reserva a los receptores compatibles cuando llega un
+-   [x] Reactivar sin reserva a los receptores compatibles cuando llega un
     mensaje; el scheduler decide cuál consume y los demás pueden volver a
     bloquearse.
 -   [ ] Incorporar canales, mensajes y esperas a clones, snapshots, forks,

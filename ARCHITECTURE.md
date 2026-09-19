@@ -197,6 +197,7 @@ AWAIT(condition)
 SEMAPHORE_P(semaphoreName)
 MONITOR_ENTRY(monitorName)
 MONITOR_CONDITION(monitorName, conditionName, WAITING | REACQUIRE)
+CHANNEL_RECEIVE(channelName)
 ```
 
 Para `await` se conserva la condición necesaria para reevaluarla.
@@ -204,7 +205,8 @@ Para `await` se conserva la condición necesaria para reevaluarla.
 Para `P` se conserva el nombre concreto del semáforo esperado. Para un
 monitor se distingue competir por una entrada normal, esperar dentro de la
 cola FIFO de una condición y haber sido señalado pero necesitar readquirir
-la instancia.
+la instancia. Para `receive` se conserva el nombre canónico del canal concreto
+resuelto antes de bloquear, incluso si luego cambia la expresión de índice.
 
 Esta información pertenece al proceso y no implica una cola FIFO dentro
 del recurso.
@@ -1034,8 +1036,10 @@ forman parte del estado clonable, por lo que Reset, Step Back y forks ya las
 preservan sin compartir referencias. `receive` ya retira el mensaje FIFO y
 escribe su tupla completa en destinos locales como una única transición: todos
 los destinos se resuelven y validan sobre una copia antes de modificar la
-memoria o el mailbox. Las esperas sobre canales vacíos y `empty(canal)`
-continúan pendientes.
+memoria o el mailbox. Sobre un canal vacío, `receive` bloquea y conserva el
+canal concreto. Un `send` vuelve `READY` a todos los receptores de ese canal
+sin reservar el mensaje; quien no lo obtenga puede bloquearse otra vez.
+`empty(canal)` continúa pendiente.
 
 Pipeline vigente:
 

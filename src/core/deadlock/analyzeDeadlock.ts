@@ -119,6 +119,13 @@ function isBlockedProcessCurrentlyEnabled(
         && state.monitorStates?.[
           reason.monitorName
         ]?.ownerProcessId === undefined
+
+    case 'CHANNEL_RECEIVE':
+      return (
+        state.channelStates[
+          reason.channelName
+        ]?.messages.length ?? 0
+      ) > 0
   }
 }
 
