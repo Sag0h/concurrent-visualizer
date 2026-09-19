@@ -1021,6 +1021,7 @@ button:disabled {
 .process-card,
 .shared-memory,
 .semaphore-card,
+.channel-card,
 .not-built {
   border: 1px solid #ddd;
   border-radius: 8px;
@@ -1520,6 +1521,121 @@ h2 {
 }
 
 .semaphore-card small {
+  color: #777;
+}
+
+.channel-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.channel-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.channel-header,
+.channel-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.channel-header code {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.channel-schema {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+}
+
+.channel-count {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #40366d;
+  background: #f1effc;
+  font-size: 18px;
+}
+
+.channel-section-heading > span,
+.channel-waiters > span:first-child {
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.channel-section-heading small {
+  color: var(--text-muted);
+}
+
+.channel-message-list {
+  display: flex;
+  margin: 8px 0 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+}
+
+.channel-message {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #ded9f3;
+  border-radius: 6px;
+  background: #faf9ff;
+}
+
+.channel-message-position {
+  color: #655996;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.channel-message code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.channel-empty {
+  margin-bottom: 0;
+}
+
+.channel-waiters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.channel-waiter {
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #7f1d1d;
+  background: #f8d7da;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.channel-card > small {
+  margin-top: auto;
   color: #777;
 }
 
@@ -2171,6 +2287,7 @@ html[data-theme='dark'] .counterexample-choice,
 html[data-theme='dark'] .process-card,
 html[data-theme='dark'] .shared-memory,
 html[data-theme='dark'] .semaphore-card,
+html[data-theme='dark'] .channel-card,
 html[data-theme='dark'] .not-built,
 html[data-theme='dark'] .history,
 html[data-theme='dark'] .runtime-diagnostic-card,
@@ -2179,6 +2296,25 @@ html[data-theme='dark'] .deadlock-tags span {
   border-color: var(--border);
   color: var(--page-text);
   background: var(--surface);
+}
+
+html[data-theme='dark'] .channel-message {
+  border-color: #514873;
+  background: #28243a;
+}
+
+html[data-theme='dark'] .channel-count {
+  color: #d9d2ff;
+  background: #393252;
+}
+
+html[data-theme='dark'] .channel-message-position {
+  color: #c5baf4;
+}
+
+html[data-theme='dark'] .channel-waiter {
+  color: #f1b7b1;
+  background: #4a292b;
 }
 
 html[data-theme='dark'] .code-editor-highlight {

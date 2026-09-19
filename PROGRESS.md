@@ -31,8 +31,9 @@ PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
 de estado FIFO clonable, `send` no bloqueante y `receive` atómico y bloqueante.
 Snapshots, claves semánticas, wait-for graph y BFS incorporan canales y
 esperas. `empty(canal)` ya observa mailboxes escalares o indexados sin reserva,
-por lo que M13.3 queda completado. El siguiente ticket inicia M13.4 mostrando
-canales, mensajes pendientes y receptores en la interfaz.
+por lo que M13.3 queda completado. M13.4 ya muestra canales, mensajes pendientes
+y receptores en la interfaz; el siguiente ticket incorpora eventos de mensajes
+al historial.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2764,3 +2765,17 @@ Con mailboxes, `send`, `receive`, bloqueo/reactivación, snapshots, identidad
 semántica, deadlock, BFS y `empty` ejecutables, M13.3 queda completado. El
 siguiente frente es M13.4: visualización completa y primeros casos educativos
 de PMA.
+
+## 2026-09-19 --- M13.4 parcial: estado visible de canales
+
+El panel State muestra ahora una tarjeta por canal concreto, incluidos los
+elementos expandidos de arrays. Cada tarjeta presenta el esquema del payload,
+la cantidad de mensajes, la cola FIFO de frente a fondo y los receptores que
+mantienen una operación pendiente. El estado vacío se comunica explícitamente
+y la vista se adapta al grid responsive y a los temas claro/oscuro existentes.
+
+La presentación consume únicamente `SimulationSnapshot`: no inspecciona ni
+modifica el engine. La cobertura de render estático verifica esquemas, orden,
+tuplas, receptores, contadores y mailboxes vacíos. El siguiente ticket mostrará
+los eventos estructurados de envío, recepción, bloqueo y reactivación dentro
+del historial.

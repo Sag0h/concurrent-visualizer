@@ -40,6 +40,10 @@ esperas. El diagnóstico representa canales concretos en el wait-for graph y
 puede inferir ciclos entre procesos que esperan antes de sus envíos futuros.
 La exploración BFS encuentra y reproduce contraejemplos de deadlock PMA.
 
+M13.4 comienza con una vista de canales en el panel de estado. Cada canal
+concreto muestra su esquema, cantidad y cola de mensajes de frente a fondo,
+además de los procesos que todavía tienen una recepción pendiente.
+
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su
 solución correcta. Los 20 programas comparten su pseudocódigo con las pruebas,

@@ -42,6 +42,7 @@ import { PlaybackControls } from './components/PlaybackControls'
 import { ExecutionFocusPanel } from './components/ExecutionFocusPanel'
 import { CodeEditor } from './components/CodeEditor'
 import { SettingsModal } from './components/SettingsModal'
+import { ChannelStatePanel } from './components/ChannelStatePanel'
 import {
   createDefaultInterfacePreferences,
   loadInterfacePreferences,
@@ -1824,6 +1825,19 @@ function App() {
                       </article>
                     ))}
                   </div>
+                </section>
+              )}
+
+              {snapshot.channels.length > 0 && (
+                <section
+                  className="simulation-mobile-section simulation-state-section"
+                  aria-labelledby="channels-heading"
+                >
+                  <h2 id="channels-heading">Channels</h2>
+
+                  <ChannelStatePanel
+                    channels={snapshot.channels}
+                  />
                 </section>
               )}
 
