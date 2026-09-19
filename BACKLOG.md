@@ -1240,7 +1240,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     de pedidos y array de canales de respuesta.
 -   [x] Incorporar una variante que demuestre el peligro de `empty` con
     múltiples receptores.
--   [ ] Agregar soluciones por mensajes a los problemas del catálogo que
+-   [x] Agregar soluciones por mensajes a los problemas del catálogo que
     admitan este paradigma.
 
 ### M13.5 --- Pasaje de mensajes sincrónico
@@ -1271,10 +1271,9 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     comportamiento educativo predeterminado.
 -   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
 
-**Estado:** M13.1, M13.2 y M13.3 COMPLETADOS. M13.4 EN CURSO: ya incluye
-estado e historial visibles, movimiento de mensajes y un primer ejemplo finito
-de clientes/servidor, junto con su variante peligrosa de `empty`. El próximo
-ticket agrega soluciones por mensajes a problemas existentes del catálogo.
+**Estado:** M13.1, M13.2, M13.3 y M13.4 COMPLETADOS. PMA cuenta con lenguaje,
+runtime, análisis, visualización y casos educativos. El próximo checkpoint es
+M13.5: pasaje de mensajes sincrónico y rendezvous.
 
 ------------------------------------------------------------------------
 

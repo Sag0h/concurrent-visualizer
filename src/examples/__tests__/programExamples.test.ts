@@ -12,6 +12,9 @@ import {
 import {
   messagePassingClientServerExample,
   messagePassingEmptyRaceProblemExample,
+  messagePassingEventSignalingExample,
+  messagePassingMultipleWaitersExample,
+  messagePassingUnitBufferExample,
 } from '../messagePassingExamples'
 import { programExamples } from '../programExamples'
 import {
@@ -47,32 +50,36 @@ function runUntilNoProgress(
 }
 
 describe('educational program catalogue', () => {
-  it('contains a problem and solution for every topic and mechanism', () => {
-    expect(programExamples).toHaveLength(22)
+  it('contains a problem and solution for every educational topic', () => {
+    expect(programExamples).toHaveLength(25)
     expect(new Set(
       programExamples.map((example) => example.id),
     ).size).toBe(programExamples.length)
 
-    const topicAndCategory = new Set(
-      programExamples.map(
-        (example) => `${example.category}:${example.topicId}`,
-      ),
+    const topicIds = new Set(
+      programExamples.map((example) => example.topicId),
     )
 
-    expect(topicAndCategory.size).toBe(11)
+    expect(topicIds.size).toBe(10)
 
-    for (const key of topicAndCategory) {
-      const [category, topicId] = key.split(':')
+    for (const topicId of topicIds) {
 
       expect(
         programExamples
           .filter((example) =>
-            example.category === category
-            && example.topicId === topicId,
+            example.topicId === topicId,
           )
           .map((example) => example.variant)
-          .sort(),
-      ).toEqual(['PROBLEM', 'SOLUTION'])
+          .includes('PROBLEM'),
+      ).toBe(true)
+      expect(
+        programExamples
+          .filter((example) =>
+            example.topicId === topicId,
+          )
+          .map((example) => example.variant)
+          .includes('SOLUTION'),
+      ).toBe(true)
     }
 
     expect(programExamples.filter(
@@ -83,7 +90,7 @@ describe('educational program catalogue', () => {
     )).toHaveLength(2)
     expect(programExamples.filter(
       (example) => example.category === 'MESSAGE_PASSING',
-    )).toHaveLength(2)
+    )).toHaveLength(5)
   })
 
   it('keeps every shared example executable by the real parser', () => {
@@ -282,6 +289,61 @@ describe('educational program catalogue', () => {
       (event) =>
         event.processId === 'Server[1]'
         && event.messagePassingEvent?.operation === 'RECEIVE'
+        && event.messagePassingEvent.status === 'BLOCKED',
+    )).toBe(true)
+  })
+
+  it('runs message-passing alternatives for existing catalogue topics', () => {
+    const eventEngine = runUntilNoProgress(
+      messagePassingEventSignalingExample,
+    )
+    const waitersEngine = runUntilNoProgress(
+      messagePassingMultipleWaitersExample,
+    )
+    const bufferEngine = runUntilNoProgress(
+      messagePassingUnitBufferExample,
+    )
+
+    expect(eventEngine.getSnapshot().executionStatus).toBe('FINISHED')
+    expect(eventEngine.getSnapshot().processes.find(
+      (process) => process.id === 'Worker',
+    )?.localMemory.began).toBe(true)
+
+    expect(waitersEngine.getSnapshot().executionStatus).toBe('FINISHED')
+    expect(waitersEngine.getSnapshot().processes
+      .filter((process) => process.id.startsWith('Worker['))
+      .map((process) => process.localMemory.began))
+      .toEqual([true, true])
+
+    expect(bufferEngine.getSnapshot().executionStatus).toBe('FINISHED')
+    expect(bufferEngine.getSnapshot().processes.find(
+      (process) => process.id === 'Consumer',
+    )?.localMemory.consumed).toBe(42)
+
+    for (const engine of [
+      eventEngine,
+      waitersEngine,
+      bufferEngine,
+    ]) {
+      expect(engine.getSnapshot().channels.every(
+        (channel) =>
+          channel.messages.length === 0
+          && channel.waitingProcessIds.length === 0,
+      )).toBe(true)
+      expect(engine.getState().history.some(
+        (event) =>
+          event.messagePassingEvent?.operation === 'SEND',
+      )).toBe(true)
+      expect(engine.getState().history.some(
+        (event) =>
+          event.messagePassingEvent?.operation === 'RECEIVE'
+          && event.messagePassingEvent.status === 'SUCCEEDED',
+      )).toBe(true)
+    }
+
+    expect(waitersEngine.getState().history.some(
+      (event) =>
+        event.messagePassingEvent?.operation === 'RECEIVE'
         && event.messagePassingEvent.status === 'BLOCKED',
     )).toBe(true)
   })

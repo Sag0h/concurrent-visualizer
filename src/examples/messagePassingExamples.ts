@@ -64,7 +64,71 @@ process Server {
 }`,
 } satisfies ProgramExample
 
+export const messagePassingEventSignalingExample = {
+  id: 'message-passing-event-signaling',
+  topicId: 'event-signaling',
+  title: 'Señalización de evento',
+  category: 'MESSAGE_PASSING',
+  variant: 'SOLUTION',
+  description: 'El coordinador envía un mensaje de inicio; el trabajador espera bloqueado sin consultar memoria compartida.',
+  recommendedScheduler: 'ROUND_ROBIN',
+  source: `chan start(bool);
+
+process Worker {
+    bool began = false;
+    receive start(began);
+}
+
+process Coordinator {
+    send start(true);
+}`,
+} satisfies ProgramExample
+
+export const messagePassingMultipleWaitersExample = {
+  id: 'message-passing-multiple-waiters',
+  topicId: 'multiple-waiters',
+  title: 'Múltiples procesos esperando',
+  category: 'MESSAGE_PASSING',
+  variant: 'SOLUTION',
+  description: 'Cada trabajador consume su propio mensaje de inicio; dos receptores requieren dos mensajes.',
+  recommendedScheduler: 'ROUND_ROBIN',
+  source: `chan start(bool);
+
+process Worker[id:0..1] {
+    bool began = false;
+    receive start(began);
+}
+
+process Coordinator {
+    send start(true);
+    send start(true);
+}`,
+} satisfies ProgramExample
+
+export const messagePassingUnitBufferExample = {
+  id: 'message-passing-unit-buffer',
+  topicId: 'unit-buffer',
+  title: 'Productor/Consumidor: buffer unitario',
+  category: 'MESSAGE_PASSING',
+  variant: 'SOLUTION',
+  description: 'El mensaje transporta el dato del productor al consumidor y la recepción espera hasta que esté disponible.',
+  recommendedScheduler: 'ROUND_ROBIN',
+  source: `chan items(int);
+
+process Consumer {
+    int consumed = 0;
+    receive items(consumed);
+}
+
+process Producer {
+    send items(42);
+}`,
+} satisfies ProgramExample
+
 export const messagePassingExamples = [
   messagePassingEmptyRaceProblemExample,
   messagePassingClientServerExample,
+  messagePassingEventSignalingExample,
+  messagePassingMultipleWaitersExample,
+  messagePassingUnitBufferExample,
 ] as const satisfies readonly ProgramExample[]

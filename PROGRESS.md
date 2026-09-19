@@ -5,9 +5,9 @@
 
 ## Estado actual
 
-**Fase:** M13.4 --- Visualización y casos educativos de PMA.
+**Fase:** M13.5 --- Pasaje de mensajes sincrónico (próxima).
 
-**Último milestone completado:** M12 --- Monitores.
+**Último milestone completado:** M13.4 --- PMA completo.
 
 **Estado M6:** completado. El lenguaje y el engine soportan acciones
 atómicas condicionales mediante `await (B);` y `await (B) { S }`,
@@ -37,8 +37,9 @@ recepción, bloqueo y reactivación en el historial. El movimiento de mensajes s
 resalta desde el último evento proyectado en el snapshot, sin incorporarlo a la
 semántica. El primer ejemplo finito de clientes y servidor ya integra el catálogo
 y termina con tres respuestas privadas correctas. Su variante problemática
-demuestra que `empty` no reserva mensajes; el siguiente ticket agregará
-soluciones PMA a problemas existentes del catálogo.
+demuestra que `empty` no reserva mensajes. Las alternativas PMA de señalización,
+múltiples esperadores y buffer unitario completan M13.4; el próximo checkpoint
+inicia M13.5 con `sync_send` y rendezvous.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2845,3 +2846,21 @@ mailbox terminó vacío y que `Server[1]` conserva la recepción pendiente. Con 
 pareja problema/solución, el catálogo vuelve a exigir ambas variantes para
 todos sus temas. El próximo ticket incorporará soluciones PMA a problemas del
 catálogo que admiten naturalmente pasaje de mensajes.
+
+## 2026-09-19 --- M13.4 completado: alternativas PMA en el catálogo
+
+Message passing agrega soluciones correctas para tres problemas ya existentes:
+señalización de evento, múltiples procesos esperando y productor/consumidor con
+un único dato. Los programas reemplazan la señal o el buffer compartido por el
+propio mensaje; la recepción bloqueante expresa la espera sin polling ni memoria
+compartida.
+
+Los tres ejemplos terminan con los valores esperados, sin mensajes ni receptores
+pendientes. La prueba del catálogo ahora exige problema y solución por tema de
+forma global, lo que permite relacionar mediante `topicId` una formulación
+problemática con varias soluciones correctas de mecanismos distintos. El
+catálogo suma 25 programas, cinco de ellos PMA.
+
+Con estado e historial visibles, movimiento visual, clientes/servidor, carrera
+de `empty` y alternativas cruzadas, M13.4 queda completado. El próximo
+checkpoint es M13.5: semántica ejecutable de pasaje sincrónico y rendezvous.

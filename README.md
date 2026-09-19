@@ -52,9 +52,11 @@ movimiento reducido y no forma parte de la semántica.
 El catálogo incluye los nueve temas académicos de semáforos, el primer caso
 con monitor y clientes/servidor mediante PMA. Cada tema ofrece un problema
 reproducible y su solución: la variante PMA problemática muestra que dos
-receptores pueden observar `!empty(canal)` y aun así uno quedar bloqueado. Los
-22 programas comparten su pseudocódigo con las pruebas, seleccionan un scheduler
-recomendado y nunca se construyen o ejecutan
+receptores pueden observar `!empty(canal)` y aun así uno quedar bloqueado.
+Señalización de evento, múltiples esperadores y buffer unitario también tienen
+alternativas correctas por mensajes. Los 25 programas comparten su pseudocódigo
+con las pruebas, seleccionan un scheduler recomendado y nunca se construyen o
+ejecutan
 automáticamente. El selector separa Semaphores, Monitors y Message passing;
 `topicId` relaciona las soluciones del mismo problema entre mecanismos.
 
@@ -96,10 +98,10 @@ La interfaz admite teclado en pestañas y Settings, conserva indicadores de
 foco visibles, anuncia errores de compilación, respeta movimiento reducido
 y mantiene contraste WCAG en los estados revisados de Light y Dark.
 
-El buffer limitado ya puede compararse con semáforos o monitor dentro del
-mismo catálogo. Cuando M13 esté disponible se agregarán alternativas mediante
-pasaje de mensajes. El escenario general se mantendrá separado de los errores
-específicos de cada mecanismo.
+El buffer limitado puede compararse con semáforos o monitor dentro del mismo
+catálogo. Otros tres temas permiten comparar semáforos y pasaje de mensajes.
+El escenario general se mantiene separado de los errores específicos de cada
+mecanismo.
 
 M7 está completado en sus siete fases:
 
@@ -873,7 +875,8 @@ En curso:
 M13.1 Semántica y alcance de mensajes             completado
 M13.2 Modelo, tokenizer y parser de PMA           completado
 M13.3 Runtime de PMA                              completado
-M13.4 Visualización y casos educativos de PMA     en curso
+M13.4 Visualización y casos educativos de PMA     completado
+M13.5 Pasaje de mensajes sincrónico               próximo
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
