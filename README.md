@@ -42,7 +42,9 @@ La exploración BFS encuentra y reproduce contraejemplos de deadlock PMA.
 
 M13.4 comienza con una vista de canales en el panel de estado. Cada canal
 concreto muestra su esquema, cantidad y cola de mensajes de frente a fondo,
-además de los procesos que todavía tienen una recepción pendiente.
+además de los procesos que todavía tienen una recepción pendiente. El historial
+usa los eventos estructurados del engine para mostrar `send`/`receive`, éxito o
+bloqueo, la transición del mailbox, el payload y los receptores reactivados.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su

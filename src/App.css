@@ -1721,6 +1721,58 @@ h2 {
   gap: 10px;
 }
 
+.message-passing-status {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.message-passing-status-blocked {
+  color: #842029;
+  background: #f8d7da;
+}
+
+.message-passing-status-succeeded {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.message-passing-history-detail {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.message-passing-history-detail code {
+  font-family: Consolas, Monaco, monospace;
+}
+
+.message-passing-count-transition,
+.message-passing-payload,
+.message-passing-awakened {
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.message-passing-count-transition {
+  background: #f1effc;
+}
+
+.message-passing-payload {
+  color: #40366d;
+  background: #faf9ff;
+}
+
+.message-passing-awakened {
+  color: #0f5132;
+  background: #d1e7dd;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .await-blocking-reason strong {
   font-size: 12px;
   text-transform: uppercase;
@@ -2315,6 +2367,26 @@ html[data-theme='dark'] .channel-message-position {
 html[data-theme='dark'] .channel-waiter {
   color: #f1b7b1;
   background: #4a292b;
+}
+
+html[data-theme='dark'] .message-passing-status-blocked {
+  color: #f1b7b1;
+  background: #4a292b;
+}
+
+html[data-theme='dark'] .message-passing-status-succeeded,
+html[data-theme='dark'] .message-passing-awakened {
+  color: #a9dfc2;
+  background: #203c30;
+}
+
+html[data-theme='dark'] .message-passing-count-transition {
+  background: #393252;
+}
+
+html[data-theme='dark'] .message-passing-payload {
+  color: #d9d2ff;
+  background: #28243a;
 }
 
 html[data-theme='dark'] .code-editor-highlight {

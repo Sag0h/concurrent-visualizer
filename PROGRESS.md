@@ -32,8 +32,9 @@ de estado FIFO clonable, `send` no bloqueante y `receive` atómico y bloqueante.
 Snapshots, claves semánticas, wait-for graph y BFS incorporan canales y
 esperas. `empty(canal)` ya observa mailboxes escalares o indexados sin reserva,
 por lo que M13.3 queda completado. M13.4 ya muestra canales, mensajes pendientes
-y receptores en la interfaz; el siguiente ticket incorpora eventos de mensajes
-al historial.
+y receptores en la interfaz, además de eventos estructurados de envío,
+recepción, bloqueo y reactivación en el historial. El siguiente ticket resaltará
+el movimiento de mensajes sin incorporarlo a la semántica.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2779,3 +2780,17 @@ modifica el engine. La cobertura de render estático verifica esquemas, orden,
 tuplas, receptores, contadores y mailboxes vacíos. El siguiente ticket mostrará
 los eventos estructurados de envío, recepción, bloqueo y reactivación dentro
 del historial.
+
+## 2026-09-19 --- M13.4 parcial: eventos de canales en el historial
+
+El historial presenta ahora `send` y `receive` a partir del
+`messagePassingEvent` estructurado del engine. La columna de estado distingue
+éxito y bloqueo; el detalle identifica el canal concreto, muestra la transición
+de cantidad del mailbox, el payload enviado o consumido y los receptores que un
+envío reactivó sin reservarles el mensaje.
+
+La vista no interpreta descripciones textuales y conserva esas descripciones
+sólo como fallback para instrucciones sin eventos especializados. La cobertura
+de render verifica envíos con múltiples receptores reactivados, recepciones
+bloqueadas y recepciones exitosas. El siguiente ticket resaltará visualmente el
+movimiento de mensajes sin convertir la animación en parte de la semántica.

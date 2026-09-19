@@ -1232,7 +1232,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
 
 -   [x] Mostrar cada canal, su tipo, mensajes pendientes y receptores
     bloqueados.
--   [ ] Mostrar eventos de envío, recepción, bloqueo y reactivación en el
+-   [x] Mostrar eventos de envío, recepción, bloqueo y reactivación en el
     historial.
 -   [ ] Resaltar el movimiento de mensajes sin convertir la animación en
     parte de la semántica.

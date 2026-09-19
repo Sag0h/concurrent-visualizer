@@ -44,6 +44,10 @@ import { CodeEditor } from './components/CodeEditor'
 import { SettingsModal } from './components/SettingsModal'
 import { ChannelStatePanel } from './components/ChannelStatePanel'
 import {
+  MessagePassingEventDetail,
+  MessagePassingEventStatus,
+} from './components/MessagePassingEventDetail'
+import {
   createDefaultInterfacePreferences,
   loadInterfacePreferences,
   saveInterfacePreferences,
@@ -2193,7 +2197,11 @@ function App() {
                                 </td>
 
                                 <td>
-                                  {entry.semaphoreEvent ? (
+                                  {entry.messagePassingEvent ? (
+                                    <MessagePassingEventStatus
+                                      event={entry.messagePassingEvent}
+                                    />
+                                  ) : entry.semaphoreEvent ? (
                                     <span
                                       className={
                                         `semaphore-status semaphore-status-${entry.semaphoreEvent.status.toLowerCase()}`
@@ -2232,7 +2240,11 @@ function App() {
                                 </td>
 
                                 <td>
-                                  {entry.semaphoreEvent ? (
+                                  {entry.messagePassingEvent ? (
+                                    <MessagePassingEventDetail
+                                      event={entry.messagePassingEvent}
+                                    />
+                                  ) : entry.semaphoreEvent ? (
                                     <span className="semaphore-history-detail">
                                       <code>
                                         {`${entry.semaphoreEvent.operation}(${entry.semaphoreEvent.semaphoreName})`}
