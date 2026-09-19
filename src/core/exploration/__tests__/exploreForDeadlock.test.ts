@@ -245,6 +245,54 @@ describe('exploreForDeadlock', () => {
     expect(result.counterexample?.processChoices).toEqual([])
   })
 
+  it('finds and replays the shortest asynchronous-channel deadlock', () => {
+    const engine = createEngine(`
+      chan left(int);
+      chan right(int);
+
+      process P1 {
+        int value;
+        receive left(value);
+        send right(1);
+      }
+
+      process P2 {
+        int value;
+        receive right(value);
+        send left(1);
+      }
+    `)
+    const result = exploreForDeadlock(engine, {
+      maxDepth: 8,
+      maxStates: 100,
+    })
+
+    expect(result.status).toBe('FOUND')
+    expect(result.counterexample).toEqual(
+      expect.objectContaining({
+        kind: 'DEADLOCK',
+        depth: 4,
+        diagnostic: expect.objectContaining({
+          kind: 'CIRCULAR_WAIT',
+        }),
+      }),
+    )
+
+    if (!result.counterexample) {
+      throw new Error('Expected a channel deadlock counterexample')
+    }
+
+    const replay = replayDeadlockCounterexample(
+      engine,
+      result.counterexample,
+    )
+
+    expect(replay.isDeadlocked()).toBe(true)
+    expect(replay.getState()).toEqual(
+      result.counterexample.terminalState,
+    )
+  })
+
   it('rejects invalid limits', () => {
     const engine = createEngine(`process P1 { }`)
 

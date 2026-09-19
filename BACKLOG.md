@@ -1223,9 +1223,10 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     bloquearse.
 -   [x] Incorporar canales, mensajes y esperas a clones, snapshots, forks,
     Reset, Step Back y claves semánticas de exploración.
--   [ ] Integrar esperas por recepción con límite de pasos, bloqueo terminal,
+-   [x] Integrar esperas por recepción con límite de pasos, bloqueo terminal,
     wait-for graph y búsqueda BFS.
--   [ ] Agregar tests unitarios, de parser, runtime, rewind y exploración.
+-   [x] Agregar tests unitarios, de parser, runtime, rewind y exploración.
+-   [ ] Evaluar `empty(canal)` contra el mailbox concreto sin reservar mensajes.
 
 ### M13.4 --- Visualización y casos educativos de PMA
 

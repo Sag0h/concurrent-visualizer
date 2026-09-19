@@ -1934,7 +1934,7 @@ function App() {
                           <tr>
                             <th>Waiting process</th>
                             <th>Resource</th>
-                            <th>Inferred holder</th>
+                            <th>Inferred dependency</th>
                           </tr>
                         </thead>
 
@@ -1962,6 +1962,9 @@ function App() {
                                   </td>
                                   <td>
                                     {edge.holdingProcessId}
+                                    {edge.dependencyType === 'CAN_PRODUCE'
+                                      ? ' (can produce)'
+                                      : ''}
                                   </td>
                                 </tr>
                               )

@@ -269,4 +269,92 @@ describe('deadlock analysis', () => {
       }),
     )
   })
+
+  it('represents a terminal channel receive as a resource wait', () => {
+    const engine = createEngine(`
+      chan jobs(int);
+      process Receiver {
+        int value;
+        receive jobs(value);
+      }
+    `)
+
+    runUntilNoProgress(engine)
+
+    expect(engine.getSnapshot().deadlock).toEqual(
+      expect.objectContaining({
+        kind: 'TERMINAL_BLOCKING',
+        involvedResources: [{
+          id: 'CHANNEL:jobs',
+          kind: 'CHANNEL',
+          name: 'jobs',
+        }],
+        resourceDependencies: [{
+          type: 'WAITS_FOR',
+          processId: 'Receiver',
+          resourceId: 'CHANNEL:jobs',
+        }],
+        waitForEdges: [],
+        graphIsComplete: false,
+      }),
+    )
+  })
+
+  it('detects a channel cycle through processes that could still send', () => {
+    const engine = createEngine(`
+      chan left(int);
+      chan right(int);
+
+      process P1 {
+        int value;
+        receive left(value);
+        send right(1);
+      }
+
+      process P2 {
+        int value;
+        receive right(value);
+        send left(1);
+      }
+    `)
+
+    runUntilNoProgress(engine)
+
+    expect(engine.getSnapshot().deadlock).toEqual(
+      expect.objectContaining({
+        kind: 'CIRCULAR_WAIT',
+        graphIsComplete: true,
+        involvedResources: [
+          {
+            id: 'CHANNEL:left',
+            kind: 'CHANNEL',
+            name: 'left',
+          },
+          {
+            id: 'CHANNEL:right',
+            kind: 'CHANNEL',
+            name: 'right',
+          },
+        ],
+        waitForEdges: [
+          {
+            waitingProcessId: 'P1',
+            holdingProcessId: 'P2',
+            resourceId: 'CHANNEL:left',
+            dependencyType: 'CAN_PRODUCE',
+          },
+          {
+            waitingProcessId: 'P2',
+            holdingProcessId: 'P1',
+            resourceId: 'CHANNEL:right',
+            dependencyType: 'CAN_PRODUCE',
+          },
+        ],
+        cycles: [{
+          processIds: ['P1', 'P2'],
+          resourceIds: ['CHANNEL:left', 'CHANNEL:right'],
+        }],
+      }),
+    )
+  })
 })

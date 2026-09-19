@@ -34,6 +34,11 @@ y escriben transaccionalmente en destinos locales. `receive` bloquea sobre un
 canal vacío y conserva la instancia concreta; un envío despierta sin reserva a
 todos los receptores compatibles. `empty(canal)` todavía no es ejecutable.
 
+Snapshots, forks, Reset, Step Back y claves semánticas incluyen mailboxes y
+esperas. El diagnóstico representa canales concretos en el wait-for graph y
+puede inferir ciclos entre procesos que esperan antes de sus envíos futuros.
+La exploración BFS encuentra y reproduce contraejemplos de deadlock PMA.
+
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su
 solución correcta. Los 20 programas comparten su pseudocódigo con las pruebas,

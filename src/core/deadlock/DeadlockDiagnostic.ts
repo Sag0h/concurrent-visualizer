@@ -24,7 +24,7 @@ export interface WaitForResource {
 }
 
 export interface ResourceDependency {
-  readonly type: 'WAITS_FOR' | 'HOLDS'
+  readonly type: 'WAITS_FOR' | 'HOLDS' | 'CAN_PRODUCE'
   readonly processId: ProcessId
   readonly resourceId: string
 }
@@ -33,6 +33,7 @@ export interface WaitForEdge {
   readonly waitingProcessId: ProcessId
   readonly holdingProcessId: ProcessId
   readonly resourceId: string
+  readonly dependencyType?: 'HOLDS' | 'CAN_PRODUCE'
 }
 
 export interface DeadlockCycle {

@@ -29,8 +29,9 @@ pasos.
 PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
 `receive`, `empty(canal)` y validación estática conservadora. M13.3 ya dispone
 de estado FIFO clonable, `send` no bloqueante y `receive` atómico y bloqueante.
-Snapshots y claves semánticas ya incorporan canales y esperas. El siguiente
-corte integra wait-for graph, deadlock y exploración BFS.
+Snapshots, claves semánticas, wait-for graph y BFS ya incorporan canales y
+esperas. El siguiente ticket hace ejecutable `empty(canal)` y cierra el runtime
+base de PMA antes de la visualización y los casos educativos.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2726,3 +2727,19 @@ con distinto contenido u orden de mensajes dejan de deduplicarse erróneamente
 durante BFS. La cobertura verifica snapshots desacoplados, orden FIFO,
 proyección semántica y restauración paso a paso. El próximo ticket completa el
 checkpoint con wait-for graph, diagnóstico de deadlock y exploración.
+
+## 2026-09-19 --- M13.3: wait-for graph y exploración PMA
+
+El diagnóstico modela cada canal esperado como recurso `CHANNEL`. Además de la
+relación `WAITS_FOR`, registra `CAN_PRODUCE` para procesos no finalizados cuyas
+instrucciones restantes todavía pueden enviar al canal concreto. Esto permite
+probar ciclos como `P1 recibe A antes de enviar B` y `P2 recibe B antes de
+enviar A`; cuando no existe un productor inferible, conserva el diagnóstico de
+bloqueo terminal y marca el grafo como incompleto.
+
+La identidad semántica de mailboxes permite que BFS explore los interleavings
+sin fusionar estados con mensajes diferentes. La cobertura encuentra el
+contraejemplo mínimo de un deadlock PMA, reproduce la misma secuencia y valida
+recursos, dependencias y ciclos. Con este commit queda completo el checkpoint
+de infraestructura; resta ejecutar `empty(canal)` para cerrar el runtime base
+de M13.3.

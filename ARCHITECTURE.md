@@ -955,9 +955,11 @@ Snapshots, forks y claves semánticas copian tanto los mensajes como la
 referencia suspendida del receptor. Los snapshots exponen tipo, cola FIFO y
 receptores pendientes por canal concreto. Los eventos de ejecución distinguen
 envío, recepción, bloqueo y reactivación, para que la UI no tenga que inferirlos
-desde descripciones. El adaptador de deadlock representará cada canal concreto
-como un recurso y relacionará la espera con procesos que todavía podrían
-producir un mensaje.
+desde descripciones. El adaptador de deadlock representa cada canal concreto
+como un recurso y relaciona la espera con procesos que todavía podrían
+producir un mensaje según sus instrucciones restantes. Esta inferencia es
+conservadora: cuando no puede identificar un productor, el grafo queda
+marcado como incompleto en lugar de inventar una dependencia.
 
 PMS será una segunda vertical. Mantendrá las declaraciones `chan` para la
 notación introductoria de la cátedra, pero reemplazará `send` por `sync_send`.

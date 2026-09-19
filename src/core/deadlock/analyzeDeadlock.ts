@@ -3,6 +3,8 @@ import type { ExecutionEvent } from '../engine/ExecutionEvent'
 import type { ExecutionState } from '../engine/ExecutionState'
 import type { Process } from '../process/Process'
 import type { ProcessId } from '../process/ProcessId'
+import type { Instruction } from '../instructions/Instruction'
+import type { Expression } from '../expressions/Expression'
 import type {
   DeadlockCycle,
   ExecutionDiagnostic,
@@ -14,6 +16,7 @@ import type {
 const semaphoreResourcePrefix = 'SEMAPHORE:'
 const monitorResourcePrefix = 'MONITOR:'
 const conditionResourcePrefix = 'CONDITION:'
+const channelResourcePrefix = 'CHANNEL:'
 
 export function analyzeDeadlock(
   state: ExecutionState,
@@ -198,6 +201,46 @@ function buildDeadlockDiagnostic(
       continue
     }
 
+    if (reason?.type === 'CHANNEL_RECEIVE') {
+      const resource = channelResource(
+        reason.channelName,
+      )
+      resources.set(resource.id, resource)
+      resourceDependencies.push({
+        type: 'WAITS_FOR',
+        processId: process.id,
+        resourceId: resource.id,
+      })
+
+      const producers = state.program.processes.filter(
+        (candidate) =>
+          candidate.state !== 'FINISHED'
+          && processMayStillSendToChannel(
+            candidate,
+            reason.channelName,
+          ),
+      )
+
+      if (producers.length === 0) {
+        graphIsComplete = false
+      }
+
+      for (const producer of producers) {
+        resourceDependencies.push({
+          type: 'CAN_PRODUCE',
+          processId: producer.id,
+          resourceId: resource.id,
+        })
+        waitForEdges.push({
+          waitingProcessId: process.id,
+          holdingProcessId: producer.id,
+          resourceId: resource.id,
+          dependencyType: 'CAN_PRODUCE',
+        })
+      }
+      continue
+    }
+
     if (reason?.type !== 'SEMAPHORE_P') {
       graphIsComplete = false
       continue
@@ -374,6 +417,100 @@ function conditionResource(
     kind: 'CONDITION',
     name,
   }
+}
+
+function channelResource(
+  channelName: string,
+): WaitForResource {
+  return {
+    id: `${channelResourcePrefix}${channelName}`,
+    kind: 'CHANNEL',
+    name: channelName,
+  }
+}
+
+function processMayStillSendToChannel(
+  process: Process,
+  channelName: string,
+): boolean {
+  const remaining: Instruction[] = [
+    ...process.instructions.slice(
+      process.programCounter + 1,
+    ),
+  ]
+
+  for (const frame of process.executionStack) {
+    remaining.push(
+      ...frame.instructions.slice(
+        frame.programCounter + 1,
+      ),
+    )
+  }
+
+  return remaining.some((instruction) =>
+    instructionMaySendToChannel(
+      instruction,
+      channelName,
+    ),
+  )
+}
+
+function instructionMaySendToChannel(
+  instruction: Instruction,
+  channelName: string,
+): boolean {
+  if (instruction.type === 'SEND') {
+    return channelReferenceMayMatch(
+      instruction.channelName,
+      instruction.channelIndex,
+      channelName,
+    )
+  }
+
+  switch (instruction.type) {
+    case 'IF':
+      return [...instruction.thenBranch, ...instruction.elseBranch]
+        .some((nested) =>
+          instructionMaySendToChannel(nested, channelName),
+        )
+    case 'WHILE':
+    case 'REPEAT_UNTIL':
+    case 'FOREACH':
+    case 'ATOMIC':
+    case 'AWAIT':
+      return instruction.body.some((nested) =>
+        instructionMaySendToChannel(nested, channelName),
+      )
+    case 'FOR':
+      return [
+        instruction.initializer,
+        ...instruction.body,
+        instruction.increment,
+      ].some((nested) =>
+        instructionMaySendToChannel(nested, channelName),
+      )
+    default:
+      return false
+  }
+}
+
+function channelReferenceMayMatch(
+  definitionName: string,
+  index: Expression | undefined,
+  concreteName: string,
+): boolean {
+  if (!index) {
+    return definitionName === concreteName
+  }
+
+  const prefix = `${definitionName}[`
+
+  if (!concreteName.startsWith(prefix)) {
+    return false
+  }
+
+  return index.type !== 'LITERAL'
+    || `${definitionName}[${index.value}]` === concreteName
 }
 
 function deduplicateDependencies(
