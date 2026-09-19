@@ -50,11 +50,11 @@ mailbox→proceso desde el foco del snapshot; la animación es sólo CSS, respet
 movimiento reducido y no forma parte de la semántica.
 
 El catálogo incluye los nueve temas académicos de semáforos, el primer caso
-con monitor y un ejemplo PMA finito de tres clientes con un servidor. Los temas
-de semáforos y monitores ofrecen un problema reproducible y su solución; PMA
-comienza con la solución clientes/servidor. Los 21 programas comparten su
-pseudocódigo con las pruebas, seleccionan un scheduler recomendado y nunca se
-construyen o ejecutan
+con monitor y clientes/servidor mediante PMA. Cada tema ofrece un problema
+reproducible y su solución: la variante PMA problemática muestra que dos
+receptores pueden observar `!empty(canal)` y aun así uno quedar bloqueado. Los
+22 programas comparten su pseudocódigo con las pruebas, seleccionan un scheduler
+recomendado y nunca se construyen o ejecutan
 automáticamente. El selector separa Semaphores, Monitors y Message passing;
 `topicId` relaciona las soluciones del mismo problema entre mecanismos.
 

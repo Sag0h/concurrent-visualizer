@@ -1238,7 +1238,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     parte de la semántica.
 -   [x] Incorporar un primer ejemplo finito de clientes y servidor con canal
     de pedidos y array de canales de respuesta.
--   [ ] Incorporar una variante que demuestre el peligro de `empty` con
+-   [x] Incorporar una variante que demuestre el peligro de `empty` con
     múltiples receptores.
 -   [ ] Agregar soluciones por mensajes a los problemas del catálogo que
     admitan este paradigma.
@@ -1273,8 +1273,8 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
 
 **Estado:** M13.1, M13.2 y M13.3 COMPLETADOS. M13.4 EN CURSO: ya incluye
 estado e historial visibles, movimiento de mensajes y un primer ejemplo finito
-de clientes/servidor. El próximo ticket incorpora la variante peligrosa de
-`empty` con múltiples receptores.
+de clientes/servidor, junto con su variante peligrosa de `empty`. El próximo
+ticket agrega soluciones por mensajes a problemas existentes del catálogo.
 
 ------------------------------------------------------------------------
 

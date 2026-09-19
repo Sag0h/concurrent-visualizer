@@ -36,8 +36,9 @@ y receptores en la interfaz, además de eventos estructurados de envío,
 recepción, bloqueo y reactivación en el historial. El movimiento de mensajes se
 resalta desde el último evento proyectado en el snapshot, sin incorporarlo a la
 semántica. El primer ejemplo finito de clientes y servidor ya integra el catálogo
-y termina con tres respuestas privadas correctas; el siguiente ticket será la
-variante peligrosa de `empty`.
+y termina con tres respuestas privadas correctas. Su variante problemática
+demuestra que `empty` no reserva mensajes; el siguiente ticket agregará
+soluciones PMA a problemas existentes del catálogo.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2829,3 +2830,18 @@ waiters vacíos, seis envíos, seis recepciones exitosas y al menos una recepci�
 bloqueada durante el recorrido. Semáforos y monitores conservan su requisito de
 pares problema/solución; PMA comienza con esta solución y sumará su variante
 problemática en el siguiente ticket.
+
+## 2026-09-19 --- M13.4 parcial: carrera por observar `empty`
+
+El tema clientes/servidor ya ofrece su variante problemática. Un cliente envía
+un único pedido y dos servidores evalúan `!empty(requests)` como verdadero
+antes de recibir. El primer servidor consume el pedido y responde; el segundo
+queda bloqueado porque la observación anterior no reservó el mensaje. El estado
+terminal se diagnostica como `TERMINAL_BLOCKING` sobre `CHANNEL:requests`.
+
+La prueba compartida con la interfaz verifica que ambos servidores registraron
+la observación verdadera, que el cliente sí obtuvo la única respuesta, que el
+mailbox terminó vacío y que `Server[1]` conserva la recepción pendiente. Con la
+pareja problema/solución, el catálogo vuelve a exigir ambas variantes para
+todos sus temas. El próximo ticket incorporará soluciones PMA a problemas del
+catálogo que admiten naturalmente pasaje de mensajes.

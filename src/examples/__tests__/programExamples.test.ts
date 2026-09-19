@@ -9,7 +9,10 @@ import {
   monitorBoundedBufferExample,
   monitorBoundedBufferProblemExample,
 } from '../monitorExamples'
-import { messagePassingClientServerExample } from '../messagePassingExamples'
+import {
+  messagePassingClientServerExample,
+  messagePassingEmptyRaceProblemExample,
+} from '../messagePassingExamples'
 import { programExamples } from '../programExamples'
 import {
   candyMutualExclusionProblemExample,
@@ -44,8 +47,8 @@ function runUntilNoProgress(
 }
 
 describe('educational program catalogue', () => {
-  it('keeps unique examples and complete established topic pairs', () => {
-    expect(programExamples).toHaveLength(21)
+  it('contains a problem and solution for every topic and mechanism', () => {
+    expect(programExamples).toHaveLength(22)
     expect(new Set(
       programExamples.map((example) => example.id),
     ).size).toBe(programExamples.length)
@@ -60,11 +63,6 @@ describe('educational program catalogue', () => {
 
     for (const key of topicAndCategory) {
       const [category, topicId] = key.split(':')
-
-      if (category === 'MESSAGE_PASSING') {
-        expect(topicId).toBe('client-server')
-        continue
-      }
 
       expect(
         programExamples
@@ -85,7 +83,7 @@ describe('educational program catalogue', () => {
     )).toHaveLength(2)
     expect(programExamples.filter(
       (example) => example.category === 'MESSAGE_PASSING',
-    )).toHaveLength(1)
+    )).toHaveLength(2)
   })
 
   it('keeps every shared example executable by the real parser', () => {
@@ -244,6 +242,47 @@ describe('educational program catalogue', () => {
       (event) =>
         event.operation === 'RECEIVE'
         && event.status === 'BLOCKED',
+    )).toBe(true)
+  })
+
+  it('reproduces the stale empty observation with competing receivers', () => {
+    const engine = runUntilNoProgress(
+      messagePassingEmptyRaceProblemExample,
+    )
+    const snapshot = engine.getSnapshot()
+    const servers = snapshot.processes.filter(
+      (process) => process.id.startsWith('Server['),
+    )
+
+    expect(snapshot.executionStatus).toBe('DEADLOCK')
+    expect(snapshot.deadlock).toEqual(
+      expect.objectContaining({
+        kind: 'TERMINAL_BLOCKING',
+        involvedResources: [
+          expect.objectContaining({
+            id: 'CHANNEL:requests',
+            kind: 'CHANNEL',
+          }),
+        ],
+      }),
+    )
+    expect(servers.map(
+      (server) => server.localMemory.sawRequest,
+    )).toEqual([true, true])
+    expect(snapshot.channels.find(
+      (channel) => channel.name === 'requests',
+    )).toMatchObject({
+      messages: [],
+      waitingProcessIds: ['Server[1]'],
+    })
+    expect(snapshot.processes.find(
+      (process) => process.id === 'Client',
+    )?.localMemory.response).toBe(20)
+    expect(engine.getState().history.some(
+      (event) =>
+        event.processId === 'Server[1]'
+        && event.messagePassingEvent?.operation === 'RECEIVE'
+        && event.messagePassingEvent.status === 'BLOCKED',
     )).toBe(true)
   })
 })
