@@ -1639,8 +1639,9 @@ no bloqueante. `receive` también es ejecutable cuando hay un mensaje: retira el
 más antiguo y escribe la tupla completa de forma atómica en destinos locales.
 Un `receive` sobre un canal vacío bloquea y conserva el canal concreto elegido.
 Cuando llega un mensaje, todos los receptores compatibles vuelven a competir
-sin reserva; el scheduler determina cuál consume. Continúa pendiente evaluar
-`empty(canal)`.
+sin reserva; el scheduler determina cuál consume. `empty(canal)` y su variante
+indexada evalúan el estado instantáneo del mailbox como `bool`; no consumen ni
+reservan el mensaje observado.
 
 ------------------------------------------------------------------------
 

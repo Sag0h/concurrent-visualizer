@@ -8,14 +8,19 @@ import type { ChannelRuntimeState } from '../channels/ChannelRuntimeState'
 export function createExecutionState(
   program: Program,
 ): ExecutionState {
+  const channelStates = createChannelStates(program)
+
   return {
     program,
     stepCount: 0,
     history: [],
     analysisState:
       createInitialExecutionAnalysisState(program),
-    monitorStates: createMonitorStates(program),
-    channelStates: createChannelStates(program),
+    monitorStates: createMonitorStates(
+      program,
+      channelStates,
+    ),
+    channelStates,
   }
 }
 
@@ -40,6 +45,7 @@ function createChannelStates(
 
 function createMonitorStates(
   program: Program,
+  channelStates: Record<string, ChannelRuntimeState>,
 ): Record<string, MonitorRuntimeState> {
   return Object.fromEntries(
     Object.values(program.monitors ?? {}).map(
@@ -51,6 +57,8 @@ function createMonitorStates(
             evaluateExpression(state.initialValue, {
               localMemory: memory,
               sharedMemory: program.sharedMemory,
+              channelStates,
+              channelDefinitions: program.channels,
             }),
           )
         }

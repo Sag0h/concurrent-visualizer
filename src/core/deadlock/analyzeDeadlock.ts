@@ -108,6 +108,8 @@ function isBlockedProcessCurrentlyEnabled(
             ?? process.localMemory,
           sharedMemory:
             state.program.sharedMemory,
+          channelStates: state.channelStates,
+          channelDefinitions: state.program.channels,
         },
       ) === true
     }

@@ -425,6 +425,8 @@ export class SimulationEngine {
               this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
+            channelStates: this.state.channelStates,
+            channelDefinitions: this.state.program.channels,
           },
         )
 
@@ -480,6 +482,8 @@ export class SimulationEngine {
               this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
+            channelStates: this.state.channelStates,
+            channelDefinitions: this.state.program.channels,
           },
         )
 
@@ -528,6 +532,8 @@ export class SimulationEngine {
               this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
+            channelStates: this.state.channelStates,
+            channelDefinitions: this.state.program.channels,
           },
         )
 
@@ -565,6 +571,8 @@ export class SimulationEngine {
               this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
+            channelStates: this.state.channelStates,
+            channelDefinitions: this.state.program.channels,
           },
         )
 
@@ -617,6 +625,8 @@ export class SimulationEngine {
                 this.getActiveLocalMemory(process),
               sharedMemory:
                 this.state.program.sharedMemory,
+              channelStates: this.state.channelStates,
+              channelDefinitions: this.state.program.channels,
             },
           )
 
@@ -678,6 +688,8 @@ export class SimulationEngine {
               this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
+            channelStates: this.state.channelStates,
+            channelDefinitions: this.state.program.channels,
           },
         )
 
@@ -1490,6 +1502,8 @@ export class SimulationEngine {
           this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       },
     )
 
@@ -1557,6 +1571,8 @@ export class SimulationEngine {
         this.getActiveLocalMemory(process),
       sharedMemory:
         this.state.program.sharedMemory,
+      channelStates: this.state.channelStates,
+      channelDefinitions: this.state.program.channels,
     },
   )
 
@@ -1794,6 +1810,8 @@ export class SimulationEngine {
               this.getActiveLocalMemory(process),
             sharedMemory:
               this.state.program.sharedMemory,
+            channelStates: this.state.channelStates,
+            channelDefinitions: this.state.program.channels,
           },
         )
     }
@@ -2010,6 +2028,8 @@ export class SimulationEngine {
             this.getActiveLocalMemory(process),
           sharedMemory:
             this.state.program.sharedMemory,
+          channelStates: this.state.channelStates,
+          channelDefinitions: this.state.program.channels,
         },
       )
 
@@ -2183,6 +2203,8 @@ export class SimulationEngine {
 
           sharedMemory:
             this.state.program.sharedMemory,
+          channelStates: this.state.channelStates,
+          channelDefinitions: this.state.program.channels,
         },
       )
 
@@ -2659,6 +2681,8 @@ export class SimulationEngine {
           this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       },
     )
 
@@ -3262,6 +3286,8 @@ export class SimulationEngine {
                 this.getActiveLocalMemory(process),
               sharedMemory:
                 this.state.program.sharedMemory,
+              channelStates: this.state.channelStates,
+              channelDefinitions: this.state.program.channels,
             },
           )
 
@@ -3338,6 +3364,8 @@ export class SimulationEngine {
                 this.getActiveLocalMemory(process),
               sharedMemory:
                 this.state.program.sharedMemory,
+              channelStates: this.state.channelStates,
+              channelDefinitions: this.state.program.channels,
             },
           )
 
@@ -3589,6 +3617,8 @@ export class SimulationEngine {
           this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       },
     )
 
@@ -3754,6 +3784,8 @@ export class SimulationEngine {
               localMemory: callerMemory,
               sharedMemory:
                 this.state.program.sharedMemory,
+              channelStates: this.state.channelStates,
+              channelDefinitions: this.state.program.channels,
             },
           ),
       )
@@ -3973,6 +4005,8 @@ export class SimulationEngine {
       evaluateExpression(argument, {
         localMemory: this.getActiveLocalMemory(process),
         sharedMemory: this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       }),
     )
 
@@ -4212,6 +4246,8 @@ export class SimulationEngine {
     const index = evaluateExpression(target.index, {
       localMemory,
       sharedMemory: this.state.program.sharedMemory,
+      channelStates: this.state.channelStates,
+      channelDefinitions: this.state.program.channels,
     })
 
     if (typeof index !== 'number' || !Number.isInteger(index)) {
@@ -4788,6 +4824,8 @@ export class SimulationEngine {
           this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       },
     )
 
@@ -5394,6 +5432,8 @@ export class SimulationEngine {
         const value = evaluateExpression(argument.expression, {
           localMemory: activeMemory,
           sharedMemory: this.state.program.sharedMemory,
+          channelStates: this.state.channelStates,
+          channelDefinitions: this.state.program.channels,
         })
 
         if (!valueMatchesDeclaredType(value, parameter.declaredType)) {
@@ -5539,6 +5579,8 @@ export class SimulationEngine {
     const index = evaluateExpression(target.index, {
       localMemory,
       sharedMemory: this.state.program.sharedMemory,
+      channelStates: this.state.channelStates,
+      channelDefinitions: this.state.program.channels,
     })
 
     if (typeof index !== 'number' || !Number.isInteger(index)) {
@@ -5920,6 +5962,8 @@ export class SimulationEngine {
             this.getActiveLocalMemory(process),
           sharedMemory:
             this.state.program.sharedMemory,
+          channelStates: this.state.channelStates,
+          channelDefinitions: this.state.program.channels,
         },
       )
 
@@ -6329,6 +6373,8 @@ export class SimulationEngine {
     return evaluateExpression(expression, {
       localMemory: this.getActiveLocalMemory(process),
       sharedMemory: this.state.program.sharedMemory,
+      channelStates: this.state.channelStates,
+      channelDefinitions: this.state.program.channels,
     })
   }
 
@@ -6494,6 +6540,8 @@ export class SimulationEngine {
       {
         localMemory: this.getActiveLocalMemory(process),
         sharedMemory: this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       },
     )
 
@@ -6533,6 +6581,8 @@ export class SimulationEngine {
           this.getActiveLocalMemory(process),
         sharedMemory:
           this.state.program.sharedMemory,
+        channelStates: this.state.channelStates,
+        channelDefinitions: this.state.program.channels,
       },
     )
 

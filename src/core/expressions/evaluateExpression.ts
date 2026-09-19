@@ -97,10 +97,57 @@ export function evaluateExpression(
         : size === 0
     }
 
-    case 'CHANNEL_EMPTY':
-      throw new Error(
-        'Message passing syntax is available, but its runtime will be implemented in M13.3',
-      )
+    case 'CHANNEL_EMPTY': {
+      const definition = context.channelDefinitions?.[
+        expression.channelName
+      ]
+
+      if (!definition || !context.channelStates) {
+        throw new Error(
+          'Channel mailbox state is not available in this expression context',
+        )
+      }
+
+      let channelName = definition.name
+
+      if (expression.channelIndex) {
+        const index = evaluateExpression(
+          expression.channelIndex,
+          context,
+        )
+
+        if (
+          typeof index !== 'number'
+          || !Number.isInteger(index)
+        ) {
+          throw new Error(
+            'Channel index must evaluate to an integer',
+          )
+        }
+
+        if (
+          definition.arrayLength === undefined
+          || index < 0
+          || index >= definition.arrayLength
+        ) {
+          throw new Error(
+            `Channel index ${index} is out of bounds for "${definition.name}"`,
+          )
+        }
+
+        channelName = `${definition.name}[${index}]`
+      }
+
+      const channel = context.channelStates[channelName]
+
+      if (!channel) {
+        throw new Error(
+          `Channel "${channelName}" has no runtime state`,
+        )
+      }
+
+      return channel.messages.length === 0
+    }
     
   }
 }

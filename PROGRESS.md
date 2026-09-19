@@ -5,7 +5,7 @@
 
 ## Estado actual
 
-**Fase:** M13.3 --- Runtime de PMA.
+**Fase:** M13.4 --- Visualización y casos educativos de PMA.
 
 **Último milestone completado:** M12 --- Monitores.
 
@@ -29,9 +29,10 @@ pasos.
 PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
 `receive`, `empty(canal)` y validación estática conservadora. M13.3 ya dispone
 de estado FIFO clonable, `send` no bloqueante y `receive` atómico y bloqueante.
-Snapshots, claves semánticas, wait-for graph y BFS ya incorporan canales y
-esperas. El siguiente ticket hace ejecutable `empty(canal)` y cierra el runtime
-base de PMA antes de la visualización y los casos educativos.
+Snapshots, claves semánticas, wait-for graph y BFS incorporan canales y
+esperas. `empty(canal)` ya observa mailboxes escalares o indexados sin reserva,
+por lo que M13.3 queda completado. El siguiente ticket inicia M13.4 mostrando
+canales, mensajes pendientes y receptores en la interfaz.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2743,3 +2744,23 @@ contraejemplo mínimo de un deadlock PMA, reproduce la misma secuencia y valida
 recursos, dependencias y ciclos. Con este commit queda completo el checkpoint
 de infraestructura; resta ejecutar `empty(canal)` para cerrar el runtime base
 de M13.3.
+
+## 2026-09-19 --- M13.3 completado: `empty(canal)` ejecutable
+
+`empty(canal)` resuelve ahora el mailbox concreto dentro del contexto de
+expresiones y devuelve si su cola FIFO está vacía. Funciona como valor de una
+declaración, dentro de expresiones compuestas, argumentos de `send`, guardas de
+control y condiciones de `await`. Los índices de arrays de canales admiten la
+misma evaluación calculada o suspendible que el resto del lenguaje y validan
+tipo y rango efectivos.
+
+La consulta no modifica el canal, no emite un evento de comunicación y no
+reserva el mensaje observado. La cobertura reproduce la carrera académica en
+la que un proceso observa `!empty(canal)`, otro consume y el primero se bloquea
+al ejecutar luego `receive`. También verifica reactivación de `await`, índices
+con funciones y errores dinámicos de rango.
+
+Con mailboxes, `send`, `receive`, bloqueo/reactivación, snapshots, identidad
+semántica, deadlock, BFS y `empty` ejecutables, M13.3 queda completado. El
+siguiente frente es M13.4: visualización completa y primeros casos educativos
+de PMA.

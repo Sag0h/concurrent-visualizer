@@ -1226,7 +1226,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
 -   [x] Integrar esperas por recepción con límite de pasos, bloqueo terminal,
     wait-for graph y búsqueda BFS.
 -   [x] Agregar tests unitarios, de parser, runtime, rewind y exploración.
--   [ ] Evaluar `empty(canal)` contra el mailbox concreto sin reservar mensajes.
+-   [x] Evaluar `empty(canal)` contra el mailbox concreto sin reservar mensajes.
 
 ### M13.4 --- Visualización y casos educativos de PMA
 
@@ -1271,8 +1271,8 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     comportamiento educativo predeterminado.
 -   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
 
-**Estado:** M13.1 y M13.2 COMPLETADOS. El próximo ticket inicia M13.3 con el
-estado FIFO de canales y la primera ejecución de `send`.
+**Estado:** M13.1, M13.2 y M13.3 COMPLETADOS. El próximo ticket inicia M13.4
+con snapshots visibles de canales, mensajes y receptores bloqueados.
 
 ------------------------------------------------------------------------
 

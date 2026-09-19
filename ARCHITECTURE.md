@@ -1042,7 +1042,8 @@ los destinos se resuelven y validan sobre una copia antes de modificar la
 memoria o el mailbox. Sobre un canal vacío, `receive` bloquea y conserva el
 canal concreto. Un `send` vuelve `READY` a todos los receptores de ese canal
 sin reservar el mensaje; quien no lo obtenga puede bloquearse otra vez.
-`empty(canal)` continúa pendiente.
+`empty(canal)` resuelve el mismo estado concreto y devuelve si su cola está
+vacía. La observación no emite un evento de comunicación ni reserva mensajes.
 
 Pipeline vigente:
 

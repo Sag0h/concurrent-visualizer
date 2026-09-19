@@ -32,7 +32,8 @@ mailbox FIFO independiente por canal concreto, `send` atómico y no bloqueante,
 y `receive` atómico cuando existe un mensaje. Los payloads se copian, validan
 y escriben transaccionalmente en destinos locales. `receive` bloquea sobre un
 canal vacío y conserva la instancia concreta; un envío despierta sin reserva a
-todos los receptores compatibles. `empty(canal)` todavía no es ejecutable.
+todos los receptores compatibles. `empty(canal)` observa el mailbox concreto
+sin mutarlo ni reservar mensajes. Con esto M13.3 queda completado.
 
 Snapshots, forks, Reset, Step Back y claves semánticas incluyen mailboxes y
 esperas. El diagnóstico representa canales concretos en el wait-for graph y
@@ -860,7 +861,8 @@ En curso:
 ``` text
 M13.1 Semántica y alcance de mensajes             completado
 M13.2 Modelo, tokenizer y parser de PMA           completado
-M13.3 Runtime de PMA                              en curso
+M13.3 Runtime de PMA                              completado
+M13.4 Visualización y casos educativos de PMA     próximo
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex
