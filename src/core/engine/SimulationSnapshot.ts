@@ -11,6 +11,8 @@ import type {
 } from '../deadlock/DeadlockDiagnostic'
 import type { RuntimeDiagnostic } from '../diagnostics/RuntimeDiagnostic'
 import type { SourceRange } from '../language/SourceRange'
+import type { DeclaredValueType } from '../language/DeclaredType'
+import type { MessageEnvelope } from '../channels/ChannelRuntimeState'
 
 export interface SimulationSnapshot {
   readonly stepCount: number
@@ -21,6 +23,7 @@ export interface SimulationSnapshot {
   readonly sharedMemory: Memory
   readonly semaphores: SemaphoreSnapshot[]
   readonly monitors: MonitorSnapshot[]
+  readonly channels: ChannelSnapshot[]
   readonly processes: ProcessSnapshot[]
   readonly microOperationHistory: MicroOperationEvent[]
   readonly memoryAccessConflicts: MemoryAccessConflict[]
@@ -51,6 +54,13 @@ export interface MonitorSnapshot {
     readonly name: string
     readonly waitingProcessIds: ProcessId[]
   }>
+}
+
+export interface ChannelSnapshot {
+  readonly name: string
+  readonly payloadTypes: DeclaredValueType[]
+  readonly messages: MessageEnvelope[]
+  readonly waitingProcessIds: ProcessId[]
 }
 
 export interface MonitorCallSnapshot {

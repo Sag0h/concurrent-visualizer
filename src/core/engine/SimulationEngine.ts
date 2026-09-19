@@ -1179,6 +1179,34 @@ export class SimulationEngine {
           }),
         ),
       })),
+      channels: Object.entries(
+        this.state.channelStates,
+      ).map(([name, channel]) => {
+        const definitionName = name.includes('[')
+          ? name.slice(0, name.indexOf('['))
+          : name
+        const definition = this.getChannelDefinition(
+          definitionName,
+        )
+
+        return {
+          name,
+          payloadTypes: structuredClone(
+            definition.payloadTypes,
+          ),
+          messages: structuredClone(channel.messages),
+          waitingProcessIds:
+            this.state.program.processes
+              .filter(
+                (process) =>
+                  process.blockingReason?.type
+                    === 'CHANNEL_RECEIVE'
+                  && process.blockingReason.channelName
+                    === name,
+              )
+              .map((process) => process.id),
+        }
+      }),
       processes: this.state.program.processes.map(
         (process) => ({
           id: process.id,

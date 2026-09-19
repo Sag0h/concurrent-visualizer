@@ -29,8 +29,8 @@ pasos.
 PMA, PMS y CSP. M13.2 completó canales escalares/indexados, `chan`, `send`,
 `receive`, `empty(canal)` y validación estática conservadora. M13.3 ya dispone
 de estado FIFO clonable, `send` no bloqueante y `receive` atómico y bloqueante.
-El siguiente corte incorpora canales y esperas a snapshots, claves semánticas,
-deadlock y exploración BFS.
+Snapshots y claves semánticas ya incorporan canales y esperas. El siguiente
+corte integra wait-for graph, deadlock y exploración BFS.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2712,3 +2712,17 @@ La cobertura verifica conservación de referencias indexadas, despertar
 múltiple sin reserva, re-bloqueo y bloqueo terminal cuando ningún proceso puede
 avanzar. El siguiente checkpoint integra este estado con snapshots de canales,
 claves semánticas, wait-for graph y exploración BFS.
+
+## 2026-09-19 --- M13.3 parcial: snapshots e identidad semántica
+
+`SimulationSnapshot` expone cada canal concreto con su esquema, mensajes FIFO
+y receptores que todavía tienen una recepción pendiente. La proyección es
+independiente del estado vivo. Step Back y Reset reconstruyen los mailboxes a
+partir de la traza, mientras forks y proyecciones semánticas conservan copias
+sin referencias compartidas.
+
+Las claves semánticas y analizadas incluyen ahora `channelStates`. Dos estados
+con distinto contenido u orden de mensajes dejan de deduplicarse erróneamente
+durante BFS. La cobertura verifica snapshots desacoplados, orden FIFO,
+proyección semántica y restauración paso a paso. El próximo ticket completa el
+checkpoint con wait-for graph, diagnóstico de deadlock y exploración.

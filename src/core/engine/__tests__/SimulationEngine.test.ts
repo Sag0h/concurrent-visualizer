@@ -554,6 +554,7 @@ describe('SimulationEngine', () => {
       },
       semaphores: [],
       monitors: [],
+      channels: [],
       microOperationHistory: [],
       memoryAccessConflicts: [],
       memoryConflictSummaries: [],

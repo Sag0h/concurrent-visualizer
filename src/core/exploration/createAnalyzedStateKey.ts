@@ -9,6 +9,7 @@ export function createAnalyzedStateKey(
     semanticState: {
       program: state.program,
       monitorStates: state.monitorStates ?? {},
+      channelStates: state.channelStates,
     },
     analysisState:
       projectExplorationAnalysisState(state),

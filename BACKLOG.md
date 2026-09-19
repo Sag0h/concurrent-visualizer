@@ -1221,7 +1221,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
 -   [x] Reactivar sin reserva a los receptores compatibles cuando llega un
     mensaje; el scheduler decide cuál consume y los demás pueden volver a
     bloquearse.
--   [ ] Incorporar canales, mensajes y esperas a clones, snapshots, forks,
+-   [x] Incorporar canales, mensajes y esperas a clones, snapshots, forks,
     Reset, Step Back y claves semánticas de exploración.
 -   [ ] Integrar esperas por recepción con límite de pasos, bloqueo terminal,
     wait-for graph y búsqueda BFS.

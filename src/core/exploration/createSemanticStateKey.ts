@@ -6,6 +6,7 @@ export function createSemanticStateKey(
   return createCanonicalValueKey({
     program: state.program,
     monitorStates: state.monitorStates ?? {},
+    channelStates: state.channelStates,
   })
 }
 
