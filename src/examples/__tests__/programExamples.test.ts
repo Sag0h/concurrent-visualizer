@@ -9,6 +9,7 @@ import {
   monitorBoundedBufferExample,
   monitorBoundedBufferProblemExample,
 } from '../monitorExamples'
+import { messagePassingClientServerExample } from '../messagePassingExamples'
 import { programExamples } from '../programExamples'
 import {
   candyMutualExclusionProblemExample,
@@ -43,8 +44,8 @@ function runUntilNoProgress(
 }
 
 describe('educational program catalogue', () => {
-  it('contains a problem and solution for every topic and mechanism', () => {
-    expect(programExamples).toHaveLength(20)
+  it('keeps unique examples and complete established topic pairs', () => {
+    expect(programExamples).toHaveLength(21)
     expect(new Set(
       programExamples.map((example) => example.id),
     ).size).toBe(programExamples.length)
@@ -55,10 +56,15 @@ describe('educational program catalogue', () => {
       ),
     )
 
-    expect(topicAndCategory.size).toBe(10)
+    expect(topicAndCategory.size).toBe(11)
 
     for (const key of topicAndCategory) {
       const [category, topicId] = key.split(':')
+
+      if (category === 'MESSAGE_PASSING') {
+        expect(topicId).toBe('client-server')
+        continue
+      }
 
       expect(
         programExamples
@@ -77,6 +83,9 @@ describe('educational program catalogue', () => {
     expect(programExamples.filter(
       (example) => example.category === 'MONITORS',
     )).toHaveLength(2)
+    expect(programExamples.filter(
+      (example) => example.category === 'MESSAGE_PASSING',
+    )).toHaveLength(1)
   })
 
   it('keeps every shared example executable by the real parser', () => {
@@ -196,6 +205,45 @@ describe('educational program catalogue', () => {
     expect(engine.getState().history.some(
       (event) =>
         event.monitorConditionEvent?.status === 'SIGNALED',
+    )).toBe(true)
+  })
+
+  it('runs the finite message-passing client/server example to completion', () => {
+    const engine = runUntilNoProgress(
+      messagePassingClientServerExample,
+    )
+    const snapshot = engine.getSnapshot()
+
+    expect(snapshot.executionStatus).toBe('FINISHED')
+    expect(snapshot.processes
+      .filter((process) => process.id.startsWith('Client['))
+      .map((process) => process.localMemory.response))
+      .toEqual([20, 40, 60])
+    expect(snapshot.channels.every(
+      (channel) =>
+        channel.messages.length === 0
+        && channel.waitingProcessIds.length === 0,
+    )).toBe(true)
+
+    const messageEvents = engine.getState().history
+      .flatMap((event) =>
+        event.messagePassingEvent
+          ? [event.messagePassingEvent]
+          : [],
+      )
+
+    expect(messageEvents.filter(
+      (event) => event.operation === 'SEND',
+    )).toHaveLength(6)
+    expect(messageEvents.filter(
+      (event) =>
+        event.operation === 'RECEIVE'
+        && event.status === 'SUCCEEDED',
+    )).toHaveLength(6)
+    expect(messageEvents.some(
+      (event) =>
+        event.operation === 'RECEIVE'
+        && event.status === 'BLOCKED',
     )).toBe(true)
   })
 })

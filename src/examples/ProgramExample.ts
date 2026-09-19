@@ -3,6 +3,7 @@ import type { SchedulerType } from '../core/scheduler/SchedulerType'
 export type ProgramExampleCategory =
   | 'SEMAPHORES'
   | 'MONITORS'
+  | 'MESSAGE_PASSING'
 export type ProgramExampleVariant = 'PROBLEM' | 'SOLUTION'
 
 export interface ProgramExample {

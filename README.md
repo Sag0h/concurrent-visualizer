@@ -49,11 +49,13 @@ La tarjeta afectada señala además el movimiento proceso→mailbox o
 mailbox→proceso desde el foco del snapshot; la animación es sólo CSS, respeta
 movimiento reducido y no forma parte de la semántica.
 
-El catálogo incluye los nueve temas académicos de semáforos y el primer caso
-con monitor. Cada tema ofrece el código con un problema reproducible y su
-solución correcta. Los 20 programas comparten su pseudocódigo con las pruebas,
-seleccionan un scheduler recomendado y nunca se construyen o ejecutan
-automáticamente. El selector separa Semaphores y Monitors, mientras
+El catálogo incluye los nueve temas académicos de semáforos, el primer caso
+con monitor y un ejemplo PMA finito de tres clientes con un servidor. Los temas
+de semáforos y monitores ofrecen un problema reproducible y su solución; PMA
+comienza con la solución clientes/servidor. Los 21 programas comparten su
+pseudocódigo con las pruebas, seleccionan un scheduler recomendado y nunca se
+construyen o ejecutan
+automáticamente. El selector separa Semaphores, Monitors y Message passing;
 `topicId` relaciona las soluciones del mismo problema entre mecanismos.
 
 La simulación puede recorrerse con `Step`, completarse inmediatamente
@@ -871,7 +873,7 @@ En curso:
 M13.1 Semántica y alcance de mensajes             completado
 M13.2 Modelo, tokenizer y parser de PMA           completado
 M13.3 Runtime de PMA                              completado
-M13.4 Visualización y casos educativos de PMA     próximo
+M13.4 Visualización y casos educativos de PMA     en curso
 ```
 
 M7.6 extendió el análisis de M5 para comprender protocolos mutex

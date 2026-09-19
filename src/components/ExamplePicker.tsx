@@ -58,6 +58,11 @@ export function ExamplePicker({
           label="Monitors"
           examples={examples}
         />
+        <ExampleCategoryOptions
+          category="MESSAGE_PASSING"
+          label="Message passing"
+          examples={examples}
+        />
       </select>
 
       {selectedExample ? (
@@ -164,5 +169,7 @@ function categoryLabel(
       return 'Semaphores'
     case 'MONITORS':
       return 'Monitors'
+    case 'MESSAGE_PASSING':
+      return 'Message passing'
   }
 }

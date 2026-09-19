@@ -1236,7 +1236,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     historial.
 -   [x] Resaltar el movimiento de mensajes sin convertir la animación en
     parte de la semántica.
--   [ ] Incorporar un primer ejemplo finito de clientes y servidor con canal
+-   [x] Incorporar un primer ejemplo finito de clientes y servidor con canal
     de pedidos y array de canales de respuesta.
 -   [ ] Incorporar una variante que demuestre el peligro de `empty` con
     múltiples receptores.
@@ -1271,8 +1271,10 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     comportamiento educativo predeterminado.
 -   [ ] Explicar en la interfaz qué mecanismo está permitido y por qué.
 
-**Estado:** M13.1, M13.2 y M13.3 COMPLETADOS. El próximo ticket inicia M13.4
-con snapshots visibles de canales, mensajes y receptores bloqueados.
+**Estado:** M13.1, M13.2 y M13.3 COMPLETADOS. M13.4 EN CURSO: ya incluye
+estado e historial visibles, movimiento de mensajes y un primer ejemplo finito
+de clientes/servidor. El próximo ticket incorpora la variante peligrosa de
+`empty` con múltiples receptores.
 
 ------------------------------------------------------------------------
 

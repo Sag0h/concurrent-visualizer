@@ -35,8 +35,9 @@ por lo que M13.3 queda completado. M13.4 ya muestra canales, mensajes pendientes
 y receptores en la interfaz, además de eventos estructurados de envío,
 recepción, bloqueo y reactivación en el historial. El movimiento de mensajes se
 resalta desde el último evento proyectado en el snapshot, sin incorporarlo a la
-semántica. El siguiente ticket será el primer ejemplo finito de clientes y
-servidor.
+semántica. El primer ejemplo finito de clientes y servidor ya integra el catálogo
+y termina con tres respuestas privadas correctas; el siguiente ticket será la
+variante peligrosa de `empty`.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2812,3 +2813,19 @@ desactivarse mediante `prefers-reduced-motion` sin cambiar el resultado de la
 ejecución. La cobertura verifica los tres movimientos y la restauración del
 foco. El próximo ticket inicia los casos educativos con un ejemplo finito de
 clientes y servidor.
+
+## 2026-09-19 --- M13.4 parcial: clientes y servidor finitos
+
+El catálogo incorpora la categoría Message passing y un primer ejemplo PMA
+correcto. Tres procesos parametrizados `Client[0..2]` envían `(id, pedido)` al
+canal compartido `requests`; un servidor procesa exactamente tres pedidos y
+responde mediante `replies[id]`. El límite explícito mantiene el ejemplo finito
+y permite observar la terminación sin confundir un servidor deliberadamente
+infinito con no terminación accidental.
+
+La prueba ejecuta el mismo pseudocódigo que carga la interfaz con Round Robin.
+Verifica estado `FINISHED`, respuestas locales `20`, `40` y `60`, mailboxes y
+waiters vacíos, seis envíos, seis recepciones exitosas y al menos una recepción
+bloqueada durante el recorrido. Semáforos y monitores conservan su requisito de
+pares problema/solución; PMA comienza con esta solución y sumará su variante
+problemática en el siguiente ticket.
