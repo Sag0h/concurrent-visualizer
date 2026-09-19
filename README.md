@@ -45,6 +45,9 @@ concreto muestra su esquema, cantidad y cola de mensajes de frente a fondo,
 además de los procesos que todavía tienen una recepción pendiente. El historial
 usa los eventos estructurados del engine para mostrar `send`/`receive`, éxito o
 bloqueo, la transición del mailbox, el payload y los receptores reactivados.
+La tarjeta afectada señala además el movimiento proceso→mailbox o
+mailbox→proceso desde el foco del snapshot; la animación es sólo CSS, respeta
+movimiento reducido y no forma parte de la semántica.
 
 El catálogo incluye los nueve temas académicos de semáforos y el primer caso
 con monitor. Cada tema ofrece el código con un problema reproducible y su

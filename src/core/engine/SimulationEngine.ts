@@ -1135,6 +1135,12 @@ export class SimulationEngine {
               : {}),
             description:
               latestExecutionEvent.description,
+            messagePassingEvent:
+              latestExecutionEvent.messagePassingEvent
+                ? structuredClone(
+                    latestExecutionEvent.messagePassingEvent,
+                  )
+                : undefined,
             microOperation:
               latestMicroOperation?.step
                 === latestExecutionEvent.step

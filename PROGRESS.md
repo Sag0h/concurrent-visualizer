@@ -33,8 +33,10 @@ Snapshots, claves semánticas, wait-for graph y BFS incorporan canales y
 esperas. `empty(canal)` ya observa mailboxes escalares o indexados sin reserva,
 por lo que M13.3 queda completado. M13.4 ya muestra canales, mensajes pendientes
 y receptores en la interfaz, además de eventos estructurados de envío,
-recepción, bloqueo y reactivación en el historial. El siguiente ticket resaltará
-el movimiento de mensajes sin incorporarlo a la semántica.
+recepción, bloqueo y reactivación en el historial. El movimiento de mensajes se
+resalta desde el último evento proyectado en el snapshot, sin incorporarlo a la
+semántica. El siguiente ticket será el primer ejemplo finito de clientes y
+servidor.
 
 **Requerimiento futuro registrado:** un mismo problema del catálogo
 podrá ofrecer soluciones alternativas mediante semáforos, monitores o
@@ -2794,3 +2796,19 @@ sólo como fallback para instrucciones sin eventos especializados. La cobertura
 de render verifica envíos con múltiples receptores reactivados, recepciones
 bloqueadas y recepciones exitosas. El siguiente ticket resaltará visualmente el
 movimiento de mensajes sin convertir la animación en parte de la semántica.
+
+## 2026-09-19 --- M13.4 parcial: movimiento visual de mensajes
+
+La tarjeta del canal afectado resalta el evento del paso visible. Un envío
+presenta la dirección proceso→mailbox y anima únicamente el mensaje recién
+agregado; una recepción exitosa presenta mailbox→proceso, y una recepción sin
+mensaje comunica que el proceso quedó esperando. Los colores distinguen envío,
+recepción y bloqueo en temas claro y oscuro.
+
+El foco se proyecta desde el `messagePassingEvent` más reciente al snapshot y
+no agrega timers, reservas ni transiciones al engine. Por eso Reset, Step Back
+y replay reconstruyen la misma indicación, mientras la animación CSS puede
+desactivarse mediante `prefers-reduced-motion` sin cambiar el resultado de la
+ejecución. La cobertura verifica los tres movimientos y la restauración del
+foco. El próximo ticket inicia los casos educativos con un ejemplo finito de
+clientes y servidor.

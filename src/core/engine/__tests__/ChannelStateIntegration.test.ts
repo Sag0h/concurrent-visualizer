@@ -109,4 +109,30 @@ describe('channel state integration', () => {
     engine.stepBack()
     expect(engine.getSnapshot()).toEqual(snapshots[0])
   })
+
+  it('projects the latest channel event as reconstructible visual focus', () => {
+    const engine = createEngine(`
+      chan jobs(int);
+      process Producer { send jobs(5); }
+    `)
+
+    engine.step()
+
+    expect(engine.getSnapshot().executionFocus)
+      .toMatchObject({
+        step: 1,
+        processId: 'Producer',
+        messagePassingEvent: {
+          operation: 'SEND',
+          channelName: 'jobs',
+          status: 'SUCCEEDED',
+          messageCountBefore: 0,
+          messageCountAfter: 1,
+          values: [5],
+        },
+      })
+
+    engine.stepBack()
+    expect(engine.getSnapshot().executionFocus).toBeUndefined()
+  })
 })

@@ -1234,7 +1234,7 @@ de retorno; las colas y valores efectivos comienzan en M13.3.
     bloqueados.
 -   [x] Mostrar eventos de envío, recepción, bloqueo y reactivación en el
     historial.
--   [ ] Resaltar el movimiento de mensajes sin convertir la animación en
+-   [x] Resaltar el movimiento de mensajes sin convertir la animación en
     parte de la semántica.
 -   [ ] Incorporar un primer ejemplo finito de clientes y servidor con canal
     de pedidos y array de canales de respuesta.

@@ -1,21 +1,39 @@
 import type { ChannelSnapshot } from '../core/engine/SimulationSnapshot'
+import type { MessagePassingExecutionEvent } from '../core/engine/ExecutionEvent'
 import { formatExpression } from '../core/expressions/formatExpression'
 import { formatDeclaredValueType } from '../core/language/DeclaredTypeUtils'
+import type { ProcessId } from '../core/process/ProcessId'
+
+export interface ChannelActivity {
+  readonly step: number
+  readonly processId: ProcessId
+  readonly event: MessagePassingExecutionEvent
+}
 
 interface ChannelStatePanelProps {
   readonly channels: ChannelSnapshot[]
+  readonly activity?: ChannelActivity
 }
 
 export function ChannelStatePanel({
   channels,
+  activity,
 }: ChannelStatePanelProps) {
   return (
     <div className="channel-grid">
-      {channels.map((channel) => (
-        <article
-          className="channel-card"
-          key={channel.name}
-        >
+      {channels.map((channel) => {
+        const currentActivity =
+          activity?.event.channelName === channel.name
+            ? activity
+            : undefined
+
+        return (
+          <article
+            className={channelCardClassName(currentActivity)}
+            key={
+              `${channel.name}-${currentActivity?.step ?? 'idle'}`
+            }
+          >
           <div className="channel-header">
             <div>
               <code>{channel.name}</code>
@@ -36,6 +54,12 @@ export function ChannelStatePanel({
             </strong>
           </div>
 
+          {currentActivity && (
+            <ChannelActivityIndicator
+              activity={currentActivity}
+            />
+          )}
+
           <div className="channel-mailbox">
             <div className="channel-section-heading">
               <span>Mailbox</span>
@@ -53,7 +77,13 @@ export function ChannelStatePanel({
               >
                 {channel.messages.map((message, index) => (
                   <li
-                    className="channel-message"
+                    className={
+                      messageClassName(
+                        index,
+                        channel.messages.length,
+                        currentActivity,
+                      )
+                    }
                     key={`${channel.name}-${index}`}
                   >
                     <span className="channel-message-position">
@@ -91,10 +121,69 @@ export function ChannelStatePanel({
           <small>
             Asynchronous · send never blocks · receive waits when empty
           </small>
-        </article>
-      ))}
+          </article>
+        )
+      })}
     </div>
   )
+}
+
+function ChannelActivityIndicator({
+  activity,
+}: {
+  readonly activity: ChannelActivity
+}) {
+  const { event, processId } = activity
+  const succeeded = event.status === 'SUCCEEDED'
+  const label = event.operation === 'SEND'
+    ? 'Message sent'
+    : succeeded
+      ? 'Message received'
+      : 'Receive blocked'
+  const movement = event.operation === 'SEND'
+    ? `${processId} → mailbox`
+    : succeeded
+      ? `mailbox → ${processId}`
+      : `${processId} waiting for a message`
+
+  return (
+    <div
+      className="channel-activity"
+      aria-label={`${label}: ${movement}`}
+    >
+      <strong>{label}</strong>
+      <span>{movement}</span>
+    </div>
+  )
+}
+
+function channelCardClassName(
+  activity: ChannelActivity | undefined,
+): string {
+  if (!activity) {
+    return 'channel-card'
+  }
+
+  return [
+    'channel-card',
+    'channel-card-active',
+    `channel-card-active-${activity.event.operation.toLowerCase()}`,
+    `channel-card-active-${activity.event.status.toLowerCase()}`,
+  ].join(' ')
+}
+
+function messageClassName(
+  index: number,
+  messageCount: number,
+  activity: ChannelActivity | undefined,
+): string {
+  const isJustSent = activity?.event.operation === 'SEND'
+    && activity.event.status === 'SUCCEEDED'
+    && index === messageCount - 1
+
+  return isJustSent
+    ? 'channel-message channel-message-just-sent'
+    : 'channel-message'
 }
 
 function formatMessage(

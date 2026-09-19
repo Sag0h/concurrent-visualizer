@@ -1841,6 +1841,17 @@ function App() {
 
                   <ChannelStatePanel
                     channels={snapshot.channels}
+                    activity={
+                      snapshot.executionFocus?.messagePassingEvent
+                        ? {
+                            step: snapshot.executionFocus.step,
+                            processId:
+                              snapshot.executionFocus.processId,
+                            event:
+                              snapshot.executionFocus.messagePassingEvent,
+                          }
+                        : undefined
+                    }
                   />
                 </section>
               )}

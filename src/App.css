@@ -1538,6 +1538,54 @@ h2 {
   gap: 16px;
 }
 
+.channel-card-active-send {
+  border-color: #7566b1;
+  box-shadow: 0 0 0 3px rgb(117 102 177 / 18%);
+}
+
+.channel-card-active-receive.channel-card-active-succeeded {
+  border-color: #3d8b68;
+  box-shadow: 0 0 0 3px rgb(61 139 104 / 18%);
+}
+
+.channel-card-active-receive.channel-card-active-blocked {
+  border-color: #c97a21;
+  box-shadow: 0 0 0 3px rgb(201 122 33 / 18%);
+}
+
+.channel-activity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: #40366d;
+  background: #f1effc;
+  animation: channel-activity-arrive 420ms ease-out;
+}
+
+.channel-card-active-receive.channel-card-active-succeeded
+  .channel-activity {
+  color: #0f5132;
+  background: #d1e7dd;
+}
+
+.channel-card-active-receive.channel-card-active-blocked
+  .channel-activity {
+  color: #704b00;
+  background: #fff4df;
+}
+
+.channel-activity strong {
+  font-size: 12px;
+}
+
+.channel-activity span {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+}
+
 .channel-header,
 .channel-section-heading {
   display: flex;
@@ -1613,6 +1661,41 @@ h2 {
 .channel-message code {
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.channel-message-just-sent {
+  animation: channel-message-arrive 520ms ease-out;
+}
+
+@keyframes channel-activity-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes channel-message-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .channel-activity,
+  .channel-message-just-sent {
+    animation: none;
+  }
 }
 
 .channel-empty {
@@ -2367,6 +2450,37 @@ html[data-theme='dark'] .channel-message-position {
 html[data-theme='dark'] .channel-waiter {
   color: #f1b7b1;
   background: #4a292b;
+}
+
+html[data-theme='dark'] .channel-card-active-send {
+  border-color: #9f91dc;
+}
+
+html[data-theme='dark'] .channel-card-active-receive.channel-card-active-succeeded {
+  border-color: #67b58d;
+}
+
+html[data-theme='dark'] .channel-card-active-receive.channel-card-active-blocked {
+  border-color: #d99a4f;
+}
+
+html[data-theme='dark'] .channel-activity {
+  color: #d9d2ff;
+  background: #393252;
+}
+
+html[data-theme='dark']
+  .channel-card-active-receive.channel-card-active-succeeded
+  .channel-activity {
+  color: #a9dfc2;
+  background: #203c30;
+}
+
+html[data-theme='dark']
+  .channel-card-active-receive.channel-card-active-blocked
+  .channel-activity {
+  color: #f0c98a;
+  background: #49391f;
 }
 
 html[data-theme='dark'] .message-passing-status-blocked {

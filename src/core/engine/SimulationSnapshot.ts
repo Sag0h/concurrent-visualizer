@@ -13,6 +13,7 @@ import type { RuntimeDiagnostic } from '../diagnostics/RuntimeDiagnostic'
 import type { SourceRange } from '../language/SourceRange'
 import type { DeclaredValueType } from '../language/DeclaredType'
 import type { MessageEnvelope } from '../channels/ChannelRuntimeState'
+import type { MessagePassingExecutionEvent } from './ExecutionEvent'
 
 export interface SimulationSnapshot {
   readonly stepCount: number
@@ -37,6 +38,7 @@ export interface ExecutionFocusSnapshot {
   readonly sourceRange?: SourceRange
   readonly description?: string
   readonly microOperation?: MicroOperationEvent
+  readonly messagePassingEvent?: MessagePassingExecutionEvent
 }
 
 export interface SemaphoreSnapshot {
